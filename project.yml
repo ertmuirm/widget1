@@ -33,6 +33,9 @@ targets:
       - path: Services
         excludes:
           - "**/.DS_Store"
+      - path: Utilities
+        excludes:
+          - "**/.DS_Store"
       - path: Shared
         excludes:
           - "**/.DS_Store"
