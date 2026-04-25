@@ -178,6 +178,7 @@ struct WidgetEntryView: View {
 struct ItemView: View {
     let item: WidgetItem
     let size: WidgetSize
+    let showLabels: Bool = false
     
     private var itemSize: CGFloat {
         switch size {
