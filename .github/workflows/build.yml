@@ -30,22 +30,25 @@ jobs:
 
       - name: Package as IPA
         run: |
-          # Try local path first, then find in DerivedData
+          # Try multiple paths to find the built app
+          DD="$HOME/Library/Developer/Xcode/DerivedData/Widget-hhstiicoevshrpceguycxqigmwsr"
           ARCHIVE_PATH="./build/Widget.xarchive"
-          if [ ! -d "$ARCHIVE_PATH" ]; then
-            ARCHIVE_PATH=$(ls -d ~/Library/Developer/Xcode/DerivedData/Widget-*/Build/Intermediates.noindex/ArchiveIntermediates/Widget/*.xarchive 2>/dev/null | head -1)
+          
+          # Try InstallationBuildProductsLocation (where xcodebuild actually puts the app)
+          APP_PATH="$DD/Build/Intermediates.noindex/ArchiveIntermediates/Widget/InstallationBuildProductsLocation/Applications/Widget.app"
+          
+          if [ -d "$APP_PATH" ]; then
+            echo "Using app at: $APP_PATH"
+            mkdir -p Payload
+            cp -r "$APP_PATH" Payload/
+            chmod +x Payload/Widget.app/Widget || true
+            zip -r Widget.ipa Payload
+            ls -la Widget.ipa
+          else
+            # Fallback
+            echo "Trying alternate paths..."
+            ls -la "$DD/Build/Intermediates.noindex/ArchiveIntermediates/Widget/" || echo "Not found"
           fi
-          if [ -z "$ARCHIVE_PATH" ] || [ ! -d "$ARCHIVE_PATH" ]; then
-            ARCHIVE_PATH="$HOME/Library/Developer/Xcode/DerivedData/Widget-hhstiicoevshrpceguycxqigmwsr/Build/Intermediates.noindex/ArchiveIntermediates/Widget/Widget.xarchive"
-          fi
-          echo "Using archive: $ARCHIVE_PATH"
-          ls -la "$ARCHIVE_PATH/Products/Applications/" || ls -la "$ARCHIVE_PATH/"
-          # Create IPA
-          mkdir -p Payload
-          cp -r "$ARCHIVE_PATH/Products/Applications/Widget.app" Payload/
-          chmod +x Payload/Widget.app/Widget || true
-          zip -r Widget.ipa Payload
-          ls -la Widget.ipa
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
