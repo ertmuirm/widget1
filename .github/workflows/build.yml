@@ -30,22 +30,17 @@ jobs:
 
       - name: Package as IPA
         run: |
-          # xcodebuild archive creates an .xcarchive with the app inside
-          # Try multiple possible archive locations
+          DD="$HOME/Library/Developer/Xcode/DerivedData/Widget-hhstiicoevshrpceguycxqigmwsr"
           
-          # First try the local build path
-          ARCHIVE="./build/Widget.xarchive"
-          if [ -d "$ARCHIVE/Products/Applications/Widget.app" ]; then
-            APP_PATH="$ARCHIVE/Products/Applications/Widget.app"
-          # Then try DerivedData
-          elif [ -d "$HOME/Library/Developer/Xcode/DerivedData/Widget-hhstiicoevshrpceguycxqigmwsr/Build/Intermediates.noindex/ArchiveIntermediates/Widget/Widget.xarchive/Products/Applications/Widget.app" ]; then
-            APP_PATH="$HOME/Library/Developer/Xcode/DerivedData/Widget-hhstiicoevshrpceguycxqigmwsr/Build/Intermediates.noindex/ArchiveIntermediates/Widget/Widget.xarchive/Products/Applications/Widget.app"
-          # Search for most recent archive
+          # Multiple possible locations for the built app
+          if [ -d "$DD/Build/Intermediates.noindex/ArchiveIntermediates/Widget/BuildProductsPath/Release-iphoneos/Widget.app" ]; then
+            APP_PATH="$DD/Build/Intermediates.noindex/ArchiveIntermediates/Widget/BuildProductsPath/Release-iphoneos/Widget.app"
+          elif [ -d "$DD/Build/Intermediates.noindex/ArchiveIntermediates/Widget/InstallationBuildProductsLocation/Applications/Widget.app" ]; then
+            APP_PATH="$DD/Build/Intermediates.noindex/ArchiveIntermediates/Widget/InstallationBuildProductsLocation/Applications/Widget.app"
+          elif [ -d "./build/Widget.xarchive/Products/Applications/Widget.app" ]; then
+            APP_PATH="./build/Widget.xarchive/Products/Applications/Widget.app"
           else
-            RECENT=$(find "$HOME/Library/Developer/Xcode/DerivedData" -name "Widget.xarchive" -type d 2>/dev/null | head -1)
-            if [ -d "$RECENT/Products/Applications/Widget.app" ]; then
-              APP_PATH="$RECENT/Products/Applications/Widget.app"
-            fi
+            APP_PATH=""
           fi
           
           if [ -n "$APP_PATH" ] && [ -d "$APP_PATH" ]; then
@@ -59,8 +54,7 @@ jobs:
             ls -la Widget.ipa
           else
             echo "ERROR: Widget.app not found"
-            find "$HOME/Library/Developer/Xcode/DerivedData" -name "Widget.app" 2>/dev/null | head -3
-            find "$HOME/Library/Developer/Xcode/DerivedData" -name "Widget.xarchive" 2>/dev/null | head -3
+            find "$DD" -name "Widget.app" 2>/dev/null | head -5
             exit 1
           fi
 
