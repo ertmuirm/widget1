@@ -31,8 +31,15 @@ struct WidgetListView: View {
             }
             
             ToolbarItem(placement: .secondaryAction) {
-                NavigationLink(destination: BackupView()) {
-                    Image(systemName: "icloud.and.arrow.up")
+                Menu {
+                    NavigationLink(destination: SettingsView()) {
+                        Label("Settings", systemImage: "gearshape")
+                    }
+                    NavigationLink(destination: BackupView()) {
+                        Label("Backup", systemImage: "icloud.and.arrow.up")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
