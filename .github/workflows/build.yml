@@ -19,23 +19,36 @@ jobs:
 
       - name: Build and Package IPA
         run: |
-          # Build AND force archive to local folder
+          # Build - xcodebuild archive uses default DerivedData location
           xcodebuild archive -scheme Widget -configuration Release \
             -archivePath ./build/Widget.xarchive \
-            -derivedDataPath ./derived \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
           
-          # Now copy app from derived  
-          echo "=== Finding built app ==="
-          find ./derived -name "Widget.app" -type d 2>/dev/null | head -3
+          # Find the archive in DerivedData
+          echo "=== Locating archive ==="
+          ARCHIVE_PATH=$(find ~/Library/Developer/Xcode/DerivedData -name "Widget.xarchive" -type d 2>/dev/null | head -1)
           
-          APP=$(find ./derived -name "Widget.app" -type d 2>/dev/null | head -1)
-          if [ -n "$APP" ] && [ -d "$APP" ]; then
-            mkdir -p Payload
-            cp -r "$APP" Payload/
-            zip -r Widget.ipa Payload 
+          if [ -n "$ARCHIVE_PATH" ]; then
+            echo "Archive at: $ARCHIVE_PATH"
+            # Check for app in Products/Applications
+            if [ -d "$ARCHIVE_PATH/Products/Applications/Widget.app" ]; then
+              mkdir -p Payload
+              cp -r "$ARCHIVE_PATH/Products/Applications/Widget.app" Payload/
+              zip -r Widget.ipa Payload
+              echo "IPA created"
+            else
+              # Try BuildProductsPath
+              find "$ARCHIVE_PATH" -name "Widget.app" -type d | head -1 | xargs -I{} cp -r "{}" Payload/ 2>/dev/null
+              zip -r Widget.ipa Payload
+            fi
+          else
+            echo "Archive not found"
+            exit 1
+          fi
+          
+          ls -la *.ipa 
     
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
