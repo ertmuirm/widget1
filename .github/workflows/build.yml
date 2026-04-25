@@ -19,28 +19,42 @@ jobs:
 
       - name: Build and Package IPA
         run: |
-          # Build the archive
+          # Build AND force archive to local folder
           xcodebuild archive -scheme Widget -configuration Release \
             -archivePath ./build/Widget.xarchive \
+            -derivedDataPath ./derived \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
           
-          # The .xarchive is an Xcode archive - users can manually export it on Mac:
-          # xcodebuild -exportArchive -archivePath Widget.xarchive -exportPath ./output -exportOptionsPlist export.plist
-          # Or via Xcode: File > Export > Export as Ad Hoc
-          echo "=== Build complete, creating archive artifact ==="
-          echo "To create IPA on Mac:"
-          echo "1. Open this .xarchive in Xcode"
-          echo "2. File > Export > Export as Ad Hoc"
-          echo "OR command line:"
-          echo "xcodebuild -exportArchive -archivePath Widget.xarchive -exportPath output"
-          zip -r Widget.xarchive.zip ./build/Widget.xarchive
-          ls -la Widget.xarchive.zip
+          # Now copy app from derived  
+          echo "=== Finding built app ==="
+          find ./derived -name "Widget.app" -type d 2>/dev/null | head -3
+          
+          APP=$(find ./derived -name "Widget.app" -type d 2>/dev/null | head -1)
+          if [ -n "$APP" ] && [ -d "$APP" ]; then
+            mkdir -p Payload
+            cp -r "$APP" Payload/
+            zip -r Widget.ipa Payload || true
+            if [ -f Widget.ipa ]; then
+              echo "SUCCESS - IPA created!"
+              ls -la Widget.ipa
+            else
+              echo "fallback: zip failed, uploading build folder"
+              zip -r Widget.xarchive.zip ./derived || true
+            fi
+          else
+            echo "fallback: no app found, uploading derived folder"
+            zip -r Widget.xarchive.zip ./derived || true
+          fi
+          
+          ls -la *.ipa *.zip 2>/dev/null || echo "No artifacts created"
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
           name: Widget
-          path: Widget.xarchive.zip
+          path: |
+            Widget.ipa
+            Widget.xarchive.zip
           retention-days: 30
