@@ -19,32 +19,31 @@ jobs:
 
       - name: Build and Package IPA
         run: |
-          # Build the archive
+          # Build the archive - note the exact DerivedData path
+          DD_BASE="Widget-hhstiicoevshrpceguycxqigmwsr"
           xcodebuild archive -scheme Widget -configuration Release \
             -archivePath ./build/Widget.xarchive \
+            -derivedDataPath "$HOME/Library/Developer/Xcode/DerivedData/$DD_BASE" \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
           
-          # Look for the app in the working DerivedData
-          WORK_DIR="$HOME/work/widget1/widget1"
-          SOURCE_DIR="$HOME/Library/Developer/Xcode/DerivedData"
+          # Use exact path from build log
+          DD="$HOME/Library/Developer/Xcode/DerivedData/$DD_BASE"
+          APP_PATH="$DD/Build/Intermediates.noindex/ArchiveIntermediates/Widget/InstallationBuildProductsLocation/Applications/Widget.app"
           
-          # Find Widget.app that was just built
-          echo "=== Finding built app ==="
-          find "$SOURCE_DIR" -name "Widget.app" -type d 2>/dev/null | head -3
+          echo "=== Looking for app at: $APP_PATH ==="
+          ls -la "$APP_PATH"
           
-          # Use last resort: copy from derived data 
-          APK=$(find "$SOURCE_DIR" -name "Widget.app" -type d 2>/dev/null | head -1)
-          
-          if [ -n "$APK" ] && [ -d "$APK" ]; then
+          if [ -d "$APP_PATH" ]; then
             mkdir -p Payload
-            cp -r "$APK" Payload/
+            cp -r "$APP_PATH" Payload/
             zip -r Widget.ipa Payload
-            echo "IPA created successfully"
+            echo "IPA created"
             ls -la Widget.ipa
           else
-            echo "ERROR: Widget.app not found"
+            echo "ERROR: Not found"
+            ls -la "$DD" 2>/dev/null
             exit 1
           fi
 
