@@ -11,30 +11,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Cache XcodeGen
-        id: cache-xcodegen
-        uses: actions/cache@v4
-        with:
-          path: ~/xcodegen
-          key: xcodegen-v1.13.4
-
       - name: Install XcodeGen
-        if: steps.cache-xcodegen.outputs.cache-hit != 'true'
-        run: |
-          curl -sL https://github.com/nicklockwood/XcodeGen/releases/download/v1.13.4/xcodegen-v1.13.4-macos-universal.tar.gz | tar -xz
-          mv xcodegen ~/xcodegen
-          chmod +x ~/xcodegen
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: brew install xcodegen
 
       - name: Generate Xcode project
-        run: ~/xcodegen generate
-        
+        run: xcodegen generate
+
       - name: Verify extension in build
         run: |
           ls -la ./build/Widget.xarchive/Products/Applications/Widget.app/
           ls -la ./build/Widget.xarchive/Products/Applications/Widget.app/PlugIns/ 2>/dev/null || echo "⚠️ Extension not found in PlugIns"
-        
+
       - name: Build (unsigned)
         run: |
           xcodebuild archive -scheme Widget -configuration Release \
