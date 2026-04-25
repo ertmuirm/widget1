@@ -1,0 +1,42 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          
+      - name: Install dependencies
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+        
+      - name: Build (unsigned)
+        run: |
+          xcodebuild archive -scheme Widget -configuration Release -archivePath ./build/Widget.xarchive CODE_SIGNING_ALLOWED=NO \
+
+      - name: Package as IPA
+        run: |
+          mkdir -p Payload
+          cp -r ./build/Widget.xarchive/Products/Applications/Widget.app Payload/
+          chmod +x Payload/Widget.app/Widget
+          zip -r Widget.ipa Payload
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Widget
+          path: Widget.ipa
+          retention-days: 30
