@@ -1,11 +1,10 @@
 import WidgetKit
 import SwiftUI
 import AppIntents
-import AppIntentsUI
 
-// MARK: - Widget Configuration Intent
+// MARK: - Widget Selection Intent
 
-struct WidgetConfigurationIntent: WidgetConfigurationIntent {
+struct SelectWidgetIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Select Widget"
     static var description = IntentDescription("Select which widget to display")
     
@@ -37,7 +36,7 @@ struct BroadcastWidget: Widget {
     let kind: String = "BroadcastExtension"
 
     var body: some WidgetConfiguration {
-        AppIntentConfiguration(kind: kind, intent: WidgetConfigurationIntent.self, provider: Provider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: SelectWidgetIntent.self, provider: Provider()) { entry in
             WidgetEntryView(entry: entry)
         }
         .configurationDisplayName("Widget")
@@ -50,18 +49,18 @@ struct BroadcastWidget: Widget {
 
 struct Provider: AppIntentTimelineProvider {
     typealias Entry = WidgetEntry
-    typealias Intent = WidgetConfigurationIntent
+    typealias Intent = SelectWidgetIntent
     
     func placeholder(in context: Context) -> WidgetEntry {
         WidgetEntry(date: Date(), configuration: WidgetConfig.defaultConfiguration)
     }
     
-    func snapshot(for configuration: WidgetConfigurationIntent, in context: Context) async -> WidgetEntry {
+    func snapshot(for configuration: SelectWidgetIntent, in context: Context) async -> WidgetEntry {
         let config = loadConfiguration(name: configuration.widgetName)
         return WidgetEntry(date: Date(), configuration: config ?? WidgetConfig.defaultConfiguration)
     }
     
-    func timeline(for configuration: WidgetConfigurationIntent, in context: Context) async -> Timeline<WidgetEntry> {
+    func timeline(for configuration: SelectWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
         let config = loadConfiguration(name: configuration.widgetName)
         let entry = WidgetEntry(date: Date(), configuration: config ?? WidgetConfig.defaultConfiguration)
         return Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
