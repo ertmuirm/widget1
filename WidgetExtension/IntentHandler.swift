@@ -25,29 +25,17 @@ struct WidgetActionIntent: AppIntent {
         self.payload = payload
     }
     
-    func perform() async throws -> IntentResult {
+    func perform() async throws -> some IntentResult & ProvidesDialog {
         switch actionType {
         case "urlScheme":
-            return await performURLScheme()
+            return .result(dialog: "Opening: \(payload)")
         case "appIntent":
-            return await performAppIntent()
+            return .result(dialog: "Running: \(payload)")
         case "shortcut":
-            return await performShortcut()
+            return .result(dialog: "Shortcut: \(payload)")
         default:
-            return .result()
+            return .result(dialog: "Unknown action")
         }
-    }
-    
-    private func performURLScheme() async -> IntentResult {
-        return .result()
-    }
-    
-    private func performAppIntent() async -> IntentResult {
-        return .result()
-    }
-    
-    private func performShortcut() async -> IntentResult {
-        return .result()
     }
 }
 
