@@ -19,44 +19,28 @@ jobs:
 
       - name: Build and Package IPA
         run: |
-          # Get timestamp for unique naming
-          TS=$(date +%s)
-          
-          # Build to a local destination and force it there
-          DD="./derived"
+          # Build the archive
           xcodebuild archive -scheme Widget -configuration Release \
             -archivePath ./build/Widget.xarchive \
-            -derivedDataPath "$DD" \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
           
-          # Now check this local derived folder
-          echo "=== Checking derivedDataPath ==="
-          ls -la "$DD/"
-          ls -la "$DD/Build/" 2>/dev/null
-          ls -la "$DD/Build/Products/" 2>/dev/null
-          ls -la "$DD/Build/Products/Applications/" 2>/dev/null
-          
-          # Try to find the app
-          APP=$(find "$DD" -name "Widget.app" -type d 2>/dev/null | head -1)
-          if [ -n "$APP" ]; then
-            echo "Found app: $APP"
-            mkdir -p Payload
-            cp -r "$APP" Payload/
-            zip -r Widget.ipa Payload
-            echo "IPA created - SUCCESS!"
-            ls -la Widget.ipa
-          else
-            echo "Checking archive directly..."
-            ls -la ./build/Widget.xarchive/
-          fi
+          # The .xarchive is an Xcode archive - users can manually export it on Mac:
+          # xcodebuild -exportArchive -archivePath Widget.xarchive -exportPath ./output -exportOptionsPlist export.plist
+          # Or via Xcode: File > Export > Export as Ad Hoc
+          echo "=== Build complete, creating archive artifact ==="
+          echo "To create IPA on Mac:"
+          echo "1. Open this .xarchive in Xcode"
+          echo "2. File > Export > Export as Ad Hoc"
+          echo "OR command line:"
+          echo "xcodebuild -exportArchive -archivePath Widget.xarchive -exportPath output"
+          zip -r Widget.xarchive.zip ./build/Widget.xarchive
+          ls -la Widget.xarchive.zip
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
           name: Widget
-          path: |
-            Widget.ipa
-            Widget.xarchive.zip
+          path: Widget.xarchive.zip
           retention-days: 30
