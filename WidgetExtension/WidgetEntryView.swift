@@ -126,7 +126,7 @@ struct WidgetEntryView: View {
     @ViewBuilder
     private var smallWidget: some View {
         if let item = entry.configuration.items.first {
-            ItemView(item: item, size: .systemSmall)
+            ItemView(item: item, size: .systemSmall, showLabels: config.showItemLabels)
         }
     }
     
@@ -138,7 +138,7 @@ struct WidgetEntryView: View {
         
         LazyVGrid(columns: columns, spacing: 2) {
             ForEach(Array(entry.configuration.items.prefix(9).enumerated()), id: \.element.id) { _, item in
-                ItemView(item: item, size: .systemMedium)
+                ItemView(item: item, size: .systemMedium, showLabels: config.showItemLabels)
             }
         }
         .padding(4)
@@ -152,7 +152,7 @@ struct WidgetEntryView: View {
         
         LazyVGrid(columns: columns, spacing: 2) {
             ForEach(Array(entry.configuration.items.prefix(18).enumerated()), id: \.element.id) { _, item in
-                ItemView(item: item, size: .systemLarge)
+                ItemView(item: item, size: .systemLarge, showLabels: config.showItemLabels)
             }
         }
         .padding(4)
@@ -166,7 +166,7 @@ struct WidgetEntryView: View {
         
         LazyVGrid(columns: columns, spacing: 2) {
             ForEach(Array(entry.configuration.items.prefix(36).enumerated()), id: \.element.id) { _, item in
-                ItemView(item: item, size: .systemExtraLarge)
+                ItemView(item: item, size: .systemExtraLarge, showLabels: config.showItemLabels)
             }
         }
         .padding(4)

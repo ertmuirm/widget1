@@ -27,10 +27,28 @@ struct WidgetOptionsProvider: DynamicOptionsProvider {
     }
     
     private func loadConfigs() -> [WidgetConfig] {
-        guard let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.iosmirror")?.appendingPathComponent("configurations.json"),
-              let data = try? Data(contentsOf: url),
-              let configs = try? JSONDecoder().decode([WidgetConfig].self, from: data) else { return [] }
-        return configs
+        // Try UserDefaults first (synced from main app)
+        if let defaults = UserDefaults(suiteName: "group.com.iosmirror"),
+           let data = defaults.data(forKey: "widgetConfigurations") {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            if let configs = try? decoder.decode([WidgetConfig].self, from: data) {
+                return configs
+            }
+        }
+        
+        // Fallback: try file
+        if let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.iosmirror")?.appendingPathComponent("configurations.json"),
+           FileManager.default.fileExists(atPath: url.path),
+           let data = try? Data(contentsOf: url) {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            if let configs = try? decoder.decode([WidgetConfig].self, from: data) {
+                return configs
+            }
+        }
+        
+        return []
     }
 }
 
