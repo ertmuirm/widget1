@@ -31,15 +31,14 @@ struct WidgetListView: View {
             }
             
             ToolbarItem(placement: .secondaryAction) {
-                Menu {
-                    NavigationLink(destination: SettingsView()) {
-                        Label("Settings", systemImage: "gearshape")
-                    }
-                    NavigationLink(destination: BackupView()) {
-                        Label("Backup", systemImage: "icloud.and.arrow.up")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
+                NavigationLink(destination: BackupView()) {
+                    Label("Backup", systemImage: "icloud.and.arrow.up")
+                }
+            }
+            
+            ToolbarItem(placement: .secondaryAction) {
+                NavigationLink(destination: SettingsView()) {
+                    Label("Settings", systemImage: "gearshape")
                 }
             }
         }
