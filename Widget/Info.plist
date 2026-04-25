@@ -20,6 +20,8 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>CFBundleMinimumOSVersion</key>
+	<string>17.0</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>
@@ -29,7 +31,7 @@
 	</dict>
 	<key>UILaunchScreen</key>
 	<dict>
-		<key> UIColorName</key>
+		<key>UIColorName</key>
 		<string>LaunchBackground</string>
 	</dict>
 	<key>UIRequiredDeviceCapabilities</key>
