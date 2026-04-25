@@ -36,9 +36,18 @@ jobs:
       - name: Generate Xcode project
         run: ~/xcodegen generate
         
+      - name: Verify extension in build
+        run: |
+          ls -la ./build/Widget.xarchive/Products/Applications/Widget.app/
+          ls -la ./build/Widget.xarchive/Products/Applications/Widget.app/PlugIns/ 2>/dev/null || echo "⚠️ Extension not found in PlugIns"
+        
       - name: Build (unsigned)
         run: |
-          xcodebuild archive -scheme Widget -configuration Release -archivePath ./build/Widget.xarchive CODE_SIGNING_ALLOWED=NO
+          xcodebuild archive -scheme Widget -configuration Release \
+            -archivePath ./build/Widget.xarchive \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
 
       - name: Package as IPA
         run: |
