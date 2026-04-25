@@ -13,11 +13,11 @@ struct BackupView: View {
     @State private var errorMessage: String?
     @State private var showError = false
     @State private var importingData: Data?
+    @State private var pendingImportURL: URL?
 
     var body: some View {
         List {
             Section {
-                // Export button
                 Button {
                     exportConfigurations()
                 } label: {
@@ -26,7 +26,6 @@ struct BackupView: View {
                 .foregroundStyle(.white)
                 .disabled(isExporting || viewModel.configurations.isEmpty)
 
-                // Import button
                 Button {
                     showImportPicker = true
                 } label: {
@@ -115,17 +114,18 @@ struct BackupView: View {
         case .success(let urls):
             guard let url = urls.first else { return }
             
-            // Start accessing security-scoped resource
-            let didStartAccessing = url.startAccessingSecurityScopedResource()
-            
-            defer {
-                if didStartAccessing {
-                    url.stopAccessingSecurityScopedResource()
-                }
-            }
-
+            // Store URL and request permission through fileImporter already handled
+            // The fileImporter presents the system picker and handles security-scoped access
             Task {
                 do {
+                    // fileImporter already grants access when user selects file
+                    let accessing = url.startAccessingSecurityScopedResource()
+                    defer {
+                        if accessing {
+                            url.stopAccessingSecurityScopedResource()
+                        }
+                    }
+                    
                     let data = try Data(contentsOf: url)
                     try viewModel.importFromJSON(data)
                 } catch {
