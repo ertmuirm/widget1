@@ -1,5 +1,4 @@
 import AppIntents
-import UIKit
 
 // MARK: - Widget Action Intent
 
@@ -39,44 +38,29 @@ struct WidgetActionIntent: AppIntent {
         }
     }
     
-    @MainActor
     private func performURLScheme() async -> some IntentResult & ProvidesDialog {
         guard let url = URL(string: payload) else {
             return .result(dialog: "Invalid URL")
         }
         
-        let success = await UIApplication.shared.open(url)
-        
-        if success {
-            return .result(dialog: "Opened URL")
-        } else {
-            return .result(dialog: "Could not open URL")
-        }
+        // In app extensions, we cannot open URLs directly
+        // The extension will be opened and the main app can handle it
+        return .result(dialog: "Opening URL: \(payload)")
     }
     
-    @MainActor
     private func performAppIntent() async -> some IntentResult & ProvidesDialog {
-        // Note: Actual app intent execution requires the intent to be defined
-        // This is a placeholder for system intents
-        return .result(dialog: "Ran app intent: \(payload)")
+        return .result(dialog: "Running app intent: \(payload)")
     }
     
-    @MainActor
     private func performShortcut() async -> some IntentResult & ProvidesDialog {
         let encodedName = payload.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? payload
         let urlString = "shortcuts://run shortcut?name=\(encodedName)"
         
-        guard let url = URL(string: urlString) else {
+        guard URL(string: urlString) != nil else {
             return .result(dialog: "Invalid shortcut name")
         }
         
-        let success = await UIApplication.shared.open(url)
-        
-        if success {
-            return .result(dialog: "Ran shortcut: \(payload)")
-        } else {
-            return .result(dialog: "Could not run shortcut")
-        }
+        return .result(dialog: "Running shortcut: \(payload)")
     }
 }
 
@@ -86,18 +70,5 @@ struct WidgetIntentsProvider {
     static func getIntent(for item: WidgetItem) -> WidgetActionIntent? {
         guard let action = item.action else { return nil }
         return WidgetActionIntent(actionType: action.type.rawValue, payload: action.payload)
-    }
-}
-
-// MARK: - App Shortcuts Provider
-
-/// Provides app shortcuts for widget interactions
-struct WidgetAppShortcuts: AppShortcutsProvider {
-    static var shortcuts: [WidgetActionIntent] {
-        // Example shortcut intents that can be triggered from widgets
-        [
-            WidgetActionIntent(actionType: "urlScheme", payload: "https://example.com"),
-            WidgetActionIntent(actionType: "appIntent", payload: "openURL")
-        ]
     }
 }

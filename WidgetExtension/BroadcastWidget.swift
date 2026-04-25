@@ -28,52 +28,30 @@ struct BroadcastWidget: Widget {
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> WidgetEntry {
-        WidgetEntry(date: Date(), configuration: placeholderConfiguration())
+        WidgetEntry(date: Date(), configuration: WidgetConfiguration.defaultConfiguration)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (WidgetEntry) -> Void) {
-        let entry = WidgetEntry(date: Date(), configuration: placeholderConfiguration())
+        let entry = WidgetEntry(date: Date(), configuration: WidgetConfiguration.defaultConfiguration)
         completion(entry)
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<WidgetEntry>) -> Void) {
         let configurations = loadConfigurations()
         
-        // Create timeline entries for each configuration
-        var entries: [WidgetEntry] = []
-        
         if configurations.isEmpty {
-            // No configurations - show placeholder
-            let entry = WidgetEntry(date: Date(), configuration: placeholderConfiguration())
-            entries.append(entry)
+            let entry = WidgetEntry(date: Date(), configuration: WidgetConfiguration.defaultConfiguration)
+            let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
+            completion(timeline)
         } else {
-            // Add entries for each configuration
+            var entries: [WidgetEntry] = []
             for config in configurations {
                 let entry = WidgetEntry(date: Date(), configuration: config)
                 entries.append(entry)
             }
+            let timeline = Timeline(entries: entries, policy: .after(Date().addingTimeInterval(3600)))
+            completion(timeline)
         }
-        
-        // Refresh every hour
-        let refreshDate = Date().addingTimeInterval(3600)
-        let timeline = Timeline(entries: entries, policy: .after(refreshDate))
-        completion(timeline)
-    }
-    
-    private func placeholderConfiguration() -> WidgetConfiguration {
-        WidgetConfiguration(
-            name: "Sample Widget",
-            size: .systemMedium,
-            items: [
-                WidgetItem(
-                    displayType: .icon,
-                    sfSymbolName: "star.fill",
-                    foregroundColor: CodableColor(.white),
-                    backgroundColor: CodableColor(.clear)
-                )
-            ],
-            backgroundColor: CodableColor(.black)
-        )
     }
     
     private func loadConfigurations() -> [WidgetConfiguration] {

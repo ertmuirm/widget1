@@ -100,7 +100,10 @@ struct WidgetEntryView: View {
     private var accessoryInlineWidget: some View {
         if let item = entry.configuration.items.first {
             if item.displayType == .icon, let symbolName = item.sfSymbolName {
-                Image(systemName: symbolName) + Text(" \(item.customText ?? "")")
+                HStack(spacing: 2) {
+                    Image(systemName: symbolName)
+                    Text(item.customText ?? "")
+                }
             } else {
                 Text(item.customText ?? "")
             }

@@ -87,6 +87,27 @@ struct WidgetConfiguration: Codable, Identifiable, Equatable {
         self.updatedAt = updatedAt
     }
     
+    /// Default configuration for placeholder
+    static let defaultConfiguration = WidgetConfiguration(
+        name: "My Widget",
+        size: .systemSmall,
+        items: [
+            WidgetItem(
+                id: UUID(),
+                displayType: .icon,
+                sfSymbolName: "star.fill",
+                customText: nil,
+                fontSize: 14,
+                foregroundColor: CodableColor.white,
+                backgroundColor: CodableColor.clear,
+                backgroundOpacity: 1.0,
+                action: nil
+            )
+        ],
+        backgroundColor: CodableColor.black,
+        backgroundOpacity: 1.0
+    )
+    
     /// Computed property for max items based on widget size
     var maxItems: Int {
         size.maxItems
