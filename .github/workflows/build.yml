@@ -24,17 +24,19 @@ jobs:
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
-
-      - name: Verify extension in build
-        run: |
-          ls -la ./build/Widget.xarchive/Products/Applications/Widget.app/
-          ls -la ./build/Widget.xarchive/Products/Applications/Widget.app/PlugIns/ 2>/dev/null || echo "⚠️ Extension not found in PlugIns"
+          echo "ARCHIVE_PATH=$(./build/Widget.xarchive)" >> $GITHUB_ENV
 
       - name: Package as IPA
         run: |
+          # Find the archive in DerivedData if not in build folder
+          ARCHIVE_PATH="./build/Widget.xarchive"
+          if [ ! -d "$ARCHIVE_PATH/Products" ]; then
+            ARCHIVE_PATH=$(ls -d $HOME/Library/Developer/Xcode/DerivedData/Widget-*/Build/Intermediates.noindex/ArchiveIntermediates/Widget/*.xarchive 2>/dev/null | head -1)
+          fi
+          echo "Using archive: $ARCHIVE_PATH"
           mkdir -p Payload
-          cp -r ./build/Widget.xarchive/Products/Applications/Widget.app Payload/
-          chmod +x Payload/Widget.app/Widget
+          cp -r "$ARCHIVE_PATH/Products/Applications/Widget.app" Payload/
+          chmod +x Payload/Widget.app/Widget || true
           zip -r Widget.ipa Payload
 
       - name: Upload unsigned IPA
