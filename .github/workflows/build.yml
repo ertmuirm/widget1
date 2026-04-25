@@ -19,28 +19,32 @@ jobs:
 
       - name: Build and Package IPA
         run: |
-          # Build to local derivedDataPath
-          mkdir -p ./derived
+          # Build WITHOUT derivedDataPath - use xcode default
           xcodebuild archive -scheme Widget -configuration Release \
             -archivePath ./build/Widget.xarchive \
-            -derivedDataPath ./derived \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
           
-          # Copy immediately from local derived
-          DD="./derived"
-          APP="$DD/Build/Intermediates.noindex/ArchiveIntermediates/Widget/InstallationBuildProductsLocation/Applications/Widget.app"
+          # Find the archive in ~/Library/Developer/Xcode/DerivedData
+          DD="$HOME/Library/Developer/Xcode/DerivedData"
+          ARCHIVE_DIR=$(ls -dt "$DD"/Widget-*/ 2>/dev/null | head -1)
           
-          echo "=== Checking: $APP ==="
-          ls -la "$APP"
+          echo "Archive dir: $ARCHIVE_DIR"
+          ls -la "$ARCHIVE_DIR"
           
-          rm -rf Payload
-          mkdir -p Payload
-          cp -R "$APP" Payload/Widget.app
+          # The archive has Products in it
+          ls -la "$ARCHIVE_DIR/Build/Products/" 2>/dev/null || echo "No Products"
+          ls -la "$ARCHIVE_DIR/Build/Intermediates.noindex/ArchiveIntermediates/Widget/" 2>/dev/null || echo "No ArchiveIntermediates"
+          
+          # Copy app from whichever location exists
+          if [ -d "$ARCHIVE_DIR/Build/Products/Applications/Widget.app" ]; then
+            cp -R "$ARCHIVE_DIR/Build/Products/Applications/Widget.app" Payload/
+          elif [ -d "$ARCHIVE_DIR/Build/Intermediates.noindex/ArchiveIntermediates/Widget/InstallationBuildProductsLocation/Applications/Widget.app" ]; then
+            cp -R "$ARCHIVE_DIR/Build/Intermediates.noindex/ArchiveIntermediates/Widget/InstallationBuildProductsLocation/Applications/Widget.app" Payload/
+          fi
+          
           cd Payload && zip -r ../Widget.ipa . && cd ..
-          echo "Done!"
-          
           ls -la *.ipa 
     
       - name: Upload unsigned IPA
