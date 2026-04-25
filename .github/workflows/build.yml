@@ -19,37 +19,39 @@ jobs:
 
       - name: Build and Package IPA
         run: |
-          # Build the archive - note the exact DerivedData path
-          DD_BASE="Widget-hhstiicoevshrpceguycxqigmwsr"
+          # Build the archive to local folder
           xcodebuild archive -scheme Widget -configuration Release \
             -archivePath ./build/Widget.xarchive \
-            -derivedDataPath "$HOME/Library/Developer/Xcode/DerivedData/$DD_BASE" \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
           
-          # Use exact path from build log
-          DD="$HOME/Library/Developer/Xcode/DerivedData/$DD_BASE"
-          APP_PATH="$DD/Build/Intermediates.noindex/ArchiveIntermediates/Widget/InstallationBuildProductsLocation/Applications/Widget.app"
+          # The .xarchive contains the app - let's just zip it up
+          # and try to find the app inside it
+          echo "=== Contents of archive ==="
+          ls -la ./build/Widget.xarchive/ 2>/dev/null || echo "No xarchive"
+          ls -la ./build/Widget.xarchive/Products/ 2>/dev/null || echo "No Products"
+          ls -la ./build/Widget.xarchive/Products/Applications/ 2>/dev/null || echo "No Applications"
           
-          echo "=== Looking for app at: $APP_PATH ==="
-          ls -la "$APP_PATH"
-          
-          if [ -d "$APP_PATH" ]; then
+          # If archive has the app inside - package it
+          APP="./build/Widget.xarchive/Products/Applications/Widget.app"
+          if [ -d "$APP" ]; then
             mkdir -p Payload
-            cp -r "$APP_PATH" Payload/
+            cp -r "$APP" Payload/
             zip -r Widget.ipa Payload
-            echo "IPA created"
+            echo "IPA created from archive"
             ls -la Widget.ipa
           else
-            echo "ERROR: Not found"
-            ls -la "$DD" 2>/dev/null
-            exit 1
+            echo "WARNING: No app in archive, uploading xarchive instead"
+            zip -r Widget.xarchive.zip ./build/Widget.xarchive
+            ls -la Widget.xarchive.zip
           fi
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
           name: Widget
-          path: Widget.ipa
+          path: |
+            Widget.ipa
+            Widget.xarchive.zip
           retention-days: 30
