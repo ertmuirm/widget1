@@ -1,6 +1,7 @@
 import WidgetKit
 import SwiftUI
 import AppIntents
+import AppIntentsUI
 
 // MARK: - Widget Configuration Intent
 
