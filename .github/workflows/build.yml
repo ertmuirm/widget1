@@ -36,9 +36,24 @@ jobs:
           APP=$(find ./build -name "Widget.app" -type d 2>/dev/null | head -1)
           if [ -n "$APP" ]; then
             echo "Found: $APP"
+            # Check what's inside
+            echo "=== Contents of Widget.app ==="
+            ls -la "$APP/"
+            # Check for executable - iOS 18 may have it in different location
+            echo "=== Looking for executable ==="
+            find "$APP" -type f -name "Widget" 2>/dev/null || echo "No executable found"
+            find "$APP" -type f -perm -u+x 2>/dev/null | head -5 || echo "No executable with perms"
+            
             mkdir -p Payload
             cp -R "$APP" Payload/Widget.app
-            chmod +x Payload/Widget.app/Widget
+            # Find the actual executable and chmod it
+            EXEC=$(find Payload/Widget.app -type f -name "Widget" -o -type f -name "Widget*" 2>/dev/null | head -1)
+            if [ -n "$EXEC" ]; then
+              echo "Chmod: $EXEC"
+              chmod +x "$EXEC"
+            else
+              echo "Warning: No executable found to chmod"
+            fi
           else
             echo "Not found"
             exit 1
