@@ -26,7 +26,7 @@ final class SharedStorage {
     // MARK: - Widget Configurations
     
     /// Save all widget configurations
-    func saveConfigurations(_ configurations: [WidgetConfiguration]) throws {
+    func saveConfigurations(_ configurations: [WidgetConfig]) throws {
         guard let url = configurationsURL else {
             throw StorageError.containerNotAvailable
         }
@@ -36,7 +36,7 @@ final class SharedStorage {
     }
     
     /// Load all widget configurations
-    func loadConfigurations() throws -> [WidgetConfiguration] {
+    func loadConfigurations() throws -> [WidgetConfig] {
         guard let url = configurationsURL else {
             throw StorageError.containerNotAvailable
         }
@@ -46,7 +46,7 @@ final class SharedStorage {
         }
         
         let data = try Data(contentsOf: url)
-        return try decoder.decode([WidgetConfiguration].self, from: data)
+        return try decoder.decode([WidgetConfig].self, from: data)
     }
     
     /// Delete all configurations
@@ -85,13 +85,13 @@ final class SharedStorage {
     // MARK: - Export/Import
     
     /// Export configurations to JSON data
-    func exportToJSON(_ configurations: [WidgetConfiguration]) throws -> Data {
+    func exportToJSON(_ configurations: [WidgetConfig]) throws -> Data {
         let exportData = ExportData(configurations: configurations)
         return try encoder.encode(exportData)
     }
     
     /// Import configurations from JSON data
-    func importFromJSON(_ data: Data) throws -> [WidgetConfiguration] {
+    func importFromJSON(_ data: Data) throws -> [WidgetConfig] {
         let exportData = try decoder.decode(ExportData.self, from: data)
         return exportData.configurations
     }

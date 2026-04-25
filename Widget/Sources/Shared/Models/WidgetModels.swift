@@ -57,7 +57,7 @@ enum DisplayType: String, Codable, CaseIterable {
 // MARK: - Widget Configuration
 
 /// Represents a complete widget configuration
-struct WidgetConfiguration: Codable, Identifiable, Equatable {
+struct WidgetConfig: Codable, Identifiable, Equatable {
     let id: UUID
     var name: String
     var size: WidgetSize
@@ -88,7 +88,7 @@ struct WidgetConfiguration: Codable, Identifiable, Equatable {
     }
     
     /// Default configuration for placeholder
-    static let defaultConfiguration = WidgetConfiguration(
+    static let defaultConfiguration = WidgetConfig(
         name: "My Widget",
         size: .systemSmall,
         items: [
@@ -295,9 +295,9 @@ enum StorageKeys {
 struct ExportData: Codable {
     let version: Int
     let exportedAt: Date
-    let configurations: [WidgetConfiguration]
+    let configurations: [WidgetConfig]
     
-    init(configurations: [WidgetConfiguration]) {
+    init(configurations: [WidgetConfig]) {
         self.version = 1
         self.exportedAt = Date()
         self.configurations = configurations

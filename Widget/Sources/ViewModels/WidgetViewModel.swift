@@ -8,8 +8,8 @@ final class WidgetViewModel: ObservableObject {
     
     // MARK: - Published Properties
     
-    @Published var configurations: [WidgetConfiguration] = []
-    @Published var selectedConfiguration: WidgetConfiguration?
+    @Published var configurations: [WidgetConfig] = []
+    @Published var selectedConfiguration: WidgetConfig?
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var showError = false
@@ -48,13 +48,13 @@ final class WidgetViewModel: ObservableObject {
     }
     
     /// Add a new configuration
-    func addConfiguration(_ config: WidgetConfiguration) {
+    func addConfiguration(_ config: WidgetConfig) {
         configurations.append(config)
         saveConfigurations()
     }
     
     /// Update an existing configuration
-    func updateConfiguration(_ config: WidgetConfiguration) {
+    func updateConfiguration(_ config: WidgetConfig) {
         if let index = configurations.firstIndex(where: { $0.id == config.id }) {
             var updated = config
             updated.updatedAt = Date()
@@ -69,7 +69,7 @@ final class WidgetViewModel: ObservableObject {
     }
     
     /// Delete a configuration
-    func deleteConfiguration(_ config: WidgetConfiguration) {
+    func deleteConfiguration(_ config: WidgetConfig) {
         configurations.removeAll { $0.id == config.id }
         saveConfigurations()
         
@@ -88,7 +88,7 @@ final class WidgetViewModel: ObservableObject {
     // MARK: - Item Management
     
     /// Add item to configuration
-    func addItem(to config: inout WidgetConfiguration) {
+    func addItem(to config: inout WidgetConfig) {
         guard config.items.count < config.maxItems else { return }
         
         let newItem = WidgetItem()
@@ -96,7 +96,7 @@ final class WidgetViewModel: ObservableObject {
     }
     
     /// Remove item from configuration
-    func removeItem(from config: inout WidgetConfiguration, at index: Int) {
+    func removeItem(from config: inout WidgetConfig, at index: Int) {
         guard index >= 0 && index < config.items.count else { return }
         config.items.remove(at: index)
     }

@@ -238,7 +238,7 @@ struct LockScreenItemView: View {
 #Preview(as: .systemSmall) {
     BroadcastWidget()
 } timeline: {
-    WidgetEntry(date: .now, configuration: WidgetConfiguration(
+    WidgetEntry(date: .now, configuration: WidgetConfig(
         name: "Test",
         size: .systemSmall,
         items: [WidgetItem(displayType: .icon, sfSymbolName: "star.fill")]
@@ -248,7 +248,7 @@ struct LockScreenItemView: View {
 #Preview(as: .systemMedium) {
     BroadcastWidget()
 } timeline: {
-    WidgetEntry(date: .now, configuration: WidgetConfiguration(
+    WidgetEntry(date: .now, configuration: WidgetConfig(
         name: "Test",
         size: .systemMedium,
         items: [

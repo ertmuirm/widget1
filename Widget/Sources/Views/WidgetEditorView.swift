@@ -6,7 +6,7 @@ struct WidgetEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var viewModel: WidgetViewModel
     
-    @State var configuration: WidgetConfiguration
+    @State var configuration: WidgetConfig
     var isNew: Bool = false
     
     @State private var selectedItemIndex: Int?
@@ -188,7 +188,7 @@ struct ItemRowView: View {
 
 #Preview {
     NavigationStack {
-        WidgetEditorView(configuration: WidgetConfiguration())
+        WidgetEditorView(configuration: WidgetConfig())
     }
     .environmentObject(WidgetViewModel())
     .preferredColorScheme(.dark)

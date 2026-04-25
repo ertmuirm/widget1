@@ -37,7 +37,7 @@ struct WidgetListView: View {
             }
         }
         .sheet(isPresented: $showAddSheet) {
-            let newConfig = WidgetConfiguration()
+            let newConfig = WidgetConfig()
             NavigationStack {
                 WidgetEditorView(configuration: newConfig, isNew: true)
             }
@@ -67,7 +67,7 @@ struct WidgetListView: View {
 // MARK: - Widget Row View
 
 struct WidgetRowView: View {
-    let configuration: WidgetConfiguration
+    let configuration: WidgetConfig
     
     var body: some View {
         HStack(spacing: 12) {
@@ -100,7 +100,7 @@ struct WidgetRowView: View {
 // MARK: - Widget Preview
 
 struct WidgetPreviewView: View {
-    let configuration: WidgetConfiguration
+    let configuration: WidgetConfig
     let size: CGSize
     
     var body: some View {

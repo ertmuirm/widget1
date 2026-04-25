@@ -4,7 +4,7 @@ import SwiftUI
 struct BroadcastWidget: Widget {
     let kind: String = "BroadcastExtension"
 
-    var body: some WidgetConfiguration {
+    var body: some WidgetConfig {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             WidgetEntryView(entry: entry)
         }
@@ -28,11 +28,11 @@ struct BroadcastWidget: Widget {
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> WidgetEntry {
-        WidgetEntry(date: Date(), configuration: WidgetConfiguration.defaultConfiguration)
+        WidgetEntry(date: Date(), configuration: WidgetConfig.defaultConfiguration)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (WidgetEntry) -> Void) {
-        let entry = WidgetEntry(date: Date(), configuration: WidgetConfiguration.defaultConfiguration)
+        let entry = WidgetEntry(date: Date(), configuration: WidgetConfig.defaultConfiguration)
         completion(entry)
     }
 
@@ -40,7 +40,7 @@ struct Provider: TimelineProvider {
         let configurations = loadConfigurations()
         
         if configurations.isEmpty {
-            let entry = WidgetEntry(date: Date(), configuration: WidgetConfiguration.defaultConfiguration)
+            let entry = WidgetEntry(date: Date(), configuration: WidgetConfig.defaultConfiguration)
             let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
             completion(timeline)
         } else {
@@ -54,7 +54,7 @@ struct Provider: TimelineProvider {
         }
     }
     
-    private func loadConfigurations() -> [WidgetConfiguration] {
+    private func loadConfigurations() -> [WidgetConfig] {
         guard let url = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: "group.com.iosmirror"
         )?.appendingPathComponent("configurations.json") else {
@@ -63,7 +63,7 @@ struct Provider: TimelineProvider {
         
         do {
             let data = try Data(contentsOf: url)
-            let configurations = try JSONDecoder().decode([WidgetConfiguration].self, from: data)
+            let configurations = try JSONDecoder().decode([WidgetConfig].self, from: data)
             return configurations
         } catch {
             return []
@@ -75,5 +75,5 @@ struct Provider: TimelineProvider {
 
 struct WidgetEntry: TimelineEntry {
     let date: Date
-    let configuration: WidgetConfiguration
+    let configuration: WidgetConfig
 }
