@@ -97,9 +97,6 @@ struct WidgetFamilySupport {
         .accessoryInline,
         .accessoryRectangular
     ]
-    #if canImport(WidgetKit)
-    @WidgetFamily(.systemSmall)
-    #endif
     
     /// Check if a family is available on current iOS version
     static func isSupported(_ family: WidgetFamily) -> Bool {
@@ -148,6 +145,7 @@ enum PlatformError: LocalizedError {
 
 // MARK: - Safe Feature Wrappers
 
+#if canImport(WidgetKit)
 extension WidgetFamily {
     /// Safely get widget family display name
     var safeDisplayName: String {
@@ -163,3 +161,4 @@ extension WidgetFamily {
         }
     }
 }
+#endif
