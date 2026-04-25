@@ -19,35 +19,27 @@ jobs:
 
       - name: Build and Package IPA
         run: |
-          # Build archive
-          xcodebuild archive -scheme Widget -configuration Release \
-            -archivePath ./build/Widget.xarchive \
+          # Build using xcodebuild build (NOT archive) to get product
+          xcodebuild -scheme Widget -configuration Release \
+            -derivedDataPath ./build \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGNING_REQUIRED=NO \
+            OTHER_CODE_SIGN_FLAGS="--" \
+            build 2>&1 | tail -20
           
-          # Use xcodebuild -exportArchive to extract the app from the archive
-          # This uses the archive file we just created
-          xcodebuild -exportArchive \
-            -archivePath ./build/Widget.xarchive \
-            -exportPath ./exported \
-            -exportOptionsPlist /dev/stdin <<< '<?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>ad-hoc</string>
-          </dict>
-          </plist>'
+          # Now check in the build folder
+          echo "=== Checking build output ==="
+          ls -la ./build/Build/Products/Release-iphoneos/ 2>/dev/null || echo "Not there"
           
-          ls -la ./exported/
-          ls -la ./exported/Applications/ 2>/dev/null || ls -la ./exported/*.app 2>/dev/null
-          
-          # Create IPA from exported
-          if [ -d "./exported/Applications/Widget.app" ]; then
-            cp -R "./exported/Applications/Widget.app" Payload/
-          elif [ -d "./exported/Widget.app" ]; then
-            cp -R "./exported/Widget.app" Payload/
+          # Find Widget.app anywhere in build
+          APP=$(find ./build -name "Widget.app" -type d 2>/dev/null | head -1)
+          if [ -n "$APP" ]; then
+            echo "Found: $APP"
+            cp -R "$APP" Payload/
+          else
+            echo "Not found"
+            exit 1
           fi
           
           cd Payload && zip -r ../Widget.ipa . && cd ..
