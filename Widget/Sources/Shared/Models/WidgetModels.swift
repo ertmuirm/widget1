@@ -64,6 +64,7 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
     var items: [WidgetItem]
     var backgroundColor: CodableColor
     var backgroundOpacity: Double
+    var showItemLabels: Bool  // Labels shown below icons
     var createdAt: Date
     var updatedAt: Date
     
@@ -74,6 +75,7 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         items: [WidgetItem] = [],
         backgroundColor: CodableColor = CodableColor(.black),
         backgroundOpacity: Double = 1.0,
+        showItemLabels: Bool = true,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -83,6 +85,7 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         self.items = items
         self.backgroundColor = backgroundColor
         self.backgroundOpacity = backgroundOpacity
+        self.showItemLabels = showItemLabels
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
