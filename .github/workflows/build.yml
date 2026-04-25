@@ -16,16 +16,29 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          
-      - name: Install dependencies
-        run: brew install xcodegen
+
+      - name: Cache XcodeGen
+        id: cache-xcodegen
+        uses: actions/cache@v4
+        with:
+          path: ~/xcodegen
+          key: xcodegen-v1.13.4
+
+      - name: Install XcodeGen
+        if: steps.cache-xcodegen.outputs.cache-hit != 'true'
+        run: |
+          curl -sL https://github.com/nicklockwood/XcodeGen/releases/download/v1.13.4/xcodegen-v1.13.4-macos-universal.tar.gz | tar -xz
+          mv xcodegen ~/xcodegen
+          chmod +x ~/xcodegen
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate Xcode project
-        run: xcodegen generate
+        run: ~/xcodegen generate
         
       - name: Build (unsigned)
         run: |
-          xcodebuild archive -scheme Widget -configuration Release -archivePath ./build/Widget.xarchive CODE_SIGNING_ALLOWED=NO \
+          xcodebuild archive -scheme Widget -configuration Release -archivePath ./build/Widget.xarchive CODE_SIGNING_ALLOWED=NO
 
       - name: Package as IPA
         run: |
