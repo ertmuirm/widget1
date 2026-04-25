@@ -69,8 +69,8 @@ struct WidgetEditorView: View {
                     Text("Color")
                     Spacer()
                     ColorPicker("", selection: Binding(
-                        get: { configuration.backgroundColor },
-                        set: { configuration.backgroundColor = $0 }
+                        get: { configuration.backgroundColor.swiftUIColor },
+                        set: { configuration.backgroundColor = CodableColor($0) }
                     ))
                     .labelsHidden()
                 }

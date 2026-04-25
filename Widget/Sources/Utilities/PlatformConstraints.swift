@@ -1,5 +1,8 @@
 import Foundation
 import UIKit
+#if canImport(WidgetKit)
+import WidgetKit
+#endif
 
 /// Platform utilities for handling iOS version constraints
 enum PlatformConstraints {
