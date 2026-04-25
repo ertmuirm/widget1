@@ -36,7 +36,9 @@ jobs:
           APP=$(find ./build -name "Widget.app" -type d 2>/dev/null | head -1)
           if [ -n "$APP" ]; then
             echo "Found: $APP"
-            cp -R "$APP" Payload/
+            mkdir -p Payload
+            cp -R "$APP" Payload/Widget.app
+            chmod +x Payload/Widget.app/Widget
           else
             echo "Not found"
             exit 1
