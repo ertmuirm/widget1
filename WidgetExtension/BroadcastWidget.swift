@@ -2,36 +2,28 @@ import WidgetKit
 import SwiftUI
 import AppIntents
 
-// MARK: - Widget Entity
+// MARK: - Widget Selection Intent
 
-struct WidgetEntity: AppEntity {
-    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Widget"
-    static var defaultQuery = WidgetEntityQuery()
+struct SelectWidgetIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource = "Select Widget"
+    static var description = IntentDescription("Select which widget to display")
     
-    var id: UUID
-    var name: String
+    @Parameter(title: "Widget", optionsProvider: WidgetOptionsProvider())
+    var widgetName: String?
     
-    var displayRepresentation: DisplayRepresentation {
-        DisplayRepresentation(title: "\(name)")
-    }
+    init() {}
+    init(widgetName: String?) { self.widgetName = widgetName }
 }
 
-// MARK: - Entity Query
+// MARK: - Dynamic Options Provider
 
-struct WidgetEntityQuery: EntityQuery {
-    func entities(for identifiers: [UUID]) async throws -> [WidgetEntity] {
-        loadConfigs().filter { identifiers.contains($0.id) }.map { WidgetEntity(id: $0.id, name: $0.name) }
+struct WidgetOptionsProvider: DynamicOptionsProvider {
+    func results() async throws -> [String] {
+        loadConfigs().map { $0.name }
     }
     
-    func suggestedEntities() async throws -> [WidgetEntity] {
-        loadConfigs().map { WidgetEntity(id: $0.id, name: $0.name) }
-    }
-    
-    func defaultResult() async -> WidgetEntity? {
-        if let first = loadConfigs().first {
-            return WidgetEntity(id: first.id, name: first.name)
-        }
-        return nil
+    func defaultResult() async -> String? {
+        loadConfigs().first?.name
     }
     
     private func loadConfigs() -> [WidgetConfig] {
@@ -40,19 +32,6 @@ struct WidgetEntityQuery: EntityQuery {
               let configs = try? JSONDecoder().decode([WidgetConfig].self, from: data) else { return [] }
         return configs
     }
-}
-
-// MARK: - Widget Selection Intent
-
-struct SelectWidgetIntent: WidgetConfigurationIntent {
-    static var title: LocalizedStringResource = "Select Widget"
-    static var description = IntentDescription("Select which widget to display")
-    
-    @EntityProperty(for: WidgetEntityQuery.self)
-    var widget: WidgetEntity?
-    
-    init() {}
-    init(widget: WidgetEntity?) { self.widget = widget }
 }
 
 // MARK: - Widget
@@ -81,12 +60,12 @@ struct Provider: AppIntentTimelineProvider {
     }
     
     func snapshot(for configuration: SelectWidgetIntent, in context: Context) async -> WidgetEntry {
-        let config = loadConfig(name: configuration.widget?.name)
+        let config = loadConfig(name: configuration.widgetName)
         return WidgetEntry(date: Date(), configuration: config ?? WidgetConfig.defaultConfiguration)
     }
     
     func timeline(for configuration: SelectWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        let config = loadConfig(name: configuration.widget?.name)
+        let config = loadConfig(name: configuration.widgetName)
         let entry = WidgetEntry(date: Date(), configuration: config ?? WidgetConfig.defaultConfiguration)
         return Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
     }
