@@ -26,32 +26,27 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
           
-          # Export from archive to IPA using xcodebuild -exportArchive
-          xcodebuild -exportArchive \
-            -archivePath ./build/Widget.xarchive \
-            -exportPath ./build/Widget.ipa \
-            -exportOptionsPlist /dev/stdin <<< '<?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>ad-hoc</string>
-          </dict>
-          </plist>'
+          # Look for the app in the working DerivedData
+          WORK_DIR="$HOME/work/widget1/widget1"
+          SOURCE_DIR="$HOME/Library/Developer/Xcode/DerivedData"
           
-          ls -la ./build/*.ipa 2>/dev/null || ls -la ./Widget.ipa 2>/dev/null || echo "Trying manual package"
+          # Find Widget.app that was just built
+          echo "=== Finding built app ==="
+          find "$SOURCE_DIR" -name "Widget.app" -type d 2>/dev/null | head -3
           
-          # Manual backup: if xcodebuild export fails
-          if [ ! -f ./build/Widget.ipa ] && [ ! -f ./Widget.ipa ]; then
-            APP="./build/Widget.xarchive/Products/Applications/Widget.app"
-            if [ -d "$APP" ]; then
-              mkdir -p Payload
-              cp -r "$APP" Payload/
-              zip -r Widget.ipa Payload
-            fi
+          # Use last resort: copy from derived data 
+          APK=$(find "$SOURCE_DIR" -name "Widget.app" -type d 2>/dev/null | head -1)
+          
+          if [ -n "$APK" ] && [ -d "$APK" ]; then
+            mkdir -p Payload
+            cp -r "$APK" Payload/
+            zip -r Widget.ipa Payload
+            echo "IPA created successfully"
+            ls -la Widget.ipa
+          else
+            echo "ERROR: Widget.app not found"
+            exit 1
           fi
-          
-          ls -la *.ipa 2>/dev/null
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
