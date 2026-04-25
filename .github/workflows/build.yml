@@ -19,6 +19,9 @@ jobs:
 
       - name: Build and Package IPA
         run: |
+          # Clean derived data to avoid any caching issues
+          rm -rf ./build
+          
           # Build using xcodebuild build (NOT archive) to get product
           xcodebuild -scheme Widget -configuration Release \
             -derivedDataPath ./build \
