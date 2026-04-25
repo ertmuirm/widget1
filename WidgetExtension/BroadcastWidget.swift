@@ -48,7 +48,7 @@ struct SelectWidgetIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Select Widget"
     static var description = IntentDescription("Select which widget to display")
     
-    @EntityProperty(for: WidgetEntityQuery())
+    @EntityProperty(for: WidgetEntityQuery.self)
     var widget: WidgetEntity?
     
     init() {}
