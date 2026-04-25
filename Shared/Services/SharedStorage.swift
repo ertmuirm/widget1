@@ -81,6 +81,46 @@ final class SharedStorage {
             UserDefaults.standard.set(newValue, forKey: StorageKeys.lastBackupDate)
         }
     }
+    
+    // MARK: - Export/Import
+    
+    /// Export configurations to JSON data
+    func exportToJSON(_ configurations: [WidgetConfiguration]) throws -> Data {
+        let exportData = ExportData(configurations: configurations)
+        return try encoder.encode(exportData)
+    }
+    
+    /// Import configurations from JSON data
+    func importFromJSON(_ data: Data) throws -> [WidgetConfiguration] {
+        let exportData = try decoder.decode(ExportData.self, from: data)
+        return exportData.configurations
+    }
+    
+    // MARK: - Storage Info
+    
+    /// Get storage usage information
+    func getStorageInfo() throws -> StorageInfo {
+        guard let url = configurationsURL else {
+            throw StorageError.containerNotAvailable
+        }
+        
+        let attributes = try? fileManager.attributesOfItem(atPath: url.path)
+        let size = attributes?[.size] as? Int64 ?? 0
+        
+        return StorageInfo(
+            fileExists: fileManager.fileExists(atPath: url.path),
+            size: size,
+            configurationCount: (try? loadConfigurations().count) ?? 0
+        )
+    }
+}
+
+// MARK: - Storage Info
+
+struct StorageInfo {
+    let fileExists: Bool
+    let size: Int64
+    let configurationCount: Int
 }
 
 // MARK: - Storage Errors

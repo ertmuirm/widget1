@@ -7,6 +7,21 @@ struct WidgetEntryView: View {
     let entry: WidgetEntry
 
     var body: some View {
+        // Route to appropriate renderer based on widget family
+        switch widgetFamily {
+        case .systemSmall, .systemMedium, .systemLarge, .systemExtraLarge:
+            homeScreenWidget
+        case .accessoryCircular, .accessoryInline, .accessoryRectangular:
+            lockScreenWidget
+        default:
+            homeScreenWidget // fallback
+        }
+    }
+    
+    // MARK: - Home Screen Widgets
+    
+    @ViewBuilder
+    private var homeScreenWidget: some View {
         GeometryReader { geometry in
             ZStack {
                 // Background
@@ -47,6 +62,59 @@ struct WidgetEntryView: View {
             largeWidget
         case .systemExtraLarge:
             extraLargeWidget
+        }
+    }
+    
+    // MARK: - Lock Screen Widgets
+    
+    @ViewBuilder
+    private var lockScreenWidget: some View {
+        switch widgetFamily {
+        case .accessoryCircular:
+            accessoryCircularWidget
+        case .accessoryInline:
+            accessoryInlineWidget
+        case .accessoryRectangular:
+            accessoryRectangularWidget
+        default:
+            accessoryCircularWidget
+        }
+    }
+    
+    @ViewBuilder
+    private var accessoryCircularWidget: some View {
+        if let item = entry.configuration.items.first {
+            if item.displayType == .icon, let symbolName = item.sfSymbolName {
+                Image(systemName: symbolName)
+                    .font(.system(size: 20))
+            } else {
+                Text(item.customText?.prefix(2) ?? "")
+                    .font(.system(size: 14, weight: .medium))
+            }
+        } else {
+            Image(systemName: "questionmark")
+        }
+    }
+    
+    @ViewBuilder
+    private var accessoryInlineWidget: some View {
+        if let item = entry.configuration.items.first {
+            if item.displayType == .icon, let symbolName = item.sfSymbolName {
+                Image(systemName: symbolName) + Text(" \(item.customText ?? "")")
+            } else {
+                Text(item.customText ?? "")
+            }
+        } else {
+            Text("Widget")
+        }
+    }
+    
+    @ViewBuilder
+    private var accessoryRectangularWidget: some View {
+        HStack(spacing: 2) {
+            ForEach(Array(entry.configuration.items.prefix(6).enumerated()), id: \.element.id) { _, item in
+                LockScreenItemView(item: item)
+            }
         }
     }
     
@@ -139,6 +207,26 @@ struct ItemView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Lock Screen Item View
+
+struct LockScreenItemView: View {
+    let item: WidgetItem
+    
+    var body: some View {
+        ZStack {
+            if item.displayType == .icon {
+                if let symbolName = item.sfSymbolName {
+                    Image(systemName: symbolName)
+                        .font(.system(size: 12))
+                }
+            } else {
+                Text(item.customText?.prefix(1) ?? "")
+                    .font(.system(size: 10))
+            }
+        }
     }
 }
 

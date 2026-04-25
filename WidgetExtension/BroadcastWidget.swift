@@ -10,7 +10,17 @@ struct BroadcastWidget: Widget {
         }
         .configurationDisplayName("Widget")
         .description("Create custom widgets with customizable actions")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge])
+        .supportedFamilies([
+            // Home Screen families
+            .systemSmall,
+            .systemMedium,
+            .systemLarge,
+            .systemExtraLarge,
+            // Lock Screen families
+            .accessoryCircular,
+            .accessoryInline,
+            .accessoryRectangular
+        ])
     }
 }
 

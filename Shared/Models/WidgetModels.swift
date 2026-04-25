@@ -180,6 +180,39 @@ enum ActionType: String, Codable, CaseIterable {
     }
 }
 
+// MARK: - Lock Screen Widget Families
+
+/// Lock Screen widget family types
+enum LockScreenWidgetFamily: String, Codable, CaseIterable {
+    case accessoryInline
+    case accessoryCircular
+    case accessoryRectangular
+    
+    var displayName: String {
+        switch self {
+        case .accessoryInline: return "Inline"
+        case .accessoryCircular: return "Circular"
+        case .accessoryRectangular: return "Rectangular"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .accessoryInline: return "Text and compact icons"
+        case .accessoryCircular: return "Single icon or abbreviated text"
+        case .accessoryRectangular: return "Up to 6 items"
+        }
+    }
+    
+    var maxItems: Int {
+        switch self {
+        case .accessoryInline: return 1
+        case .accessoryCircular: return 1
+        case .accessoryRectangular: return 6
+        }
+    }
+}
+
 // MARK: - Codable Color
 
 /// A color that can be encoded/decoded
