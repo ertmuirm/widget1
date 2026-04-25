@@ -19,30 +19,27 @@ jobs:
 
       - name: Build and Package IPA
         run: |
-          # Build
+          # Build to local derivedDataPath
+          mkdir -p ./derived
           xcodebuild archive -scheme Widget -configuration Release \
             -archivePath ./build/Widget.xarchive \
+            -derivedDataPath ./derived \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
           
-          # Direct path from build logs
-          DD="$HOME/Library/Developer/Xcode/DerivedData/Widget-hhstiicoevshrpceguycxqigmwsr"
+          # Copy immediately from local derived
+          DD="./derived"
           APP="$DD/Build/Intermediates.noindex/ArchiveIntermediates/Widget/InstallationBuildProductsLocation/Applications/Widget.app"
           
-          echo "=== Checking app at: $APP ==="
-          ls -la "$APP" 2>/dev/null && echo "App found!"
+          echo "=== Checking: $APP ==="
+          ls -la "$APP"
           
-          if [ -d "$APP" ]; then
-            rm -rf Payload
-            mkdir -p Payload
-            cp -R "$APP" Payload/Widget.app
-            cd Payload && zip -r ../Widget.ipa . && cd ..
-            echo "IPA created!"
-          else
-            echo "App directory missing"
-            exit 1
-          fi
+          rm -rf Payload
+          mkdir -p Payload
+          cp -R "$APP" Payload/Widget.app
+          cd Payload && zip -r ../Widget.ipa . && cd ..
+          echo "Done!"
           
           ls -la *.ipa 
     
