@@ -25,7 +25,7 @@ struct WidgetActionIntent: AppIntent {
         self.payload = payload
     }
     
-    func perform() async throws -> some IntentResult & ProvidesDialog {
+    func perform() async throws -> IntentResult {
         switch actionType {
         case "urlScheme":
             return await performURLScheme()
@@ -34,33 +34,20 @@ struct WidgetActionIntent: AppIntent {
         case "shortcut":
             return await performShortcut()
         default:
-            return .result(dialog: "Unknown action type")
+            return .result()
         }
     }
     
-    private func performURLScheme() async -> some IntentResult & ProvidesDialog {
-        guard let url = URL(string: payload) else {
-            return .result(dialog: "Invalid URL")
-        }
-        
-        // In app extensions, we cannot open URLs directly
-        // The extension will be opened and the main app can handle it
-        return .result(dialog: "Opening URL: \(payload)")
+    private func performURLScheme() async -> IntentResult {
+        return .result()
     }
     
-    private func performAppIntent() async -> some IntentResult & ProvidesDialog {
-        return .result(dialog: "Running app intent: \(payload)")
+    private func performAppIntent() async -> IntentResult {
+        return .result()
     }
     
-    private func performShortcut() async -> some IntentResult & ProvidesDialog {
-        let encodedName = payload.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? payload
-        let urlString = "shortcuts://run shortcut?name=\(encodedName)"
-        
-        guard URL(string: urlString) != nil else {
-            return .result(dialog: "Invalid shortcut name")
-        }
-        
-        return .result(dialog: "Running shortcut: \(payload)")
+    private func performShortcut() async -> IntentResult {
+        return .result()
     }
 }
 

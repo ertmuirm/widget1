@@ -4,19 +4,17 @@ import SwiftUI
 struct BroadcastWidget: Widget {
     let kind: String = "BroadcastExtension"
 
-    var body: some WidgetConfig {
+    var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             WidgetEntryView(entry: entry)
         }
         .configurationDisplayName("Widget")
         .description("Create custom widgets with customizable actions")
         .supportedFamilies([
-            // Home Screen families
             .systemSmall,
             .systemMedium,
             .systemLarge,
             .systemExtraLarge,
-            // Lock Screen families
             .accessoryCircular,
             .accessoryInline,
             .accessoryRectangular
