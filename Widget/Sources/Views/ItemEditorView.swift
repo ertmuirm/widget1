@@ -67,8 +67,8 @@ struct ItemEditorView: View {
                     Text("Foreground")
                     Spacer()
                     ColorPicker("", selection: Binding(
-                        get: { item.foregroundColor },
-                        set: { item.foregroundColor = $0 }
+                        get: { item.foregroundColor.swiftUIColor },
+                        set: { item.foregroundColor = CodableColor($0) }
                     ))
                     .labelsHidden()
                 }
@@ -78,8 +78,8 @@ struct ItemEditorView: View {
                     Text("Background")
                     Spacer()
                     ColorPicker("", selection: Binding(
-                        get: { item.backgroundColor },
-                        set: { item.backgroundColor = $0 }
+                        get: { item.backgroundColor.swiftUIColor },
+                        set: { item.backgroundColor = CodableColor($0) }
                     ))
                     .labelsHidden()
                 }

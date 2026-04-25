@@ -100,14 +100,22 @@ struct WidgetFamilySupport {
     
     /// Check if a family is available on current iOS version
     static func isSupported(_ family: WidgetFamily) -> Bool {
-        #available(iOS 16.0, *)
-        switch family {
-        case .systemSmall, .systemMedium, .systemLarge, .systemExtraLarge:
-            return true
-        case .accessoryCircular, .accessoryInline, .accessoryRectangular:
-            return true
-        default:
-            return false
+        if #available(iOS 16.0, *) {
+            switch family {
+            case .systemSmall, .systemMedium, .systemLarge, .systemExtraLarge:
+                return true
+            case .accessoryCircular, .accessoryInline, .accessoryRectangular:
+                return true
+            default:
+                return false
+            }
+        } else {
+            switch family {
+            case .systemSmall, .systemMedium, .systemLarge:
+                return true
+            default:
+                return false
+            }
         }
     }
 }

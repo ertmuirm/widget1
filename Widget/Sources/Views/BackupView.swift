@@ -75,7 +75,7 @@ struct BackupView: View {
         .fileImporter(
             isPresented: $showImportPicker,
             allowedContentTypes: [.json],
-            allowMultipleDocuments: false
+            allowsMultipleSelection: false
         ) { result in
             handleImport(result)
         }
@@ -91,7 +91,7 @@ struct BackupView: View {
         Task {
             do {
                 let data = try viewModel.exportToJSON()
-                let document = ExportDocument(data: data)
+                _ = data
                 
                 // Trigger file exporter
                 showExportPicker = true
