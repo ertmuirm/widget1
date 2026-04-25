@@ -19,29 +19,35 @@ jobs:
 
       - name: Build and Package IPA
         run: |
-          # Build WITHOUT derivedDataPath - use xcode default
+          # Build archive
           xcodebuild archive -scheme Widget -configuration Release \
             -archivePath ./build/Widget.xarchive \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
           
-          # Find the archive in ~/Library/Developer/Xcode/DerivedData
-          DD="$HOME/Library/Developer/Xcode/DerivedData"
-          ARCHIVE_DIR=$(ls -dt "$DD"/Widget-*/ 2>/dev/null | head -1)
+          # Use xcodebuild -exportArchive to extract the app from the archive
+          # This uses the archive file we just created
+          xcodebuild -exportArchive \
+            -archivePath ./build/Widget.xarchive \
+            -exportPath ./exported \
+            -exportOptionsPlist /dev/stdin <<< '<?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>ad-hoc</string>
+          </dict>
+          </plist>'
           
-          echo "Archive dir: $ARCHIVE_DIR"
-          ls -la "$ARCHIVE_DIR"
+          ls -la ./exported/
+          ls -la ./exported/Applications/ 2>/dev/null || ls -la ./exported/*.app 2>/dev/null
           
-          # The archive has Products in it
-          ls -la "$ARCHIVE_DIR/Build/Products/" 2>/dev/null || echo "No Products"
-          ls -la "$ARCHIVE_DIR/Build/Intermediates.noindex/ArchiveIntermediates/Widget/" 2>/dev/null || echo "No ArchiveIntermediates"
-          
-          # Copy app from whichever location exists
-          if [ -d "$ARCHIVE_DIR/Build/Products/Applications/Widget.app" ]; then
-            cp -R "$ARCHIVE_DIR/Build/Products/Applications/Widget.app" Payload/
-          elif [ -d "$ARCHIVE_DIR/Build/Intermediates.noindex/ArchiveIntermediates/Widget/InstallationBuildProductsLocation/Applications/Widget.app" ]; then
-            cp -R "$ARCHIVE_DIR/Build/Intermediates.noindex/ArchiveIntermediates/Widget/InstallationBuildProductsLocation/Applications/Widget.app" Payload/
+          # Create IPA from exported
+          if [ -d "./exported/Applications/Widget.app" ]; then
+            cp -R "./exported/Applications/Widget.app" Payload/
+          elif [ -d "./exported/Widget.app" ]; then
+            cp -R "./exported/Widget.app" Payload/
           fi
           
           cd Payload && zip -r ../Widget.ipa . && cd ..
