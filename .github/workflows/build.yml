@@ -35,26 +35,11 @@ jobs:
           if [ -n "$APP" ] && [ -d "$APP" ]; then
             mkdir -p Payload
             cp -r "$APP" Payload/
-            zip -r Widget.ipa Payload || true
-            if [ -f Widget.ipa ]; then
-              echo "SUCCESS - IPA created!"
-              ls -la Widget.ipa
-            else
-              echo "fallback: zip failed, uploading build folder"
-              zip -r Widget.xarchive.zip ./derived || true
-            fi
-          else
-            echo "fallback: no app found, uploading derived folder"
-            zip -r Widget.xarchive.zip ./derived || true
-          fi
-          
-          ls -la *.ipa *.zip 2>/dev/null || echo "No artifacts created"
-
+            zip -r Widget.ipa Payload 
+    
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
           name: Widget
-          path: |
-            Widget.ipa
-            Widget.xarchive.zip
+          path: Widget.ipa
           retention-days: 30
