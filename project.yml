@@ -24,19 +24,19 @@ targets:
       - path: Widget
         excludes:
           - "**/.DS_Store"
-      - path: Views
+      - path: Widget/Sources/Views
         excludes:
           - "**/.DS_Store"
-      - path: ViewModels
+      - path: Widget/Sources/ViewModels
         excludes:
           - "**/.DS_Store"
-      - path: Services
+      - path: Widget/Sources/Services
         excludes:
           - "**/.DS_Store"
-      - path: Utilities
+      - path: Widget/Sources/Utilities
         excludes:
           - "**/.DS_Store"
-      - path: Shared
+      - path: Widget/Sources/Shared
         excludes:
           - "**/.DS_Store"
     settings:
@@ -68,7 +68,7 @@ targets:
       - path: WidgetExtension
         excludes:
           - "**/.DS_Store"
-      - path: Shared
+      - path: Widget/Sources/Shared
         excludes:
           - "**/.DS_Store"
     settings:
