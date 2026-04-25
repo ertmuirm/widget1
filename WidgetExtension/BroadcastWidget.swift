@@ -8,7 +8,7 @@ struct WidgetEntity: AppEntity {
     static var typeDisplayRepresentation: TypeDisplayRepresentation = "Widget"
     static var defaultQuery = WidgetEntityQuery()
     
-    var id: String
+    var id: UUID
     var name: String
     
     var displayRepresentation: DisplayRepresentation {
@@ -19,7 +19,7 @@ struct WidgetEntity: AppEntity {
 // MARK: - Entity Query
 
 struct WidgetEntityQuery: EntityQuery {
-    func entities(for identifiers: [String]) async throws -> [WidgetEntity] {
+    func entities(for identifiers: [UUID]) async throws -> [WidgetEntity] {
         loadConfigs().filter { identifiers.contains($0.id) }.map { WidgetEntity(id: $0.id, name: $0.name) }
     }
     
