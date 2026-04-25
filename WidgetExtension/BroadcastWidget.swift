@@ -103,6 +103,9 @@ struct BroadcastWidget: Widget {
 // MARK: - Timeline Provider
 
 struct Provider: AppIntentTimelineProvider {
+    typealias Entry = WidgetEntry
+    typealias Intent = WidgetConfigurationIntent
+    
     func placeholder(in context: Context) -> WidgetEntry {
         WidgetEntry(date: Date(), configuration: WidgetConfig.defaultConfiguration)
     }
