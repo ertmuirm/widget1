@@ -19,35 +19,28 @@ jobs:
 
       - name: Build and Package IPA
         run: |
-          # Build - xcodebuild archive uses default DerivedData location
+          # Build
           xcodebuild archive -scheme Widget -configuration Release \
             -archivePath ./build/Widget.xarchive \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
           
-          # Find Widget.app in DerivedData - the app is at InstallationBuildProductsLocation
-          echo "=== Locating Widget.app ==="
-          DD="$HOME/Library/Developer/Xcode/DerivedData"
-          DD_HASH=$(ls -d "$DD"/Widget-*/ 2>/dev/null | head -1)
+          # Direct path from build logs
+          DD="$HOME/Library/Developer/Xcode/DerivedData/Widget-hhstiicoevshrpceguycxqigmwsr"
+          APP="$DD/Build/Intermediates.noindex/ArchiveIntermediates/Widget/InstallationBuildProductsLocation/Applications/Widget.app"
           
-          if [ -n "$DD_HASH" ]; then
-            APP="$DD_HASH/Build/Intermediates.noindex/ArchiveIntermediates/Widget/InstallationBuildProductsLocation/Applications/Widget.app"
-            echo "Checking: $APP"
-            
-            if [ -d "$APP" ]; then
-              echo "Found app!"
-              mkdir -p Payload
-              cp -r "$APP" Payload/
-              zip -r Widget.ipa Payload
-              echo "IPA created"
-            else
-              # Try alternate path
-              find "$DD" -name "Widget.app" -type d 2>/dev/null | head -1 | xargs -I{} cp -r "{}" Payload/ 2>/dev/null
-              zip -r Widget.ipa Payload
-            fi
+          echo "=== Checking app at: $APP ==="
+          ls -la "$APP" 2>/dev/null && echo "App found!"
+          
+          if [ -d "$APP" ]; then
+            rm -rf Payload
+            mkdir -p Payload
+            cp -R "$APP" Payload/Widget.app
+            cd Payload && zip -r ../Widget.ipa . && cd ..
+            echo "IPA created!"
           else
-            echo "DerivedData not found"
+            echo "App directory missing"
             exit 1
           fi
           
