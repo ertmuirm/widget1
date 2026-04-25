@@ -1,121 +1,42 @@
-name: Build iOS App
+name: Build iOS IPA
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: macos-latest
-    
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    
-    - name: Verify XcodeGen
-      run: |
-        if ! command -v xcodegen &> /dev/null; then
-          brew install xcodegen
-        fi
-        xcodegen --version
-    
-    - name: Generate Xcode project
-      run: xcodegen generate
-    
-    - name: Setup Code Signing
-      run: |
-        # Create temporary keychain for ad-hoc signing
-        security create-keychain -p "" temp.keychain
-        security set-keychain-settings temp.keychain
-        security import $ADDITIONAL_CERTIFICATES -k temp.keychain -P "" -A 2>/dev/null || true
-        security set-keychain-search-list -s "" temp.keychain 2>/dev/null || true
-        
-    - name: Build App
-      run: |
-        xcodebuild -scheme Widget \
-          -configuration Debug \
-          -derivedDataPath build \
-          -destination 'generic/platform=iOS Simulator,name=iPhone 16' \
-          CODE_SIGN_IDENTITY=- \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO \
-          build
-    
-    - name: Build Extension
-      run: |
-        xcodebuild -scheme BroadcastExtension \
-          -configuration Debug \
-          -derivedDataPath build \
-          -destination 'generic/platform=iOS Simulator,name=iPhone 16' \
-          CODE_SIGN_IDENTITY=- \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO \
-          build
 
-    - name: Create IPA
-      run: |
-        # Build for device with unsigned code
-        xcodebuild -scheme Widget \
-          -configuration Debug \
-          -derivedDataPath build-ipa \
-          -destination 'generic/platform=iOS' \
-          CODE_SIGN_IDENTITY=- \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO \
-          build-for-testing
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          
+      - name: Install dependencies
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
         
-        # Find the built app
-        APP_PATH=$(find build-ipa/Build/Products/Debug-iphoneos -name "*.app" -type d | head -1)
-        if [ -z "$APP_PATH" ]; then
-          echo "No app found"
-          exit 1
-        fi
-        
-        # Create IPA using PackageApplication
-        xcrun devicemanager package app "$APP_PATH" --output Widget.ipa --sign "-" || \
-        xcrun packagingtools package --root "$APP_PATH" -o Widget.ipa
-        
-    - name: Create SideStore Package
-      run: |
-        # Create SideStore-compatible ZIP
-        # SideStore requires Info.plist with certain keys
-        cat > Info.plist << 'EOF'
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>CFBundleIdentifier</key>
-            <string>com.iosmirror</string>
-            <key>CFBundleShortVersionString</key>
-            <string>1.0</string>
-            <key>CFBundleVersion</key>
-            <string>1</string>
-        </dict>
-        </plist>
-        EOF
-        
-        cat > README.txt << 'EOF'
-        Widget App - SideStore Installation
-        =============================
-        
-        Installation:
-        1. Install SideStore from https://github.com/SideStore/SideStore
-        2. Open SideStore and add this IPA
-        3. Authorize the app when prompted
-        
-        Note: This is an unsigned build for sideloading.
-        
-        For support, visit: https://github.com/iosmirror/widget/issues
-        EOF
-        
-        # Package as ZIP
-        zip -r Widget-SideStore.zip Widget.ipa Info.plist README.txt
-        
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Widget-SideStore
-        path: Widget-SideStore.zip
-        retention-days: 30
+      - name: Build (unsigned)
+        run: |
+          xcodebuild archive -scheme Widget -configuration Release -archivePath ./build/Widget.xarchive CODE_SIGNING_ALLOWED=NO \
+
+      - name: Package as IPA
+        run: |
+          mkdir -p Payload
+          cp -r ./build/Widget.xarchive/Products/Applications/Widget.app Payload/
+          chmod +x Payload/Widget.app/Widget
+          zip -r Widget.ipa Payload
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Widget
+          path: Widget.ipa
+          retention-days: 30
