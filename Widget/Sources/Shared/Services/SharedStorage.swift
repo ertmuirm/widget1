@@ -33,6 +33,11 @@ final class SharedStorage {
         
         let data = try encoder.encode(configurations)
         try data.write(to: url, options: .atomic)
+        
+        // Also save to UserDefaults for widget extension access
+        if let defaults = UserDefaults(suiteName: StorageKeys.appGroupIdentifier) {
+            defaults.set(data, forKey: "widgetConfigurations")
+        }
     }
     
     /// Load all widget configurations
