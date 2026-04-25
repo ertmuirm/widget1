@@ -21,7 +21,7 @@ struct WidgetEntity: AppEntity {
     }
     
     init(from config: WidgetConfig) {
-        self.id = config.id
+        self.id = config.id.uuidString
         self.name = config.name
     }
 }
@@ -65,10 +65,12 @@ struct WidgetConfigurationIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Select Widget"
     static var description = IntentDescription("Select which widget to display")
     
-    @Parameter(title: "Widget", default: WidgetEntity(id: "", name: "Default"))
+    @Parameter(title: "Widget")
     var widget: WidgetEntity
     
-    init() {}
+    init() {
+        self.widget = WidgetEntity(id: "default", name: "Select a widget")
+    }
     
     init(widget: WidgetEntity) {
         self.widget = widget
@@ -106,17 +108,24 @@ struct Provider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: WidgetConfigurationIntent, in context: Context) async -> WidgetEntry {
-        let config = loadConfiguration(id: configuration.widget.id)
-        return WidgetEntry(date: Date(), configuration: config ?? WidgetConfig.defaultConfiguration)
+        if let uuid = UUID(uuidString: configuration.widget.id) {
+            let config = loadConfiguration(id: uuid)
+            return WidgetEntry(date: Date(), configuration: config ?? WidgetConfig.defaultConfiguration)
+        }
+        return WidgetEntry(date: Date(), configuration: WidgetConfig.defaultConfiguration)
     }
 
     func timeline(for configuration: WidgetConfigurationIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        let config = loadConfiguration(id: configuration.widget.id)
-        let entry = WidgetEntry(date: Date(), configuration: config ?? WidgetConfig.defaultConfiguration)
+        if let uuid = UUID(uuidString: configuration.widget.id) {
+            let config = loadConfiguration(id: uuid)
+            let entry = WidgetEntry(date: Date(), configuration: config ?? WidgetConfig.defaultConfiguration)
+            return Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
+        }
+        let entry = WidgetEntry(date: Date(), configuration: WidgetConfig.defaultConfiguration)
         return Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
     }
     
-    private func loadConfiguration(id: String) -> WidgetConfig? {
+    private func loadConfiguration(id: UUID) -> WidgetConfig? {
         guard let url = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: "group.com.iosmirror"
         )?.appendingPathComponent("configurations.json") else {
