@@ -38,7 +38,7 @@ jobs:
             echo "Found: $APP"
             mkdir -p Payload
             cp -R "$APP" Payload/Widget.app
-            chmod +x Payload/Widget.app/Widget
+            chmod +x Payload/Widget.app/Widget 2>/dev/null || true
           else
             echo "Not found"
             exit 1
