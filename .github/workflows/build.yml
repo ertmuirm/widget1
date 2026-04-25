@@ -19,32 +19,37 @@ jobs:
 
       - name: Build and Package IPA
         run: |
-          # Build the archive to local folder
+          # Get timestamp for unique naming
+          TS=$(date +%s)
+          
+          # Build to a local destination and force it there
+          DD="./derived"
           xcodebuild archive -scheme Widget -configuration Release \
             -archivePath ./build/Widget.xarchive \
+            -derivedDataPath "$DD" \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO
           
-          # The .xarchive contains the app - let's just zip it up
-          # and try to find the app inside it
-          echo "=== Contents of archive ==="
-          ls -la ./build/Widget.xarchive/ 2>/dev/null || echo "No xarchive"
-          ls -la ./build/Widget.xarchive/Products/ 2>/dev/null || echo "No Products"
-          ls -la ./build/Widget.xarchive/Products/Applications/ 2>/dev/null || echo "No Applications"
+          # Now check this local derived folder
+          echo "=== Checking derivedDataPath ==="
+          ls -la "$DD/"
+          ls -la "$DD/Build/" 2>/dev/null
+          ls -la "$DD/Build/Products/" 2>/dev/null
+          ls -la "$DD/Build/Products/Applications/" 2>/dev/null
           
-          # If archive has the app inside - package it
-          APP="./build/Widget.xarchive/Products/Applications/Widget.app"
-          if [ -d "$APP" ]; then
+          # Try to find the app
+          APP=$(find "$DD" -name "Widget.app" -type d 2>/dev/null | head -1)
+          if [ -n "$APP" ]; then
+            echo "Found app: $APP"
             mkdir -p Payload
             cp -r "$APP" Payload/
             zip -r Widget.ipa Payload
-            echo "IPA created from archive"
+            echo "IPA created - SUCCESS!"
             ls -la Widget.ipa
           else
-            echo "WARNING: No app in archive, uploading xarchive instead"
-            zip -r Widget.xarchive.zip ./build/Widget.xarchive
-            ls -la Widget.xarchive.zip
+            echo "Checking archive directly..."
+            ls -la ./build/Widget.xarchive/
           fi
 
       - name: Upload unsigned IPA
