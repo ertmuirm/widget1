@@ -15,7 +15,7 @@ enum Constants {
     
     enum StorageKeys {
         // App Group ID - can be replaced by SideStore or injected at build time
-        static let appGroupIdentifier = "group.com.iosmirror"
+        static let appGroupIdentifier = AppGroup.suiteName
         
         static let widgetConfigurations = "widgetConfigurations"
         static let hasCompletedOnboarding = "hasCompletedOnboarding"
@@ -23,9 +23,24 @@ enum Constants {
         static let userPreferences = "userPreferences"
     }
 
-    enum appGroup {
-        // Current app group in use - prefer App Group, fallback handled at runtime
-        static var current: String { StorageKeys.appGroupIdentifier }
+    enum AppGroup {
+        static let rawId = "group.com.iosmirror" 
+        static let teamId = "J3D2F4SMVD" 
+
+        static var suiteName: String {
+            // SideStore often modifies the ID to: group.<TeamID>.com.example.myapp
+            let sideStoreId = "group.\(teamId).\(rawId.replacingOccurrences(of: "group.", with: ""))"
+            
+            if UserDefaults(suiteName: rawId) != nil {
+                return rawId
+            } else {
+                return sideStoreId
+            }
+        }
+        
+        static var defaults: UserDefaults? {
+            return UserDefaults(suiteName: suiteName)
+        }
     }
     
     // MARK: - Widget Configuration
