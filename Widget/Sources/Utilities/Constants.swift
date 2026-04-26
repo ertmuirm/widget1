@@ -24,18 +24,33 @@ enum Constants {
     }
 
     enum AppGroup {
-        static let rawId = "group.com.iosmirror" 
-        static let teamId = "J3D2F4SMVD" 
-
+        // 1. The original ID set in Xcode Signing & Capabilities
+        static let rawId = "group.com.iosmirror"
+        
+        // 2. The User's Personal Team ID
+        static let teamId = "J3D2F4SMVD"
+        
+        // 3. Robust Suite Name Getter using FileManager
         static var suiteName: String {
-            // SideStore often modifies the ID to: group.<TeamID>.com.example.myapp
-            let sideStoreId = "group.\(teamId).\(rawId.replacingOccurrences(of: "group.", with: ""))"
+            // Construct the SideStore-style ID: group.<TeamID>.<original_suffix>
+            let rawSuffix = rawId.replacingOccurrences(of: "group.", with: "")
+            let sideStoreId = "group.\(teamId).\(rawSuffix)"
             
-            if UserDefaults(suiteName: rawId) != nil {
-                return rawId
-            } else {
+            // CHECK: Strict file system check using FileManager
+            // We prefer the SideStore ID first because we know we are signed by SideStore
+            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: sideStoreId) {
+                print("✅ Active App Group (SideStore): \(sideStoreId)")
+                print("📂 Container Path: \(container.path)")
                 return sideStoreId
             }
+            else if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: rawId) {
+                print("✅ Active App Group (Original): \(rawId)")
+                return rawId
+            }
+            
+            // Fallback for debugging
+            print("❌ CRITICAL ERROR: No valid App Group container found for either ID.")
+            return rawId
         }
         
         static var defaults: UserDefaults? {
