@@ -45,7 +45,9 @@ struct WidgetNameQuery: EntityQuery {
         }
         
         do {
-            let configurations = try JSONDecoder().decode([WidgetConfig].self, from: data)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let configurations = try decoder.decode([WidgetConfig].self, from: data)
             return configurations
                 .filter { identifiers.contains($0.name) }
                 .map { WidgetNameEntity(id: $0.name, name: $0.name) }
@@ -55,47 +57,61 @@ struct WidgetNameQuery: EntityQuery {
     }
     
     func suggestedEntities() async throws -> [WidgetNameEntity] {
-        // Explicit App Group check with diagnostic entity
-        guard let sharedDefaults = UserDefaults(suiteName: appGroupID) else {
-            return [WidgetNameEntity(id: "Error", name: "Invalid App Group ID: \(appGroupID)")]
-        }
-        
-        // Force synchronize to get latest data
-        sharedDefaults.synchronize()
-        
-        // Check if data exists
-        guard let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
-            // Key doesn't exist or is nil - might be empty app
-            // Return empty array instead of diagnostic entity to allow user to add widgets
-            return []
-        }
-        
-        // Try to decode
-        do {
-            let configurations = try JSONDecoder().decode([WidgetConfig].self, from: data)
+        // Try UserDefaults first
+        if let sharedDefaults = UserDefaults(suiteName: appGroupID) {
+            sharedDefaults.synchronize()
             
-            // Check if array is empty
-            if configurations.isEmpty {
-                return []
+            if let data = sharedDefaults.data(forKey: "widgetConfigurations") {
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
+                   !configurations.isEmpty {
+                    return configurations.map { WidgetNameEntity(id: $0.name, name: $0.name) }
+                }
             }
-            
-            let entities = configurations.map { WidgetNameEntity(id: $0.name, name: $0.name) }
-            return entities
-        } catch {
-            return []
         }
+        
+        // Fallback to file-based storage
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID),
+           let data = try? Data(contentsOf: containerURL.appendingPathComponent("configurations.json")) {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
+               !configurations.isEmpty {
+                return configurations.map { WidgetNameEntity(id: $0.name, name: $0.name) }
+            }
+        }
+        
+        return []
     }
     
     func defaultResult() async -> WidgetNameEntity? {
-        // Same logic as suggestedEntities() but return first item
-        guard let sharedDefaults = UserDefaults(suiteName: appGroupID),
-              let data = sharedDefaults.data(forKey: "widgetConfigurations"),
-              let configurations = try? JSONDecoder().decode([WidgetConfig].self, from: data),
-              let firstConfig = configurations.first else {
-            return nil
+        // Try UserDefaults first
+        if let sharedDefaults = UserDefaults(suiteName: appGroupID) {
+            sharedDefaults.synchronize()
+            
+            if let data = sharedDefaults.data(forKey: "widgetConfigurations") {
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
+                   let firstConfig = configurations.first {
+                    return WidgetNameEntity(id: firstConfig.name, name: firstConfig.name)
+                }
+            }
         }
         
-        return WidgetNameEntity(id: firstConfig.name, name: firstConfig.name)
+        // Fallback to file-based storage
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID),
+           let data = try? Data(contentsOf: containerURL.appendingPathComponent("configurations.json")) {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
+               let firstConfig = configurations.first {
+                return WidgetNameEntity(id: firstConfig.name, name: firstConfig.name)
+            }
+        }
+        
+        return nil
     }
 }
 
@@ -150,19 +166,31 @@ struct BroadcastProvider: AppIntentTimelineProvider {
     private func loadConfig(name: String?) -> WidgetConfig? {
         guard let name = name else { return nil }
         
-        guard let sharedDefaults = UserDefaults(suiteName: appGroupID) else {
-            return nil
+        // Try UserDefaults first
+        if let sharedDefaults = UserDefaults(suiteName: appGroupID) {
+            sharedDefaults.synchronize()
+            
+            if let data = sharedDefaults.data(forKey: "widgetConfigurations") {
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
+                   let config = configurations.first(where: { $0.name == name }) {
+                    return config
+                }
+            }
         }
         
-        // Force synchronize to get latest data
-        sharedDefaults.synchronize()
-        
-        guard let data = sharedDefaults.data(forKey: "widgetConfigurations"),
-              let configurations = try? JSONDecoder().decode([WidgetConfig].self, from: data),
-              let config = configurations.first(where: { $0.name == name }) else {
-            return nil
+        // Fallback to file-based storage
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID),
+           let data = try? Data(contentsOf: containerURL.appendingPathComponent("configurations.json")) {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
+               let config = configurations.first(where: { $0.name == name }) {
+                return config
+            }
         }
         
-        return config
+        return nil
     }
 }
