@@ -32,16 +32,23 @@ enum Constants {
         
         // 3. Robust Suite Name Getter using FileManager
         static var suiteName: String {
-            // Construct the SideStore-style ID: group.<TeamID>.<original_suffix>
-            let rawSuffix = rawId.replacingOccurrences(of: "group.", with: "")
-            let sideStoreId = "group.\(teamId).\(rawSuffix)"
+            // Try SideStore format: group.com.iosmirror.J3D2F4SMVD (team ID appended to suffix)
+            let sideStoreId1 = "group.com.iosmirror.\(teamId)"
+            // Alternative: group.J3D2F4SMVD.com.iosmirror
+            let sideStoreId2 = "group.\(teamId).com.iosmirror"
+            // Original
+            let rawId = "group.com.iosmirror"
             
             // CHECK: Strict file system check using FileManager
-            // We prefer the SideStore ID first because we know we are signed by SideStore
-            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: sideStoreId) {
-                print("✅ Active App Group (SideStore): \(sideStoreId)")
+            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: sideStoreId1) {
+                print("✅ Active App Group (SideStore1): \(sideStoreId1)")
                 print("📂 Container Path: \(container.path)")
-                return sideStoreId
+                return sideStoreId1
+            }
+            else if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: sideStoreId2) {
+                print("✅ Active App Group (SideStore2): \(sideStoreId2)")
+                print("📂 Container Path: \(container.path)")
+                return sideStoreId2
             }
             else if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: rawId) {
                 print("✅ Active App Group (Original): \(rawId)")

@@ -25,6 +25,11 @@ struct DebugOverlayView: View {
             }
             .font(.caption)
             
+            Button("Detect App Group") {
+                detectAppGroup()
+            }
+            .font(.caption)
+            
             HStack {
                 Button("Save Test") {
                     saveTestData()
@@ -121,6 +126,27 @@ struct DebugOverlayView: View {
         } catch {
             statusText = "❌ Save failed: \(error.localizedDescription)"
         }
+    }
+    
+    private func detectAppGroup() {
+        let teamId = "J3D2F4SMVD"
+        let rawId = "group.com.iosmirror"
+        let sideStoreId1 = "group.com.iosmirror.\(teamId)"
+        let sideStoreId2 = "group.\(teamId).com.iosmirror"
+        
+        statusText = "---App Group Detection---\n"
+        
+        for id in [sideStoreId1, sideStoreId2, rawId] {
+            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                statusText += "✅ \(id)\n"
+                statusText += "Path: \(container.path)\n"
+            } else {
+                statusText += "❌ \(id)\n"
+            }
+        }
+        
+        let active = AppGroup.suiteName
+        statusText += "---Active: \(active)---\n"
     }
 }
 
