@@ -28,7 +28,7 @@ struct WidgetNameEntity: AppEntity, Hashable {
 
 /// EntityQuery for fetching widget names from shared App Group storage
 struct WidgetNameQuery: EntityQuery {
-    private let appGroupID = "group.com.iosmirror"
+    private let appGroupID = StorageKeys.appGroupIdentifier
     
     func entities(for identifiers: [String]) async throws -> [WidgetNameEntity] {
         let savedNames = loadSavedNames()
@@ -125,7 +125,7 @@ struct BroadcastWidget: Widget {
 // MARK: - Timeline Provider
 
 struct BroadcastProvider: AppIntentTimelineProvider {
-    private let appGroupID = "group.com.iosmirror"
+    private let appGroupID = StorageKeys.appGroupIdentifier
     
     func placeholder(in context: Context) -> WidgetEntry {
         WidgetEntry(date: Date(), configuration: WidgetConfig.defaultConfiguration)
