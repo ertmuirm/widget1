@@ -9,8 +9,31 @@ final class SharedStorage {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     
+    // Try multiple App Group IDs
+    private let appGroupIDs = [
+        "group.com.iosmirror.J3D2F4SMVD",
+        "group.J3D2F4SMVD.com.iosmirror", 
+        "group.com.iosmirror"
+    ]
+    
+    private func getContainerURL() -> URL? {
+        // Try each possible ID
+        for id in appGroupIDs {
+            if let url = fileManager.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                // Verify we can write to it
+                let testFile = url.appendingPathComponent(".test")
+                if fileManager.createFile(atPath: testFile.path, contents: nil) {
+                    try? fileManager.removeItem(at: testFile)
+                    print("✅ Using App Group: \(id)")
+                    return url
+                }
+            }
+        }
+        return nil
+    }
+    
     private var containerURL: URL? {
-        fileManager.containerURL(forSecurityApplicationGroupIdentifier: StorageKeys.appGroupIdentifier)
+        getContainerURL()
     }
     
     private var configurationsURL: URL? {

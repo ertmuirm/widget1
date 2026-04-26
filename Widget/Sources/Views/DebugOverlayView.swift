@@ -34,30 +34,41 @@ enum AppGroup {
 struct DebugOverlayView: View {
     
     @State private var statusText = "Checking..."
+    @State private var showingExport = false
+    @State private var showingImport = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("DEBUG OVERLAY")
-                .font(.caption.bold())
+                .font(.headline.bold())
                 .foregroundStyle(.red)
             
             Divider()
             
-            Text(statusText)
-                .font(.caption2)
-                .foregroundStyle(.white)
+            ScrollView {
+                Text(statusText)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(minHeight: 150, maxHeight: 200)
             
             Divider()
             
-            Button("Refresh") {
-                checkAppGroupData()
+            HStack {
+                Button("Refresh") {
+                    checkAppGroupData()
+                }
+                .font(.caption)
+                
+                Spacer()
+                
+                Button("Detect") {
+                    detectAppGroup()
+                }
+                .font(.caption)
+                .foregroundStyle(.yellow)
             }
-            .font(.caption)
-            
-            Button("Detect App Group") {
-                detectAppGroup()
-            }
-            .font(.caption)
             
             HStack {
                 Button("Save Test") {
@@ -67,15 +78,32 @@ struct DebugOverlayView: View {
                 
                 Spacer()
                 
+                Button("Backup") {
+                    backupData()
+                }
+                .font(.caption)
+                .foregroundStyle(.green)
+            }
+            
+            HStack {
                 Button("Load") {
                     checkAppGroupData()
                 }
                 .font(.caption)
+                
+                Spacer()
+                
+                Button("Restore") {
+                    restoreData()
+                }
+                .font(.caption)
+                .foregroundStyle(.cyan)
             }
         }
-        .padding(12)
-        .background(.black.opacity(0.8))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(16)
+        .frame(minWidth: 300, minHeight: 280)
+        .background(.black.opacity(0.9))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
         .onAppear {
             checkAppGroupData()
         }
@@ -176,6 +204,55 @@ struct DebugOverlayView: View {
         
         let active = AppGroup.suiteName
         statusText += "---Active: \(active)---\n"
+    }
+    
+    private func backupData() {
+        do {
+            let configs = try SharedStorage.shared.loadConfigurations()
+            guard !configs.isEmpty else {
+                statusText = "⚠️ No configs to backup"
+                return
+            }
+            
+            let json = try SharedStorage.shared.exportToJSON(configs)
+            let fileName = "widget_backup_\(Date().iso8601Format()).json"
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+            try json.write(to: tempURL)
+            
+            statusText = "✅ Backup saved!\n\(fileName)\n"
+            statusText += "Size: \(json.count) bytes\n"
+            
+            // Try to save to documents for sharing
+            if let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                let backupURL = docsURL.appendingPathComponent("widget_backup.json")
+                try json.write(to: backupURL)
+                statusText += "Saved to: \(backupURL.lastPathComponent)\n"
+            } else {
+                statusText += "❌ Could not save to Documents"
+            }
+        } catch {
+            statusText = "❌ Backup failed: \(error.localizedDescription)"
+        }
+    }
+    
+    private func restoreData() {
+        do {
+            let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+            let backupURL = docsURL?.appendingPathComponent("widget_backup.json")
+            
+            guard let url = backupURL, FileManager.default.fileExists(atPath: url.path) else {
+                statusText = "⚠️ No backup file found"
+                return
+            }
+            
+            let data = try Data(contentsOf: url)
+            let configs = try SharedStorage.shared.importFromJSON(data)
+            try SharedStorage.shared.saveConfigurations(configs)
+            
+            statusText = "✅ Restored \(configs.count) configs!\n"
+        } catch {
+            statusText = "❌ Restore failed: \(error.localizedDescription)"
+        }
     }
 }
 

@@ -24,39 +24,28 @@ enum Constants {
     }
 
     enum AppGroup {
-        // 1. The original ID set in Xcode Signing & Capabilities
         static let rawId = "group.com.iosmirror"
-        
-        // 2. The User's Personal Team ID
         static let teamId = "J3D2F4SMVD"
         
-        // 3. Robust Suite Name Getter using FileManager
+        // Try all possible IDs
+        static let allIDs = [
+            "group.com.iosmirror.\(teamId)",
+            "group.\(teamId).com.iosmirror",
+            rawId
+        ]
+        
         static var suiteName: String {
-            // Try SideStore format: group.com.iosmirror.J3D2F4SMVD (team ID appended to suffix)
-            let sideStoreId1 = "group.com.iosmirror.\(teamId)"
-            // Alternative: group.J3D2F4SMVD.com.iosmirror
-            let sideStoreId2 = "group.\(teamId).com.iosmirror"
-            // Original
-            let rawId = "group.com.iosmirror"
-            
-            // CHECK: Strict file system check using FileManager
-            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: sideStoreId1) {
-                print("✅ Active App Group (SideStore1): \(sideStoreId1)")
-                print("📂 Container Path: \(container.path)")
-                return sideStoreId1
+            for id in allIDs {
+                if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                    let testFile = container.appendingPathComponent(".test")
+                    if FileManager.default.createFile(atPath: testFile.path, contents: nil) {
+                        try? FileManager.default.removeItem(at: testFile)
+                        print("✅ Active App Group: \(id)")
+                        return id
+                    }
+                }
             }
-            else if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: sideStoreId2) {
-                print("✅ Active App Group (SideStore2): \(sideStoreId2)")
-                print("📂 Container Path: \(container.path)")
-                return sideStoreId2
-            }
-            else if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: rawId) {
-                print("✅ Active App Group (Original): \(rawId)")
-                return rawId
-            }
-            
-            // Fallback for debugging
-            print("❌ CRITICAL ERROR: No valid App Group container found for either ID.")
+            print("❌ CRITICAL ERROR: No valid App Group container found")
             return rawId
         }
         
