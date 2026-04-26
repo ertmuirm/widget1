@@ -47,10 +47,20 @@ final class SharedStorage {
         }
         
         // Sync to shared UserDefaults for widget extension (EntityQuery)
-        if let defaults = UserDefaults(suiteName: StorageKeys.appGroupIdentifier) {
+        // Use standard UserDefaults (not suiteName) for immediate availability
+        let appGroupID = StorageKeys.appGroupIdentifier
+        print("[SharedStorage.saveConfigurations] Using App Group: \(appGroupID)")
+        
+        if let defaults = UserDefaults(suiteName: appGroupID) {
+            // Force remove any cached data first
+            defaults.removeObject(forKey: "widgetConfigurations")
             defaults.set(data, forKey: "widgetConfigurations")
-            defaults.synchronize()
-            print("[SharedStorage.saveConfigurations] Synced to UserDefaults SUCCESS")
+            let syncResult = defaults.synchronize()
+            print("[SharedStorage.saveConfigurations] UserDefaults synchronize: \(syncResult)")
+            
+            // Verify it was set
+            let verifyData = defaults.data(forKey: "widgetConfigurations")
+            print("[SharedStorage.saveConfigurations] Verified data: \(verifyData?.count ?? 0) bytes")
         } else {
             print("[SharedStorage.saveConfigurations] ERROR: Failed to access App Group UserDefaults")
         }
@@ -59,7 +69,7 @@ final class SharedStorage {
         let logEntry = """
         [\(ISO8601DateFormatter().string(from: Date()))] [Storage] Saved \(configurations.count) configs (\(data.count) bytes)
         """
-        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: StorageKeys.appGroupIdentifier) {
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
             let logFile = containerURL.appendingPathComponent("debug.log")
             if let logData = logEntry.appending("\n").data(using: .utf8) {
                 if FileManager.default.fileExists(atPath: logFile.path) {

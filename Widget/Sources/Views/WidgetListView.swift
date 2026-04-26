@@ -5,6 +5,8 @@ struct WidgetListView: View {
     
     @EnvironmentObject var viewModel: WidgetViewModel
     @State private var showAddSheet = false
+    @State private var navigateToSettings = false
+    @State private var navigateToDebug = false
     
     var body: some View {
         List {
@@ -12,7 +14,7 @@ struct WidgetListView: View {
                 emptyView
             } else {
                 ForEach(viewModel.configurations) { config in
-                    NavigationLink(destination: WidgetEditorView(configuration: config)) {
+                    NavigationLink(value: config) {
                         WidgetRowView(configuration: config)
                     }
                 }
@@ -21,6 +23,15 @@ struct WidgetListView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Widgets")
+        .navigationDestination(for: WidgetConfig.self) { config in
+            WidgetEditorView(configuration: config)
+        }
+        .navigationDestination(isPresented: $navigateToSettings) {
+            SettingsView()
+        }
+        .navigationDestination(isPresented: $navigateToDebug) {
+            DebugLogView()
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
@@ -31,19 +42,17 @@ struct WidgetListView: View {
             }
             
             ToolbarItem(placement: .secondaryAction) {
-                NavigationLink(destination: BackupView()) {
-                    Image(systemName: "icloud.and.arrow.up")
-                }
-            }
-            
-            ToolbarItem(placement: .secondaryAction) {
-                NavigationLink(destination: SettingsView()) {
+                Button {
+                    navigateToSettings = true
+                } label: {
                     Image(systemName: "gear")
                 }
             }
             
             ToolbarItem(placement: .secondaryAction) {
-                NavigationLink(destination: DebugLogView()) {
+                Button {
+                    navigateToDebug = true
+                } label: {
                     Image(systemName: "doc.text")
                 }
             }

@@ -33,64 +33,75 @@ struct WidgetNameQuery: EntityQuery {
     private let appGroupID = StorageKeys.appGroupIdentifier
     
     func entities(for identifiers: [String]) async throws -> [WidgetNameEntity] {
-        // Explicit App Group check with diagnostic entity
+        print("[WidgetNameQuery.entities] Looking for: \(identifiers)")
+        print("[WidgetNameQuery.entities] App Group: \(appGroupID)")
+        
         guard let sharedDefaults = UserDefaults(suiteName: appGroupID) else {
+            print("[WidgetNameQuery.entities] ERROR: Could not access UserDefaults")
             return [WidgetNameEntity(id: "Error", name: "Invalid App Group ID: \(appGroupID)")]
         }
         
+        sharedDefaults.synchronize()
+        
         guard let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
-            // Data key doesn't exist - return empty (not an error, just no data)
+            print("[WidgetNameQuery.entities] No data in UserDefaults for key 'widgetConfigurations'")
             return []
         }
         
+        print("[WidgetNameQuery.entities] Found \(data.count) bytes in UserDefaults")
+        
         do {
             let configurations = try JSONDecoder().decode([WidgetConfig].self, from: data)
+            print("[WidgetNameQuery.entities] Decoded \(configurations.count) configs")
             return configurations
                 .filter { identifiers.contains($0.name) }
                 .map { WidgetNameEntity(id: $0.name, name: $0.name) }
         } catch {
+            print("[WidgetNameQuery.entities] ERROR decoding: \(error)")
             return [WidgetNameEntity(id: "Error", name: "Decoding Error: \(error.localizedDescription)")]
         }
     }
     
     func suggestedEntities() async throws -> [WidgetNameEntity] {
-        // Explicit App Group check with diagnostic entity
+        print("[WidgetNameQuery.suggestedEntities] App Group: \(appGroupID)")
+        
         guard let sharedDefaults = UserDefaults(suiteName: appGroupID) else {
+            print("[WidgetNameQuery.suggestedEntities] ERROR: Could not access UserDefaults")
             return [WidgetNameEntity(id: "Error", name: "Invalid App Group ID: \(appGroupID)")]
         }
         
-        // Check if data exists
+        sharedDefaults.synchronize()
+        
         guard let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
-            // Key doesn't exist or is nil - might be empty app
+            print("[WidgetNameQuery.suggestedEntities] No data for key 'widgetConfigurations'")
             return [WidgetNameEntity(id: "No Data", name: "No Data in App Group")]
         }
         
-        // Try to decode
+        print("[WidgetNameQuery.suggestedEntities] Found \(data.count) bytes")
+        
         do {
             let configurations = try JSONDecoder().decode([WidgetConfig].self, from: data)
+            print("[WidgetNameQuery.suggestedEntities] Decoded \(configurations.count) configs")
             
-            // Check if array is empty
             if configurations.isEmpty {
                 return [WidgetNameEntity(id: "Empty", name: "Empty Configurations")]
             }
             
-            let entities = configurations.map { WidgetNameEntity(id: $0.name, name: $0.name) }
-            return entities
+            return configurations.map { WidgetNameEntity(id: $0.name, name: $0.name) }
         } catch {
+            print("[WidgetNameQuery.suggestedEntities] ERROR: \(error)")
             return [WidgetNameEntity(id: "Error", name: "Decoding Error: \(error.localizedDescription)")]
         }
     }
     
     func defaultResult() async -> WidgetNameEntity? {
-        // Same logic as suggestedEntities() but return first item
-        guard let sharedDefaults = UserDefaults(suiteName: appGroupID),
-              let data = sharedDefaults.data(forKey: "widgetConfigurations"),
-              let configurations = try? JSONDecoder().decode([WidgetConfig].self, from: data),
-              let firstConfig = configurations.first else {
-            return nil
+        if let sharedDefaults = UserDefaults(suiteName: appGroupID),
+           let data = sharedDefaults.data(forKey: "widgetConfigurations"),
+           let configurations = try? JSONDecoder().decode([WidgetConfig].self, from: data),
+           let firstConfig = configurations.first {
+            return WidgetNameEntity(id: firstConfig.name, name: firstConfig.name)
         }
-        
-        return WidgetNameEntity(id: firstConfig.name, name: firstConfig.name)
+        return nil
     }
 }
 
