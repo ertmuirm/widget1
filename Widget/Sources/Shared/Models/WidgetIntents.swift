@@ -66,22 +66,28 @@ struct WidgetNameQuery: EntityQuery {
                 decoder.dateDecodingStrategy = .iso8601
                 if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
                    !configurations.isEmpty {
+                    print("[WidgetNameQuery] Found \(configurations.count) configs in UserDefaults")
                     return configurations.map { WidgetNameEntity(id: $0.name, name: $0.name) }
                 }
             }
         }
         
         // Fallback to file-based storage
-        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID),
-           let data = try? Data(contentsOf: containerURL.appendingPathComponent("configurations.json")) {
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
-               !configurations.isEmpty {
-                return configurations.map { WidgetNameEntity(id: $0.name, name: $0.name) }
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
+            let fileURL = containerURL.appendingPathComponent("configurations.json")
+            print("[WidgetNameQuery] Checking file: \(fileURL.path)")
+            if let data = try? Data(contentsOf: fileURL) {
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
+                   !configurations.isEmpty {
+                    print("[WidgetNameQuery] Found \(configurations.count) configs in file")
+                    return configurations.map { WidgetNameEntity(id: $0.name, name: $0.name) }
+                }
             }
         }
         
+        print("[WidgetNameQuery] No configurations found")
         return []
     }
     
@@ -175,22 +181,27 @@ struct BroadcastProvider: AppIntentTimelineProvider {
                 decoder.dateDecodingStrategy = .iso8601
                 if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
                    let config = configurations.first(where: { $0.name == name }) {
+                    print("[BroadcastProvider] Found config '\(name)' in UserDefaults")
                     return config
                 }
             }
         }
         
         // Fallback to file-based storage
-        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID),
-           let data = try? Data(contentsOf: containerURL.appendingPathComponent("configurations.json")) {
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
-               let config = configurations.first(where: { $0.name == name }) {
-                return config
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
+            let fileURL = containerURL.appendingPathComponent("configurations.json")
+            if let data = try? Data(contentsOf: fileURL) {
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
+                   let config = configurations.first(where: { $0.name == name }) {
+                    print("[BroadcastProvider] Found config '\(name)' in file")
+                    return config
+                }
             }
         }
         
+        print("[BroadcastProvider] Config '\(name)' not found")
         return nil
     }
 }

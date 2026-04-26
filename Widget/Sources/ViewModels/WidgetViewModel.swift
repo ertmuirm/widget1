@@ -44,7 +44,7 @@ final class WidgetViewModel: ObservableObject {
         do {
             try storage.saveConfigurations(configurations)
             // Reload widget timelines so the extension picks up changes
-            WidgetCenter.shared.reloadAllTimelines()
+            WidgetCenter.shared.reloadTimelines(ofKind: "BroadcastExtension")
         } catch {
             showError(error)
         }
