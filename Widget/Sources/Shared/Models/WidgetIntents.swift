@@ -31,54 +31,64 @@ struct WidgetNameQuery: EntityQuery {
     private let appGroupID = StorageKeys.appGroupIdentifier
     
     func entities(for identifiers: [String]) async throws -> [WidgetNameEntity] {
-        let savedNames = loadSavedNames()
-        return savedNames
-            .filter { identifiers.contains($0) }
-            .map { WidgetNameEntity(id: $0, name: $0) }
+        // Explicit App Group check with diagnostic entity
+        guard let sharedDefaults = UserDefaults(suiteName: appGroupID) else {
+            return [WidgetNameEntity(id: "Error", name: "Invalid App Group ID: \(appGroupID)")]
+        }
+        
+        guard let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
+            // Data key doesn't exist - return empty (not an error, just no data)
+            return []
+        }
+        
+        do {
+            let configurations = try JSONDecoder().decode([WidgetConfig].self, from: data)
+            return configurations
+                .filter { identifiers.contains($0.name) }
+                .map { WidgetNameEntity(id: $0.name, name: $0.name) }
+        } catch {
+            return [WidgetNameEntity(id: "Error", name: "Decoding Error: \(error.localizedDescription)")]
+        }
     }
     
     func suggestedEntities() async throws -> [WidgetNameEntity] {
-        let savedNames = loadSavedNames()
-        let entities = savedNames.map { WidgetNameEntity(id: $0, name: $0) }
-        
-        // No data fallback
-        if entities.isEmpty {
-            return [WidgetNameEntity(id: "None Found", name: "None Found")]
+        // Explicit App Group check with diagnostic entity
+        guard let sharedDefaults = UserDefaults(suiteName: appGroupID) else {
+            return [WidgetNameEntity(id: "Error", name: "Invalid App Group ID: \(appGroupID)")]
         }
         
-        return entities
+        // Check if data exists
+        guard let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
+            // Key doesn't exist or is nil - might be empty app
+            return [WidgetNameEntity(id: "No Data", name: "No Data in App Group")]
+        }
+        
+        // Try to decode
+        do {
+            let configurations = try JSONDecoder().decode([WidgetConfig].self, from: data)
+            
+            // Check if array is empty
+            if configurations.isEmpty {
+                return [WidgetNameEntity(id: "Empty", name: "Empty Configurations")]
+            }
+            
+            let entities = configurations.map { WidgetNameEntity(id: $0.name, name: $0.name) }
+            return entities
+        } catch {
+            return [WidgetNameEntity(id: "Error", name: "Decoding Error: \(error.localizedDescription)")]
+        }
     }
     
     func defaultResult() async -> WidgetNameEntity? {
-        let savedNames = loadSavedNames()
-        if let firstName = savedNames.first {
-            return WidgetNameEntity(id: firstName, name: firstName)
-        }
-        return WidgetNameEntity(id: "None Found", name: "None Found")
-    }
-    
-    private func loadSavedNames() -> [String] {
-        // Load from shared UserDefaults
-        if let defaults = UserDefaults(suiteName: appGroupID),
-           let data = defaults.data(forKey: "widgetConfigurations"),
-           let configurations = try? decodeConfigurations(from: data) {
-            return configurations.map { $0.name }
+        // Same logic as suggestedEntities() but return first item
+        guard let sharedDefaults = UserDefaults(suiteName: appGroupID),
+              let data = sharedDefaults.data(forKey: "widgetConfigurations"),
+              let configurations = try? JSONDecoder().decode([WidgetConfig].self, from: data),
+              let firstConfig = configurations.first else {
+            return nil
         }
         
-        // Fallback: load from file
-        if let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID)?.appendingPathComponent("configurations.json"),
-           let data = try? Data(contentsOf: url),
-           let configurations = try? decodeConfigurations(from: data) {
-            return configurations.map { $0.name }
-        }
-        
-        return []
-    }
-    
-    private func decodeConfigurations(from data: Data) throws -> [WidgetConfig] {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([WidgetConfig].self, from: data)
+        return WidgetNameEntity(id: firstConfig.name, name: firstConfig.name)
     }
 }
 
@@ -145,29 +155,36 @@ struct BroadcastProvider: AppIntentTimelineProvider {
     private func loadConfig(name: String?) -> WidgetConfig? {
         guard let name = name else { return nil }
         
-        // Try UserDefaults first
-        if let defaults = UserDefaults(suiteName: appGroupID),
-           let data = defaults.data(forKey: "widgetConfigurations"),
-           let configurations = try? decodeConfigurations(from: data),
-           let config = configurations.first(where: { $0.name == name }) {
-            return config
+        // Explicit App Group check
+        guard let sharedDefaults = UserDefaults(suiteName: appGroupID) else {
+            print("[BroadcastProvider] Invalid App Group ID: \(appGroupID)")
+            return nil
+        }
+        
+        guard let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
+            print("[BroadcastProvider] No data for key 'widgetConfigurations'")
+            return nil
+        }
+        
+        do {
+            let configurations = try JSONDecoder().decode([WidgetConfig].self, from: data)
+            if let config = configurations.first(where: { $0.name == name }) {
+                return config
+            }
+            print("[BroadcastProvider] Config not found: \(name)")
+        } catch {
+            print("[BroadcastProvider] Decoding error: \(error.localizedDescription)")
         }
         
         // Fallback: load from file
         if let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID)?.appendingPathComponent("configurations.json"),
            let data = try? Data(contentsOf: url),
-           let configurations = try? decodeConfigurations(from: data),
+           let configurations = try? JSONDecoder().decode([WidgetConfig].self, from: data),
            let config = configurations.first(where: { $0.name == name }) {
             return config
         }
         
         return nil
-    }
-    
-    private func decodeConfigurations(from data: Data) throws -> [WidgetConfig] {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode([WidgetConfig].self, from: data)
     }
 }
 

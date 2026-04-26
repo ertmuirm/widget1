@@ -38,6 +38,9 @@ final class SharedStorage {
         if let defaults = UserDefaults(suiteName: StorageKeys.appGroupIdentifier) {
             defaults.set(data, forKey: "widgetConfigurations")
             defaults.synchronize()
+            print("[SharedStorage] Synced \(configurations.count) configs to App Group UserDefaults")
+        } else {
+            print("[SharedStorage] ERROR: Failed to access App Group UserDefaults")
         }
     }
     
