@@ -102,13 +102,16 @@ struct DebugOverlayView: View {
     }
     
     private func saveTestData() {
+        let testItem = WidgetItem(
+            id: UUID(),
+            displayType: .text,
+            customText: "Hello!"
+        )
         let testConfig = WidgetConfig(
             id: UUID(),
-            name: "Test Widget",
-            size: .medium,
-            items: [
-                WidgetItem(id: UUID(), type: .text, content: "Hello!", color: .white)
-            ]
+            name: "Test",
+            size: .systemSmall,
+            items: [testItem]
         )
         
         do {
