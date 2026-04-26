@@ -14,7 +14,7 @@ struct WidgetListView: View {
                 emptyView
             } else {
                 ForEach(viewModel.configurations) { config in
-                    NavigationLink(value: config) {
+                    NavigationLink(destination: WidgetEditorView(configuration: config)) {
                         WidgetRowView(configuration: config)
                     }
                 }
@@ -23,9 +23,6 @@ struct WidgetListView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Widgets")
-        .navigationDestination(for: WidgetConfig.self) { config in
-            WidgetEditorView(configuration: config)
-        }
         .navigationDestination(isPresented: $navigateToSettings) {
             SettingsView()
         }
