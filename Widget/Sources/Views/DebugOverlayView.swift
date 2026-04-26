@@ -1,5 +1,6 @@
 import SwiftUI
 import WidgetKit
+import Constants
 
 /// Floating debug overlay that shows app group data status
 struct DebugOverlayView: View {
