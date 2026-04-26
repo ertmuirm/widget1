@@ -34,14 +34,9 @@ struct WidgetNameQuery: EntityQuery {
     
     func entities(for identifiers: [String]) async throws -> [WidgetNameEntity] {
         print("[WidgetNameQuery.entities] Looking for: \(identifiers)")
-        print("[WidgetNameQuery.entities] App Group: \(appGroupID)")
         
-        guard let sharedDefaults = UserDefaults(suiteName: appGroupID) else {
-            print("[WidgetNameQuery.entities] ERROR: Could not access UserDefaults")
-            return [WidgetNameEntity(id: "Error", name: "Invalid App Group ID: \(appGroupID)")]
-        }
-        
-        sharedDefaults.synchronize()
+        // Use standard UserDefaults for widget extension
+        let sharedDefaults = UserDefaults.standard
         
         guard let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
             print("[WidgetNameQuery.entities] No data in UserDefaults for key 'widgetConfigurations'")
@@ -63,14 +58,10 @@ struct WidgetNameQuery: EntityQuery {
     }
     
     func suggestedEntities() async throws -> [WidgetNameEntity] {
-        print("[WidgetNameQuery.suggestedEntities] App Group: \(appGroupID)")
+        print("[WidgetNameQuery.suggestedEntities]")
         
-        guard let sharedDefaults = UserDefaults(suiteName: appGroupID) else {
-            print("[WidgetNameQuery.suggestedEntities] ERROR: Could not access UserDefaults")
-            return [WidgetNameEntity(id: "Error", name: "Invalid App Group ID: \(appGroupID)")]
-        }
-        
-        sharedDefaults.synchronize()
+        // Use standard UserDefaults
+        let sharedDefaults = UserDefaults.standard
         
         guard let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
             print("[WidgetNameQuery.suggestedEntities] No data for key 'widgetConfigurations'")
@@ -95,8 +86,8 @@ struct WidgetNameQuery: EntityQuery {
     }
     
     func defaultResult() async -> WidgetNameEntity? {
-        if let sharedDefaults = UserDefaults(suiteName: appGroupID),
-           let data = sharedDefaults.data(forKey: "widgetConfigurations"),
+        let sharedDefaults = UserDefaults.standard
+        if let data = sharedDefaults.data(forKey: "widgetConfigurations"),
            let configurations = try? JSONDecoder().decode([WidgetConfig].self, from: data),
            let firstConfig = configurations.first {
             return WidgetNameEntity(id: firstConfig.name, name: firstConfig.name)
@@ -156,33 +147,21 @@ struct BroadcastProvider: AppIntentTimelineProvider {
     private func loadConfig(name: String?) -> WidgetConfig? {
         guard let name = name else { return nil }
         
-        // Try UserDefaults first
-        if let sharedDefaults = UserDefaults(suiteName: appGroupID) {
-            sharedDefaults.synchronize()
-            
-            if let data = sharedDefaults.data(forKey: "widgetConfigurations") {
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
-                   let config = configurations.first(where: { $0.name == name }) {
-                    print("[BroadcastProvider] Found config '\(name)' in UserDefaults")
-                    return config
-                }
-            }
+        // Use standard UserDefaults (App Group may not be available in unsigned builds)
+        let sharedDefaults = UserDefaults.standard
+        sharedDefaults.synchronize()
+        
+        guard let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
+            print("[BroadcastProvider] No data in UserDefaults")
+            return nil
         }
         
-        // Fallback to file-based storage
-        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
-            let fileURL = containerURL.appendingPathComponent("configurations.json")
-            if let data = try? Data(contentsOf: fileURL) {
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
-                   let config = configurations.first(where: { $0.name == name }) {
-                    print("[BroadcastProvider] Found config '\(name)' in file")
-                    return config
-                }
-            }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
+           let config = configurations.first(where: { $0.name == name }) {
+            print("[BroadcastProvider] Found config '\(name)' in UserDefaults")
+            return config
         }
         
         print("[BroadcastProvider] Config '\(name)' not found")

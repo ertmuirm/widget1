@@ -41,23 +41,25 @@ struct WidgetListView: View {
             }
         }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showAddSheet = true
-                } label: {
-                    Image(systemName: "plus")
-                }
-            }
-            
-            ToolbarItem(placement: .secondaryAction) {
+            ToolbarItem(placement: .topBarLeading) {
                 Button {
                     showSettingsSheet = true
                 } label: {
                     Image(systemName: "gear")
+                        .font(.title3)
                 }
             }
             
-            ToolbarItem(placement: .secondaryAction) {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showAddSheet = true
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title3)
+                }
+            }
+            
+            ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button("Debug Overlay") {
                         showDebugOverlay.toggle()
@@ -67,6 +69,7 @@ struct WidgetListView: View {
                     }
                 } label: {
                     Image(systemName: "doc.text")
+                        .font(.title3)
                 }
             }
         }
