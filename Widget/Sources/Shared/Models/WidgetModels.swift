@@ -57,7 +57,7 @@ enum DisplayType: String, Codable, CaseIterable {
 // MARK: - Widget Configuration
 
 /// Represents a complete widget configuration
-struct WidgetConfig: Codable, Identifiable, Equatable {
+struct WidgetConfig: Codable, Identifiable, Equatable, Hashable {
     let id: UUID
     var name: String
     var size: WidgetSize
