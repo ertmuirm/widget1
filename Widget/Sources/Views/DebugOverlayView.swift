@@ -215,7 +215,10 @@ struct DebugOverlayView: View {
             }
             
             let json = try SharedStorage.shared.exportToJSON(configs)
-            let fileName = "widget_backup_\(Date().iso8601Format()).json"
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            let dateStr = formatter.string(from: Date())
+            let fileName = "widget_backup_\(dateStr).json"
             let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
             try json.write(to: tempURL)
             
