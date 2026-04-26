@@ -187,10 +187,3 @@ struct BroadcastProvider: AppIntentTimelineProvider {
         return nil
     }
 }
-
-// MARK: - Widget Entry
-
-struct WidgetEntry: TimelineEntry {
-    let date: Date
-    let configuration: WidgetConfig
-}

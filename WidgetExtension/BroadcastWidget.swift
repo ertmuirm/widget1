@@ -26,12 +26,6 @@ struct BroadcastWidget: Widget {
     }
 }
 
-// MARK: - Timeline Provider
-
-// Use BroadcastProvider from shared WidgetSources
-// The SelectWidgetIntent and WidgetNameEntity are defined in WidgetSources
-// This file just provides the entry point
-
 // MARK: - Widget Entry
 
 // Use WidgetEntry from shared WidgetSources
