@@ -13,9 +13,9 @@ struct ContentView: View {
                 OnboardingView(showOnboarding: $showOnboarding)
             } else {
                 WidgetListView()
-                    .navigationDestination(isPresented: $navigateToSettings) {
-                        SettingsView()
-                    }
+            }
+            .navigationDestination(isPresented: $navigateToSettings) {
+                SettingsView()
             }
         }
         .environmentObject(viewModel)
