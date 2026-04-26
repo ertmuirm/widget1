@@ -9,7 +9,9 @@ struct WidgetNameEntity: AppEntity, Hashable {
         TypeDisplayRepresentation(name: "Widget")
     }
     
-    static var defaultQuery: WidgetNameQuery.Type = WidgetNameQuery.self
+    static var defaultQuery: some EntityQuery {
+        WidgetNameQuery()
+    }
     
     var id: String
     var name: String
