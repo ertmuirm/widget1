@@ -37,7 +37,7 @@ jobs:
           if [ -n "$APP" ]; then
             echo "Found: $APP"
             mkdir -p Payload
-            cp -R "$APP" Payload/
+            cp -r ./build/Build/Products/Release-iphoneos/Widget.app Payload/
             chmod +x Payload/Widget.app/Widget
           else
             echo "Not found"
