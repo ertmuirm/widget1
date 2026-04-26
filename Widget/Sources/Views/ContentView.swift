@@ -18,7 +18,14 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink(destination: SettingsView()) {
+                Menu {
+                    NavigationLink(destination: SettingsView()) {
+                        Label("Settings", systemImage: "gear")
+                    }
+                    NavigationLink(destination: DebugLogView()) {
+                        Label("Debug Logs", systemImage: "doc.text")
+                    }
+                } label: {
                     Image(systemName: "gear")
                         .foregroundStyle(.white)
                 }

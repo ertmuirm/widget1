@@ -54,6 +54,25 @@ final class SharedStorage {
         } else {
             print("[SharedStorage.saveConfigurations] ERROR: Failed to access App Group UserDefaults")
         }
+        
+        // Also write to debug log file
+        let logEntry = """
+        [\(ISO8601DateFormatter().string(from: Date()))] [Storage] Saved \(configurations.count) configs (\(data.count) bytes)
+        """
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: StorageKeys.appGroupIdentifier) {
+            let logFile = containerURL.appendingPathComponent("debug.log")
+            if let logData = logEntry.appending("\n").data(using: .utf8) {
+                if FileManager.default.fileExists(atPath: logFile.path) {
+                    if let handle = try? FileHandle(forWritingTo: logFile) {
+                        handle.seekToEndOfFile()
+                        handle.write(logData)
+                        handle.closeFile()
+                    }
+                } else {
+                    try? logData.write(to: logFile)
+                }
+            }
+        }
     }
     
     /// Load all widget configurations
