@@ -135,7 +135,7 @@ struct BroadcastProvider: AppIntentTimelineProvider {
     func timeline(for configuration: SelectWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
         let config = loadConfig(name: configuration.selectedWidget?.name)
         let entry = WidgetEntry(date: Date(), configuration: config ?? WidgetConfig.defaultConfiguration)
-        return Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
+        return Timeline(entries: [entry], policy: .atEnd)
     }
     
     private func loadConfig(name: String?) -> WidgetConfig? {
