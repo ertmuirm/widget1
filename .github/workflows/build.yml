@@ -19,28 +19,35 @@ jobs:
 
       - name: Build and Package IPA
         run: |
-          # Build using xcodebuild build (NOT archive) to get product
+          set -e
+          
+          # Generate Xcode project first
+          xcodegen generate
+          
+          # Build using xcodebuild
           xcodebuild -scheme Widget -configuration Release \
             -derivedDataPath ./build \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             OTHER_CODE_SIGN_FLAGS="--" \
-            build 2>&1 | tail -20
+            build 2>&1 | tee build.log | tail -50
           
-          # Now check in the build folder
-          echo "=== Checking build output ==="
-          ls -la ./build/Build/Products/Release-iphoneos/ 2>/dev/null || echo "Not there"
+          # Show any errors
+          echo "=== Build Errors ==="
+          grep -i "error:" build.log || echo "No errors found"
           
           # Find Widget.app anywhere in build
           APP=$(find ./build -name "Widget.app" -type d 2>/dev/null | head -1)
           if [ -n "$APP" ]; then
             echo "Found: $APP"
             mkdir -p Payload
-            cp -r ./build/Build/Products/Release-iphoneos/Widget.app Payload/
+            cp -R "$APP" Payload/
             chmod +x Payload/Widget.app/Widget
           else
-            echo "Not found"
+            echo "Widget.app not found!"
+            echo "=== Build Products ==="
+            find ./build -name "*.app" -type d 2>/dev/null || echo "No .app files found"
             exit 1
           fi
           zip -r Widget.ipa Payload
