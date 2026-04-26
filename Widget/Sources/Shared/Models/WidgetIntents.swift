@@ -84,13 +84,11 @@ struct WidgetNameQuery: EntityQuery {
     }
     
     func defaultResult() async -> WidgetNameEntity? {
-        guard let sharedDefaults = UserDefaults(suiteName: StorageKeys.appGroupIdentifier),
-              let data = sharedDefaults.data(forKey: "widgetConfigurations"),
+        guard let sharedDefaults = UserDefaults(suiteName: StorageKeys.appGroupIdentifier) else { return nil }
+        guard let data = sharedDefaults.data(forKey: "widgetConfigurations"),
               let configurations = try? JSONDecoder().decode([WidgetConfig].self, from: data),
-              let firstConfig = configurations.first {
-            return WidgetNameEntity(id: firstConfig.name, name: firstConfig.name)
-        }
-        return nil
+              let firstConfig = configurations.first else { return nil }
+        return WidgetNameEntity(id: firstConfig.name, name: firstConfig.name)
     }
 }
 
