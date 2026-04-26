@@ -33,13 +33,14 @@ struct WidgetNameQuery: EntityQuery {
     private let appGroupID = StorageKeys.appGroupIdentifier
     
     func entities(for identifiers: [String]) async throws -> [WidgetNameEntity] {
-        // Explicit App Group check with diagnostic entity
         guard let sharedDefaults = UserDefaults(suiteName: appGroupID) else {
-            return [WidgetNameEntity(id: "Error", name: "Invalid App Group ID: \(appGroupID)")]
+            return []
         }
         
+        // Force synchronize
+        sharedDefaults.synchronize()
+        
         guard let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
-            // Data key doesn't exist - return empty (not an error, just no data)
             return []
         }
         
@@ -49,7 +50,7 @@ struct WidgetNameQuery: EntityQuery {
                 .filter { identifiers.contains($0.name) }
                 .map { WidgetNameEntity(id: $0.name, name: $0.name) }
         } catch {
-            return [WidgetNameEntity(id: "Error", name: "Decoding Error: \(error.localizedDescription)")]
+            return []
         }
     }
     
@@ -59,10 +60,14 @@ struct WidgetNameQuery: EntityQuery {
             return [WidgetNameEntity(id: "Error", name: "Invalid App Group ID: \(appGroupID)")]
         }
         
+        // Force synchronize to get latest data
+        sharedDefaults.synchronize()
+        
         // Check if data exists
         guard let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
             // Key doesn't exist or is nil - might be empty app
-            return [WidgetNameEntity(id: "No Data", name: "No Data in App Group")]
+            // Return empty array instead of diagnostic entity to allow user to add widgets
+            return []
         }
         
         // Try to decode
@@ -71,13 +76,13 @@ struct WidgetNameQuery: EntityQuery {
             
             // Check if array is empty
             if configurations.isEmpty {
-                return [WidgetNameEntity(id: "Empty", name: "Empty Configurations")]
+                return []
             }
             
             let entities = configurations.map { WidgetNameEntity(id: $0.name, name: $0.name) }
             return entities
         } catch {
-            return [WidgetNameEntity(id: "Error", name: "Decoding Error: \(error.localizedDescription)")]
+            return []
         }
     }
     
@@ -145,8 +150,14 @@ struct BroadcastProvider: AppIntentTimelineProvider {
     private func loadConfig(name: String?) -> WidgetConfig? {
         guard let name = name else { return nil }
         
-        guard let sharedDefaults = UserDefaults(suiteName: appGroupID),
-              let data = sharedDefaults.data(forKey: "widgetConfigurations"),
+        guard let sharedDefaults = UserDefaults(suiteName: appGroupID) else {
+            return nil
+        }
+        
+        // Force synchronize to get latest data
+        sharedDefaults.synchronize()
+        
+        guard let data = sharedDefaults.data(forKey: "widgetConfigurations"),
               let configurations = try? JSONDecoder().decode([WidgetConfig].self, from: data),
               let config = configurations.first(where: { $0.name == name }) else {
             return nil

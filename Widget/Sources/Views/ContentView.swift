@@ -16,6 +16,14 @@ struct ContentView: View {
         }
         .environmentObject(viewModel)
         .preferredColorScheme(.dark)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink(destination: SettingsView()) {
+                    Image(systemName: "gear")
+                        .foregroundStyle(.white)
+                }
+            }
+        }
     }
 }
 
