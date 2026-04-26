@@ -5,7 +5,6 @@ struct ContentView: View {
     
     @StateObject private var viewModel = WidgetViewModel()
     @State private var showOnboarding = !SharedStorage.shared.hasCompletedOnboarding
-    @State private var navigateToSettings = false
     
     var body: some View {
         NavigationStack {
@@ -14,17 +13,12 @@ struct ContentView: View {
             } else {
                 WidgetListView()
             }
-            .navigationDestination(isPresented: $navigateToSettings) {
-                SettingsView()
-            }
         }
         .environmentObject(viewModel)
         .preferredColorScheme(.dark)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    navigateToSettings = true
-                } label: {
+                NavigationLink(destination: SettingsView()) {
                     Image(systemName: "gear")
                         .foregroundStyle(.white)
                 }
