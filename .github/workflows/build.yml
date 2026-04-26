@@ -43,8 +43,7 @@ jobs:
             echo "Not found"
             exit 1
           fi
-          
-          cd Payload && zip -r ../Widget.ipa . && cd ..
+          zip -r Widget.ipa Payload
           ls -la *.ipa 
     
       - name: Upload unsigned IPA
