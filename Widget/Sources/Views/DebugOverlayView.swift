@@ -1,6 +1,34 @@
 import SwiftUI
 import WidgetKit
-import Constants
+
+enum AppGroup {
+    static let rawId = "group.com.iosmirror"
+    static let teamId = "J3D2F4SMVD"
+    
+    static var suiteName: String {
+        let sideStoreId1 = "group.com.iosmirror.\(teamId)"
+        let sideStoreId2 = "group.\(teamId).com.iosmirror"
+        let rawId = "group.com.iosmirror"
+        
+        if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: sideStoreId1) {
+            print("✅ Active App Group (SideStore1): \(sideStoreId1)")
+            print("📂 Container Path: \(container.path)")
+            return sideStoreId1
+        }
+        else if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: sideStoreId2) {
+            print("✅ Active App Group (SideStore2): \(sideStoreId2)")
+            print("📂 Container Path: \(container.path)")
+            return sideStoreId2
+        }
+        else if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: rawId) {
+            print("✅ Active App Group (Original): \(rawId)")
+            return rawId
+        }
+        
+        print("❌ CRITICAL ERROR: No valid App Group container found for either ID.")
+        return rawId
+    }
+}
 
 /// Floating debug overlay that shows app group data status
 struct DebugOverlayView: View {
