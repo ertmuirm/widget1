@@ -28,6 +28,7 @@ struct WidgetNameEntity: AppEntity, Hashable {
 
 /// EntityQuery for fetching widget names from shared App Group storage
 struct WidgetNameQuery: EntityQuery {
+    typealias Entity = WidgetNameEntity
     
     private let appGroupID = StorageKeys.appGroupIdentifier
     
