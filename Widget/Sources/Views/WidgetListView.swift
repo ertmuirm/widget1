@@ -5,29 +5,40 @@ struct WidgetListView: View {
     
     @EnvironmentObject var viewModel: WidgetViewModel
     @State private var showAddSheet = false
-    @State private var navigateToSettings = false
-    @State private var navigateToDebug = false
+    @State private var showSettingsSheet = false
+    @State private var showDebugSheet = false
+    @State private var showDebugOverlay = false
     
     var body: some View {
-        List {
-            if viewModel.configurations.isEmpty {
-                emptyView
-            } else {
-                ForEach(viewModel.configurations) { config in
-                    NavigationLink(destination: WidgetEditorView(configuration: config)) {
-                        WidgetRowView(configuration: config)
+        ZStack {
+            List {
+                if viewModel.configurations.isEmpty {
+                    emptyView
+                } else {
+                    ForEach(viewModel.configurations) { config in
+                        NavigationLink(destination: WidgetEditorView(configuration: config)) {
+                            WidgetRowView(configuration: config)
+                        }
+                    }
+                    .onDelete(perform: viewModel.deleteConfiguration)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle("Widgets")
+            
+            // Floating debug overlay
+            if showDebugOverlay {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        DebugOverlayView()
+                            .frame(width: 200, height: 150)
+                            .padding()
                     }
                 }
-                .onDelete(perform: viewModel.deleteConfiguration)
+                .background(.ultraThinMaterial)
             }
-        }
-        .listStyle(.insetGrouped)
-        .navigationTitle("Widgets")
-        .navigationDestination(isPresented: $navigateToSettings) {
-            SettingsView()
-        }
-        .navigationDestination(isPresented: $navigateToDebug) {
-            DebugLogView()
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -40,15 +51,20 @@ struct WidgetListView: View {
             
             ToolbarItem(placement: .secondaryAction) {
                 Button {
-                    navigateToSettings = true
+                    showSettingsSheet = true
                 } label: {
                     Image(systemName: "gear")
                 }
             }
             
             ToolbarItem(placement: .secondaryAction) {
-                Button {
-                    navigateToDebug = true
+                Menu {
+                    Button("Debug Overlay") {
+                        showDebugOverlay.toggle()
+                    }
+                    Button("Debug Logs") {
+                        showDebugSheet = true
+                    }
                 } label: {
                     Image(systemName: "doc.text")
                 }
@@ -58,6 +74,16 @@ struct WidgetListView: View {
             let newConfig = WidgetConfig()
             NavigationStack {
                 WidgetEditorView(configuration: newConfig, isNew: true)
+            }
+        }
+        .sheet(isPresented: $showSettingsSheet) {
+            NavigationStack {
+                SettingsView()
+            }
+        }
+        .sheet(isPresented: $showDebugSheet) {
+            NavigationStack {
+                DebugLogView()
             }
         }
     }
