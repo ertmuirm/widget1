@@ -16,21 +16,6 @@ struct ContentView: View {
         }
         .environmentObject(viewModel)
         .preferredColorScheme(.dark)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    NavigationLink(destination: SettingsView()) {
-                        Label("Settings", systemImage: "gear")
-                    }
-                    NavigationLink(destination: DebugLogView()) {
-                        Label("Debug Logs", systemImage: "doc.text")
-                    }
-                } label: {
-                    Image(systemName: "gear")
-                        .foregroundStyle(.white)
-                }
-            }
-        }
     }
 }
 

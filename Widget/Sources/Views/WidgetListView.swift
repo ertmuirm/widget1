@@ -35,6 +35,18 @@ struct WidgetListView: View {
                     Image(systemName: "icloud.and.arrow.up")
                 }
             }
+            
+            ToolbarItem(placement: .secondaryAction) {
+                NavigationLink(destination: SettingsView()) {
+                    Image(systemName: "gear")
+                }
+            }
+            
+            ToolbarItem(placement: .secondaryAction) {
+                NavigationLink(destination: DebugLogView()) {
+                    Image(systemName: "doc.text")
+                }
+            }
         }
         .sheet(isPresented: $showAddSheet) {
             let newConfig = WidgetConfig()
