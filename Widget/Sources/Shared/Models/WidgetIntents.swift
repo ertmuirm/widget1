@@ -121,7 +121,11 @@ struct WidgetEntry: TimelineEntry {
 // MARK: - Timeline Provider
 
 struct BroadcastProvider: AppIntentTimelineProvider {
-    private let appGroupID = StorageKeys.appGroupIdentifier
+    private let appGroupID: String
+    
+    init() {
+        self.appGroupID = StorageKeys.appGroupIdentifier
+    }
     
     func placeholder(in context: Context) -> WidgetEntry {
         WidgetEntry(date: Date(), configuration: WidgetConfig.defaultConfiguration)
