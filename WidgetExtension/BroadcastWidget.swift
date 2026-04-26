@@ -1,11 +1,15 @@
 import WidgetKit
 import SwiftUI
+import AppIntents
+
+// Use shared AppEntity and Intent from WidgetSources
+// Note: WidgetConfig must be accessible to both targets
 
 struct BroadcastWidget: Widget {
     let kind: String = "BroadcastExtension"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(kind: kind, provider: Provider()) { entry in
+        AppIntentConfiguration(kind: kind, intent: SelectWidgetIntent.self, provider: BroadcastProvider()) { entry in
             WidgetEntryView(entry: entry)
         }
         .configurationDisplayName("Widget")
@@ -24,54 +28,10 @@ struct BroadcastWidget: Widget {
 
 // MARK: - Timeline Provider
 
-struct Provider: TimelineProvider {
-    func placeholder(in context: Context) -> WidgetEntry {
-        WidgetEntry(date: Date(), configuration: WidgetConfig.defaultConfiguration)
-    }
-
-    func getSnapshot(in context: Context, completion: @escaping (WidgetEntry) -> Void) {
-        let entry = WidgetEntry(date: Date(), configuration: WidgetConfig.defaultConfiguration)
-        completion(entry)
-    }
-
-    func getTimeline(in context: Context, completion: @escaping (Timeline<WidgetEntry>) -> Void) {
-        let configurations = loadConfigurations()
-        
-        if configurations.isEmpty {
-            let entry = WidgetEntry(date: Date(), configuration: WidgetConfig.defaultConfiguration)
-            let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(3600)))
-            completion(timeline)
-        } else {
-            var entries: [WidgetEntry] = []
-            for config in configurations {
-                let entry = WidgetEntry(date: Date(), configuration: config)
-                entries.append(entry)
-            }
-            let timeline = Timeline(entries: entries, policy: .after(Date().addingTimeInterval(3600)))
-            completion(timeline)
-        }
-    }
-    
-    private func loadConfigurations() -> [WidgetConfig] {
-        guard let url = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: "group.com.iosmirror"
-        )?.appendingPathComponent("configurations.json") else {
-            return []
-        }
-        
-        do {
-            let data = try Data(contentsOf: url)
-            let configurations = try JSONDecoder().decode([WidgetConfig].self, from: data)
-            return configurations
-        } catch {
-            return []
-        }
-    }
-}
+// Use BroadcastProvider from shared WidgetSources
+// The SelectWidgetIntent and WidgetNameEntity are defined in WidgetSources
+// This file just provides the entry point
 
 // MARK: - Widget Entry
 
-struct WidgetEntry: TimelineEntry {
-    let date: Date
-    let configuration: WidgetConfig
-}
+// Use WidgetEntry from shared WidgetSources

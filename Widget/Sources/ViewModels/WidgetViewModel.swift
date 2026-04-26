@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import WidgetKit
 
 /// Main ViewModel for managing widget configurations
 @MainActor
@@ -42,6 +43,8 @@ final class WidgetViewModel: ObservableObject {
     func saveConfigurations() {
         do {
             try storage.saveConfigurations(configurations)
+            // Reload widget timelines so the extension picks up changes
+            WidgetCenter.shared.reloadAllTimelines()
         } catch {
             showError(error)
         }

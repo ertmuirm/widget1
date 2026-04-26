@@ -33,6 +33,12 @@ final class SharedStorage {
         
         let data = try encoder.encode(configurations)
         try data.write(to: url, options: .atomic)
+        
+        // Sync to shared UserDefaults for widget extension (EntityQuery)
+        if let defaults = UserDefaults(suiteName: appGroupIdentifier) {
+            defaults.set(data, forKey: "widgetConfigurations")
+            defaults.synchronize()
+        }
     }
     
     /// Load all widget configurations
