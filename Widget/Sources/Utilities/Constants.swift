@@ -14,10 +14,18 @@ enum Constants {
     // MARK: - Storage Keys
     
     enum StorageKeys {
+        // App Group ID - can be replaced by SideStore or injected at build time
+        static let appGroupIdentifier = "group.com.iosmirror"
+        
         static let widgetConfigurations = "widgetConfigurations"
         static let hasCompletedOnboarding = "hasCompletedOnboarding"
         static let lastBackupDate = "lastBackupDate"
         static let userPreferences = "userPreferences"
+    }
+
+    enum appGroup {
+        // Current app group in use - prefer App Group, fallback handled at runtime
+        static var current: String { StorageKeys.appGroupIdentifier }
     }
     
     // MARK: - Widget Configuration
