@@ -9,7 +9,7 @@ struct WidgetNameEntity: AppEntity, Hashable {
         TypeDisplayRepresentation(name: "Widget")
     }
     
-    static var defaultQuery: WidgetNameQuery.Type = WidgetNameQuery.self
+    static var defaultQuery: WidgetNameQuery = WidgetNameQuery()
     
     var id: String
     var name: String
@@ -101,7 +101,7 @@ struct SelectWidgetIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Select Widget"
     static var description = IntentDescription("Choose which widget configuration to display")
     
-    @Parameter(title: "Widget", query: WidgetNameQuery.self)
+    @Parameter(title: "Widget")
     var selectedWidget: WidgetNameEntity?
     
     init() {}
