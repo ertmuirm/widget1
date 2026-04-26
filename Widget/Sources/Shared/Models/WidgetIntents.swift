@@ -33,61 +33,116 @@ struct WidgetNameQuery: EntityQuery {
     private let appGroupID = StorageKeys.appGroupIdentifier
     
     func entities(for identifiers: [String]) async throws -> [WidgetNameEntity] {
-        guard let sharedDefaults = UserDefaults(suiteName: appGroupID) else {
-            return []
-        }
+        print("[WidgetNameQuery.entities] Looking for identifiers: \(identifiers)")
         
-        // Force synchronize
-        sharedDefaults.synchronize()
-        
-        guard let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
-            return []
-        }
-        
-        do {
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            let configurations = try decoder.decode([WidgetConfig].self, from: data)
-            return configurations
-                .filter { identifiers.contains($0.name) }
-                .map { WidgetNameEntity(id: $0.name, name: $0.name) }
-        } catch {
-            return []
-        }
-    }
-    
-    func suggestedEntities() async throws -> [WidgetNameEntity] {
         // Try UserDefaults first
         if let sharedDefaults = UserDefaults(suiteName: appGroupID) {
             sharedDefaults.synchronize()
             
             if let data = sharedDefaults.data(forKey: "widgetConfigurations") {
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
-                   !configurations.isEmpty {
-                    print("[WidgetNameQuery] Found \(configurations.count) configs in UserDefaults")
-                    return configurations.map { WidgetNameEntity(id: $0.name, name: $0.name) }
+                print("[WidgetNameQuery.entities] Found data in UserDefaults, size: \(data.count) bytes")
+                do {
+                    let decoder = JSONDecoder()
+                    decoder.dateDecodingStrategy = .iso8601
+                    let configurations = try decoder.decode([WidgetConfig].self, from: data)
+                    print("[WidgetNameQuery.entities] Decoded \(configurations.count) configs from UserDefaults")
+                    let filtered = configurations.filter { identifiers.contains($0.name) }
+                    print("[WidgetNameQuery.entities] Filtered to \(filtered.count) matching configs")
+                    return filtered.map { WidgetNameEntity(id: $0.name, name: $0.name) }
+                } catch {
+                    print("[WidgetNameQuery.entities] ERROR decoding UserDefaults: \(error)")
                 }
+            } else {
+                print("[WidgetNameQuery.entities] No data in UserDefaults for key 'widgetConfigurations'")
             }
+        } else {
+            print("[WidgetNameQuery.entities] ERROR: Could not access App Group UserDefaults")
         }
         
         // Fallback to file-based storage
         if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
             let fileURL = containerURL.appendingPathComponent("configurations.json")
-            print("[WidgetNameQuery] Checking file: \(fileURL.path)")
+            print("[WidgetNameQuery.entities] Checking file: \(fileURL.path)")
             if let data = try? Data(contentsOf: fileURL) {
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
-                   !configurations.isEmpty {
-                    print("[WidgetNameQuery] Found \(configurations.count) configs in file")
-                    return configurations.map { WidgetNameEntity(id: $0.name, name: $0.name) }
+                print("[WidgetNameQuery.entities] Found data in file, size: \(data.count) bytes")
+                do {
+                    let decoder = JSONDecoder()
+                    decoder.dateDecodingStrategy = .iso8601
+                    let configurations = try decoder.decode([WidgetConfig].self, from: data)
+                    print("[WidgetNameQuery.entities] Decoded \(configurations.count) configs from file")
+                    let filtered = configurations.filter { identifiers.contains($0.name) }
+                    print("[WidgetNameQuery.entities] Filtered to \(filtered.count) matching configs")
+                    return filtered.map { WidgetNameEntity(id: $0.name, name: $0.name) }
+                } catch {
+                    print("[WidgetNameQuery.entities] ERROR decoding file: \(error)")
                 }
+            } else {
+                print("[WidgetNameQuery.entities] No data in file")
             }
         }
         
-        print("[WidgetNameQuery] No configurations found")
+        print("[WidgetNameQuery.entities] Returning empty array")
+        return []
+    }
+    
+    func suggestedEntities() async throws -> [WidgetNameEntity] {
+        print("[WidgetNameQuery.suggestedEntities] Called")
+        
+        // Try UserDefaults first
+        if let sharedDefaults = UserDefaults(suiteName: appGroupID) {
+            sharedDefaults.synchronize()
+            print("[WidgetNameQuery.suggestedEntities] UserDefaults accessed")
+            
+            if let data = sharedDefaults.data(forKey: "widgetConfigurations") {
+                print("[WidgetNameQuery.suggestedEntities] Found \(data.count) bytes in UserDefaults")
+                do {
+                    let decoder = JSONDecoder()
+                    decoder.dateDecodingStrategy = .iso8601
+                    let configurations = try decoder.decode([WidgetConfig].self, from: data)
+                    print("[WidgetNameQuery.suggestedEntities] Decoded \(configurations.count) configs from UserDefaults")
+                    if !configurations.isEmpty {
+                        return configurations.map { WidgetNameEntity(id: $0.name, name: $0.name) }
+                    }
+                } catch {
+                    print("[WidgetNameQuery.suggestedEntities] ERROR decoding UserDefaults: \(error)")
+                }
+            } else {
+                print("[WidgetNameQuery.suggestedEntities] No data in UserDefaults for 'widgetConfigurations'")
+            }
+        } else {
+            print("[WidgetNameQuery.suggestedEntities] ERROR: Could not access App Group UserDefaults")
+        }
+        
+        // Fallback to file-based storage
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
+            let fileURL = containerURL.appendingPathComponent("configurations.json")
+            print("[WidgetNameQuery.suggestedEntities] Checking file: \(fileURL.path)")
+            
+            var isDir: ObjCBool = false
+            let exists = FileManager.default.fileExists(atPath: containerURL.path, isDirectory: &isDir)
+            print("[WidgetNameQuery.suggestedEntities] Container exists: \(exists), isDir: \(isDir.boolValue)")
+            
+            if FileManager.default.fileExists(atPath: fileURL.path) {
+                if let data = try? Data(contentsOf: fileURL) {
+                    print("[WidgetNameQuery.suggestedEntities] Found \(data.count) bytes in file")
+                    do {
+                        let decoder = JSONDecoder()
+                        decoder.dateDecodingStrategy = .iso8601
+                        let configurations = try decoder.decode([WidgetConfig].self, from: data)
+                        print("[WidgetNameQuery.suggestedEntities] Decoded \(configurations.count) configs from file")
+                        if !configurations.isEmpty {
+                            return configurations.map { WidgetNameEntity(id: $0.name, name: $0.name) }
+                        }
+                    } catch {
+                        print("[WidgetNameQuery.suggestedEntities] ERROR decoding file: \(error)")
+                    }
+                }
+            } else {
+                print("[WidgetNameQuery.suggestedEntities] File does not exist at: \(fileURL.path)")
+            }
+        }
+        
+        print("[WidgetNameQuery.suggestedEntities] No configurations found, returning empty array")
         return []
     }
     

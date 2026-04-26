@@ -28,20 +28,31 @@ final class SharedStorage {
     /// Save all widget configurations
     func saveConfigurations(_ configurations: [WidgetConfig]) throws {
         guard let url = configurationsURL else {
+            print("[SharedStorage] ERROR: configurationsURL is nil")
             throw StorageError.containerNotAvailable
         }
         
+        print("[SharedStorage.saveConfigurations] Saving \(configurations.count) configs")
+        print("[SharedStorage.saveConfigurations] URL: \(url.path)")
+        
         let data = try encoder.encode(configurations)
-        try data.write(to: url, options: .atomic)
-        print("[SharedStorage] Saved \(configurations.count) configs to file")
+        print("[SharedStorage.saveConfigurations] Encoded data size: \(data.count) bytes")
+        
+        do {
+            try data.write(to: url, options: .atomic)
+            print("[SharedStorage.saveConfigurations] File write SUCCESS")
+        } catch {
+            print("[SharedStorage.saveConfigurations] ERROR writing file: \(error)")
+            throw error
+        }
         
         // Sync to shared UserDefaults for widget extension (EntityQuery)
         if let defaults = UserDefaults(suiteName: StorageKeys.appGroupIdentifier) {
             defaults.set(data, forKey: "widgetConfigurations")
             defaults.synchronize()
-            print("[SharedStorage] Synced \(configurations.count) configs to App Group UserDefaults")
+            print("[SharedStorage.saveConfigurations] Synced to UserDefaults SUCCESS")
         } else {
-            print("[SharedStorage] ERROR: Failed to access App Group UserDefaults")
+            print("[SharedStorage.saveConfigurations] ERROR: Failed to access App Group UserDefaults")
         }
     }
     
