@@ -109,27 +109,11 @@ struct SelectWidgetIntent: WidgetConfigurationIntent {
     }
 }
 
-// MARK: - Widget with AppIntentConfiguration
+// MARK: - Widget Entry
 
-struct BroadcastWidget: Widget {
-    let kind: String = "BroadcastExtension"
-
-    var body: some WidgetConfiguration {
-        AppIntentConfiguration(kind: kind, intent: SelectWidgetIntent.self, provider: BroadcastProvider()) { entry in
-            WidgetEntryView(entry: entry)
-        }
-        .configurationDisplayName("Widget")
-        .description("Create custom widgets with customizable actions")
-        .supportedFamilies([
-            .systemSmall,
-            .systemMedium,
-            .systemLarge,
-            .systemExtraLarge,
-            .accessoryCircular,
-            .accessoryInline,
-            .accessoryRectangular
-        ])
-    }
+struct WidgetEntry: TimelineEntry {
+    let date: Date
+    let configuration: WidgetConfig
 }
 
 // MARK: - Timeline Provider
@@ -155,35 +139,13 @@ struct BroadcastProvider: AppIntentTimelineProvider {
     private func loadConfig(name: String?) -> WidgetConfig? {
         guard let name = name else { return nil }
         
-        // Explicit App Group check
-        guard let sharedDefaults = UserDefaults(suiteName: appGroupID) else {
-            print("[BroadcastProvider] Invalid App Group ID: \(appGroupID)")
+        guard let sharedDefaults = UserDefaults(suiteName: appGroupID),
+              let data = sharedDefaults.data(forKey: "widgetConfigurations"),
+              let configurations = try? JSONDecoder().decode([WidgetConfig].self, from: data),
+              let config = configurations.first(where: { $0.name == name }) else {
             return nil
         }
         
-        guard let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
-            print("[BroadcastProvider] No data for key 'widgetConfigurations'")
-            return nil
-        }
-        
-        do {
-            let configurations = try JSONDecoder().decode([WidgetConfig].self, from: data)
-            if let config = configurations.first(where: { $0.name == name }) {
-                return config
-            }
-            print("[BroadcastProvider] Config not found: \(name)")
-        } catch {
-            print("[BroadcastProvider] Decoding error: \(error.localizedDescription)")
-        }
-        
-        // Fallback: load from file
-        if let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID)?.appendingPathComponent("configurations.json"),
-           let data = try? Data(contentsOf: url),
-           let configurations = try? JSONDecoder().decode([WidgetConfig].self, from: data),
-           let config = configurations.first(where: { $0.name == name }) {
-            return config
-        }
-        
-        return nil
+        return config
     }
 }
