@@ -49,32 +49,56 @@ struct DebugOverlayView: View {
     
     private func checkAppGroupData() {
         let appGroupID = StorageKeys.appGroupIdentifier
-        statusText = "App Group ID: \(appGroupID)\n"
+        statusText = "App Group: \(appGroupID)\n"
         
-        // Check standard UserDefaults
-        let defaults = UserDefaults.standard
-        statusText += "---UserDefaults.standard---\n"
-        
-        if let data = defaults.data(forKey: "widgetConfigurations") {
-            statusText += "✅ Data: \(data.count) bytes\n"
+        // Check 1: Container URL
+        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
+            statusText += "✅ Container: exists\n"
+            statusText += "Path: \(containerURL.path)\n"
             
-            if let configs = try? JSONDecoder().decode([WidgetConfig].self, from: data) {
-                statusText += "Configs: \(configs.count)\n"
-                for config in configs {
-                    statusText += "- \(config.name)\n"
+            // Check for configurations.json
+            let configURL = containerURL.appendingPathComponent("configurations.json")
+            if FileManager.default.fileExists(atPath: configURL.path) {
+                statusText += "✅ File: exists\n"
+                
+                if let data = try? Data(contentsOf: configURL),
+                   let configs = try? JSONDecoder().decode([WidgetConfig].self, from: data) {
+                    statusText += "Config count: \(configs.count)\n"
+                    for config in configs {
+                        statusText += "- \(config.name)\n"
+                    }
                 }
+            } else {
+                statusText += "❌ File: not found\n"
             }
         } else {
-            statusText += "❌ No data yet\n"
+            statusText += "❌ Container: access denied\n"
         }
         
-        // Check App Group container
-        statusText += "---Container---\n"
-        if let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
-            statusText += "✅ Container available\n"
+        statusText += "---UserDefaults---\n"
+        
+        // Check 2: UserDefaults
+        if let defaults = UserDefaults(suiteName: appGroupID) {
+            statusText += "✅ UserDefaults: accessible\n"
+            
+            if let data = defaults.data(forKey: "widgetConfigurations") {
+                statusText += "✅ Data key exists: \(data.count) bytes\n"
+                
+                if let configs = try? JSONDecoder().decode([WidgetConfig].self, from: data) {
+                    statusText += "Config count: \(configs.count)\n"
+                    for config in configs {
+                        statusText += "- \(config.name)\n"
+                    }
+                }
+            } else {
+                statusText += "❌ Data key: empty or nil\n"
+            }
         } else {
-            statusText += "❌ Container not available\n"
+            statusText += "❌ UserDefaults: access denied\n"
         }
+        
+        // Force trigger refresh
+        WidgetCenter.shared.reloadAllTimelines()
     }
     
     private func saveTestData() {

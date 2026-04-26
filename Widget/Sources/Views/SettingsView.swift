@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 /// Settings and preferences view
 struct SettingsView: View {
@@ -46,35 +45,9 @@ struct SettingsView: View {
                 HStack {
                     Text("Build")
                     Spacer()
-                    Text("136")
+                    Text("1")
                         .foregroundStyle(.secondary)
                 }
-            }
-            
-            // Backup/Restore section
-            Section("Backup & Restore") {
-                Button {
-                    exportConfigurations()
-                } label: {
-                    Label("Export Widgets", systemImage: "square.and.arrow.up")
-                }
-                .foregroundStyle(.white)
-                
-                Button {
-                    importConfigurations()
-                } label: {
-                    Label("Import Widgets", systemImage: "square.and.arrow.down")
-                }
-                .foregroundStyle(.white)
-                
-                Button {
-                    viewModel.configurations.removeAll()
-                    try? SharedStorage.shared.deleteAllConfigurations()
-                } label: {
-                    Label("Clear All Widgets", systemImage: "trash")
-                }
-                .foregroundStyle(.red)
-            }
             }
             
             // Support section
@@ -157,35 +130,6 @@ extension View {
             .padding()
             .background(ThemeColors.cardBackground)
             .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-    
-    // MARK: - Export/Import Functions
-    
-    private func exportConfigurations() {
-        guard !viewModel.configurations.isEmpty else { return }
-        
-        do {
-            let data = try JSONEncoder().encode(viewModel.configurations)
-            let jsonString = String(data: data, encoding: .utf8) ?? ""
-            UIPasteboard.general.string = jsonString
-            print("[SettingsView] Exported \(viewModel.configurations.count) configs")
-        } catch {
-            print("[SettingsView] Export error: \(error)")
-        }
-    }
-    
-    private func importConfigurations() {
-        guard let jsonString = UIPasteboard.general.string,
-              let data = jsonString.data(using: .utf8) else { return }
-        
-        do {
-            let configs = try JSONDecoder().decode([WidgetConfig].self, from: data)
-            viewModel.configurations = configs
-            try SharedStorage.shared.saveConfigurations(configs)
-            print("[SettingsView] Imported \(configs.count) configs")
-        } catch {
-            print("[SettingsView] Import error: \(error)")
-        }
     }
 }
 
