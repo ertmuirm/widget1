@@ -34,6 +34,23 @@ struct WidgetEntryView: View {
                 } else {
                     itemsGrid(in: geometry.size)
                 }
+                
+                // Debug overlay (shows in DEBUG builds only)
+                #if DEBUG
+                VStack {
+                    HStack {
+                        Text("\(entry.configuration.items.count)")
+                            .font(.system(size: 8))
+                            .foregroundStyle(.red)
+                        Spacer()
+                        Text(String(describing: widgetFamily))
+                            .font(.system(size: 8))
+                            .foregroundStyle(.green)
+                    }
+                    Spacer()
+                }
+                .padding(4)
+                #endif
             }
         }
     }
@@ -53,7 +70,8 @@ struct WidgetEntryView: View {
     private func itemsGrid(in size: CGSize) -> some View {
         let config = entry.configuration
         
-        switch config.size {
+        // Use widgetFamily instead of config.size for proper sizing
+        switch widgetFamily {
         case .systemSmall:
             smallWidget
         case .systemMedium:
@@ -62,6 +80,8 @@ struct WidgetEntryView: View {
             largeWidget
         case .systemExtraLarge:
             extraLargeWidget
+        default:
+            mediumWidget // fallback
         }
     }
     
