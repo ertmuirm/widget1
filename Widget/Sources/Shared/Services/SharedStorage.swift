@@ -9,31 +9,51 @@ final class SharedStorage {
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     
-    // Try multiple App Group IDs
+    // App Group IDs to try
     private let appGroupIDs = [
         "group.com.iosmirror.J3D2F4SMVD",
         "group.J3D2F4SMVD.com.iosmirror", 
         "group.com.iosmirror"
     ]
     
-    private func getContainerURL() -> URL? {
-        // Try each possible ID
+    // Storage mode
+    private var useFileStorage = false
+    private var activeAppGroupID: String = "group.com.iosmirror"
+    
+    // UserDefaults reference (use whichever works)
+    private var sharedDefaults: UserDefaults? {
+        for id in appGroupIDs {
+            if let defaults = UserDefaults(suiteName: id) {
+                // Test if it works
+                defaults.set("test", forKey: "_test_key")
+                if defaults.string(forKey: "_test_key") == "test" {
+                    defaults.removeObject(forKey: "_test_key")
+                    print("✅ Using UserDefaults: \(id)")
+                    activeAppGroupID = id
+                    return defaults
+                }
+            }
+        }
+        // Fallback to standard
+        print("⚠️ Falling back to standard UserDefaults")
+        activeAppGroupID = "standard"
+        return UserDefaults.standard
+    }
+    
+    private var containerURL: URL? {
+        guard useFileStorage else { return nil }
         for id in appGroupIDs {
             if let url = fileManager.containerURL(forSecurityApplicationGroupIdentifier: id) {
-                // Verify we can write to it
                 let testFile = url.appendingPathComponent(".test")
                 if fileManager.createFile(atPath: testFile.path, contents: nil) {
                     try? fileManager.removeItem(at: testFile)
-                    print("✅ Using App Group: \(id)")
+                    print("✅ Using file container: \(id)")
+                    activeAppGroupID = id
                     return url
                 }
             }
         }
         return nil
-    }
-    
-    private var containerURL: URL? {
-        getContainerURL()
     }
     
     private var configurationsURL: URL? {
@@ -50,42 +70,26 @@ final class SharedStorage {
     
     /// Save all widget configurations
     func saveConfigurations(_ configurations: [WidgetConfig]) throws {
-        guard let url = configurationsURL else {
-            throw StorageError.containerNotAvailable
-        }
-        
         let data = try encoder.encode(configurations)
-        try data.write(to: url, options: .atomic)
         
-        // Sync to standard UserDefaults for widget extension (EntityQuery)
-        // Use standard since App Group UserDefaults may not be available in unsigned builds
-        UserDefaults.standard.set(data, forKey: "widgetConfigurations")
-        UserDefaults.standard.synchronize()
+        // Use UserDefaults (works even without container)
+        sharedDefaults?.set(data, forKey: "widgetConfigurations")
+        
+        print("✅ Saved \(configurations.count) configs to UserDefaults")
     }
     
     /// Load all widget configurations
     func loadConfigurations() throws -> [WidgetConfig] {
-        guard let url = configurationsURL else {
-            throw StorageError.containerNotAvailable
-        }
-        
-        guard fileManager.fileExists(atPath: url.path) else {
+        guard let data = sharedDefaults?.data(forKey: "widgetConfigurations") else {
             return []
         }
         
-        let data = try Data(contentsOf: url)
         return try decoder.decode([WidgetConfig].self, from: data)
     }
     
     /// Delete all configurations
     func deleteAllConfigurations() throws {
-        guard let url = configurationsURL else {
-            throw StorageError.containerNotAvailable
-        }
-        
-        if fileManager.fileExists(atPath: url.path) {
-            try fileManager.removeItem(at: url)
-        }
+        sharedDefaults?.removeObject(forKey: "widgetConfigurations")
     }
     
     // MARK: - Onboarding
@@ -128,18 +132,19 @@ final class SharedStorage {
     
     /// Get storage usage information
     func getStorageInfo() throws -> StorageInfo {
-        guard let url = configurationsURL else {
-            throw StorageError.containerNotAvailable
-        }
-        
-        let attributes = try? fileManager.attributesOfItem(atPath: url.path)
-        let size = attributes?[.size] as? Int64 ?? 0
+        let configs = try loadConfigurations()
+        let size = sharedDefaults?.data(forKey: "widgetConfigurations")?.count ?? 0
         
         return StorageInfo(
-            fileExists: fileManager.fileExists(atPath: url.path),
-            size: size,
-            configurationCount: (try? loadConfigurations().count) ?? 0
+            fileExists: true,
+            size: Int64(size),
+            configurationCount: configs.count
         )
+    }
+    
+    /// Get active App Group ID
+    var activeAppGroup: String {
+        activeAppGroupID
     }
 }
 

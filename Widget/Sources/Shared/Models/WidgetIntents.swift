@@ -30,13 +30,32 @@ struct WidgetNameEntity: AppEntity, Hashable {
 struct WidgetNameQuery: EntityQuery {
     typealias Entity = WidgetNameEntity
     
-    private let appGroupID = StorageKeys.appGroupIdentifier
+    // Use multiple App Group IDs with fallback
+    private let appGroupIDs = [
+        "group.com.iosmirror.J3D2F4SMVD",
+        "group.J3D2F4SMVD.com.iosmirror",
+        "group.com.iosmirror"
+    ]
+    
+    // Get working UserDefaults
+    private func getSharedDefaults() -> UserDefaults? {
+        for id in appGroupIDs {
+            if let defaults = UserDefaults(suiteName: id) {
+                defaults.set("test", forKey: "_test_intent")
+                if defaults.string(forKey: "_test_intent") == "test" {
+                    defaults.removeObject(forKey: "_test_intent")
+                    return defaults
+                }
+            }
+        }
+        return UserDefaults.standard
+    }
     
     func entities(for identifiers: [String]) async throws -> [WidgetNameEntity] {
         print("[WidgetNameQuery.entities] Looking for: \(identifiers)")
         
         // Use App Group UserDefaults for widget extension
-        guard let sharedDefaults = UserDefaults(suiteName: StorageKeys.appGroupIdentifier),
+        guard let sharedDefaults = getSharedDefaults(),
               let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
             print("[WidgetNameQuery.entities] No data in UserDefaults for key 'widgetConfigurations'")
             return []
@@ -60,7 +79,7 @@ struct WidgetNameQuery: EntityQuery {
         print("[WidgetNameQuery.suggestedEntities]")
         
         // Use App Group UserDefaults
-        guard let sharedDefaults = UserDefaults(suiteName: StorageKeys.appGroupIdentifier),
+        guard let sharedDefaults = getSharedDefaults(),
               let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
             print("[WidgetNameQuery.suggestedEntities] No data for key 'widgetConfigurations'")
             return [WidgetNameEntity(id: "No Data", name: "No Data in App Group")]
@@ -84,7 +103,7 @@ struct WidgetNameQuery: EntityQuery {
     }
     
     func defaultResult() async -> WidgetNameEntity? {
-        guard let sharedDefaults = UserDefaults(suiteName: StorageKeys.appGroupIdentifier) else { return nil }
+        guard let sharedDefaults = getSharedDefaults() else { return nil }
         guard let data = sharedDefaults.data(forKey: "widgetConfigurations"),
               let configurations = try? JSONDecoder().decode([WidgetConfig].self, from: data),
               let firstConfig = configurations.first else { return nil }
@@ -119,10 +138,10 @@ struct WidgetEntry: TimelineEntry {
 // MARK: - Timeline Provider
 
 struct BroadcastProvider: AppIntentTimelineProvider {
-    private let appGroupID: String
+    
     
     init() {
-        self.appGroupID = StorageKeys.appGroupIdentifier
+        
     }
     
     func placeholder(in context: Context) -> WidgetEntry {
@@ -144,7 +163,7 @@ struct BroadcastProvider: AppIntentTimelineProvider {
         guard let name = name else { return nil }
         
         // Use standard UserDefaults (App Group may not be available in unsigned builds)
-        guard let sharedDefaults = UserDefaults(suiteName: StorageKeys.appGroupIdentifier) else {
+        guard let sharedDefaults = getSharedDefaults() else {
             return nil
         }
         sharedDefaults.synchronize()
