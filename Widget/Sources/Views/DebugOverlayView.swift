@@ -219,7 +219,7 @@ struct DebugOverlayView: View {
             // If not found, try Documents
             if data == nil {
                 let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
-                if let url = FileManager.default.contentsOfDirectory(at: docsURL!, includingPropertiesForKeys: nil).filter { $0.lastPathComponent.hasPrefix("widget_backup") }.first {
+                if let url = try? FileManager.default.contentsOfDirectory(at: docsURL!, includingPropertiesForKeys: nil).filter { $0.lastPathComponent.hasPrefix("widget_backup") }.first {
                     data = try? Data(contentsOf: url)
                 }
             }
