@@ -104,12 +104,13 @@ struct SettingsView: View {
     private func backupConfigs() {
         do {
             let configs = try SharedStorage.shared.loadConfigurations()
-            guard !configs.isEmpty else { return }
+            guard !configs.isEmpty else { 
+                print("⚠️ No configurations to backup")
+                return 
+            }
             let json = try SharedStorage.shared.exportToJSON(configs)
-            
-            // Save to UserDefaults (always works)
             UserDefaults.standard.set(json, forKey: "widgetBackup")
-            print("✅ Backup saved to UserDefaults")
+            print("✅ Backup saved: \(configs.count) configs")
         } catch {
             print("❌ Backup failed: \(error)")
         }
@@ -117,14 +118,14 @@ struct SettingsView: View {
     
     private func restoreConfigs() {
         guard let data = UserDefaults.standard.data(forKey: "widgetBackup") else {
-            print("⚠️ No backup found in UserDefaults")
+            print("⚠️ No backup found")
             return
         }
         
         do {
             let configs = try SharedStorage.shared.importFromJSON(data)
             try SharedStorage.shared.saveConfigurations(configs)
-            print("✅ Restored \(configs.count) configs")
+            print("✅ Restored: \(configs.count) configs")
         } catch {
             print("❌ Restore failed: \(error)")
         }

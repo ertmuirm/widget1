@@ -183,28 +183,10 @@ struct BroadcastProvider: AppIntentTimelineProvider {
     
     private func loadConfig(name: String?) -> WidgetConfig? {
         guard let name = name else { return nil }
-        
-        // Use standard UserDefaults (App Group may not be available in unsigned builds)
-        guard let sharedDefaults = getWorkingUserDefaults() else {
+        guard let config = SharedStorage.shared.getConfig(named: name) else {
+            print("[BroadcastProvider] Config not found: (name)")
             return nil
         }
-        sharedDefaults.synchronize()
-        sharedDefaults.synchronize()
-        
-        guard let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
-            print("[BroadcastProvider] No data in UserDefaults")
-            return nil
-        }
-        
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        if let configurations = try? decoder.decode([WidgetConfig].self, from: data),
-           let config = configurations.first(where: { $0.name == name }) {
-            print("[BroadcastProvider] Found config '\(name)' in UserDefaults")
-            return config
-        }
-        
-        print("[BroadcastProvider] Config '\(name)' not found")
-        return nil
+        print("[BroadcastProvider] Found: (name) items: (config.items.count)")
+        return config
     }
-}

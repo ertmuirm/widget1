@@ -1,179 +1,148 @@
 import Foundation
 
-/// Service for storing widget configurations in App Group shared container
+/// Unified storage for widget configurations - works for both app and extension
 final class SharedStorage {
     
     static let shared = SharedStorage()
     
-    private let fileManager = FileManager.default
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
     
-    // App Group IDs to try
-    private let appGroupIDs = [
-        "group.com.iosmirror.J3D2F4SMVD",
-        "group.J3D2F4SMVD.com.iosmirror", 
-        "group.com.iosmirror"
-    ]
+    // Fixed key for configurations
+    static let configKey = "widgetConfigurations"
     
-    // Storage mode
-    private var useFileStorage = false
-    private var activeAppGroupID: String = "group.com.iosmirror"
+    // Static cache for App Group ID - shared between all instances
+    private static var cachedAppGroupID: String?
     
-    // UserDefaults reference (use whichever works)
-    private var sharedDefaults: UserDefaults? {
-        for id in appGroupIDs {
+    /// Get active App Group ID (cached for consistency)
+    var activeAppGroupID: String {
+        if let cached = SharedStorage.cachedAppGroupID {
+            return cached
+        }
+        
+        let ids = [
+            "group.com.iosmirror.J3D2F4SMVD",
+            "group.J3D2F4SMVD.com.iosmirror",
+            "group.com.iosmirror"
+        ]
+        
+        for id in ids {
             if let defaults = UserDefaults(suiteName: id) {
-                // Test if it works
-                defaults.set("test", forKey: "_test_key")
-                if defaults.string(forKey: "_test_key") == "test" {
-                    defaults.removeObject(forKey: "_test_key")
-                    print("✅ Using UserDefaults: \(id)")
-                    activeAppGroupID = id
-                    return defaults
+                defaults.set("test", forKey: "_test")
+                if defaults.string(forKey: "_test") == "test" {
+                    defaults.removeObject(forKey: "_test")
+                    SharedStorage.cachedAppGroupID = id
+                    print("[Storage] Using: \(id)")
+                    return id
                 }
             }
         }
-        // Fallback to standard
-        print("⚠️ Falling back to standard UserDefaults")
-        activeAppGroupID = "standard"
-        return UserDefaults.standard
+        
+        SharedStorage.cachedAppGroupID = "standard"
+        return "standard"
     }
     
-    private var containerURL: URL? {
-        guard useFileStorage else { return nil }
-        for id in appGroupIDs {
-            if let url = fileManager.containerURL(forSecurityApplicationGroupIdentifier: id) {
-                let testFile = url.appendingPathComponent(".test")
-                if fileManager.createFile(atPath: testFile.path, contents: nil) {
-                    try? fileManager.removeItem(at: testFile)
-                    print("✅ Using file container: \(id)")
-                    activeAppGroupID = id
-                    return url
-                }
-            }
-        }
-        return nil
-    }
-    
-    private var configurationsURL: URL? {
-        containerURL?.appendingPathComponent("configurations.json")
+    /// UserDefaults for the cached App Group ID
+    private var defaults: UserDefaults? {
+        return UserDefaults(suiteName: activeAppGroupID)
     }
     
     private init() {
-        encoder.outputFormatting = .prettyPrinted
         encoder.dateEncodingStrategy = .iso8601
         decoder.dateDecodingStrategy = .iso8601
     }
     
-    // MARK: - Widget Configurations
+    // MARK: - Save/Load
     
-    /// Save all widget configurations
     func saveConfigurations(_ configurations: [WidgetConfig]) throws {
+        guard let defaults = defaults else {
+            throw StorageError.noDefaults
+        }
+        
         let data = try encoder.encode(configurations)
+        defaults.set(data, forKey: Self.configKey)
+        defaults.synchronize()
         
-        // Use UserDefaults (works even without container)
-        sharedDefaults?.set(data, forKey: "widgetConfigurations")
-        
-        print("✅ Saved \(configurations.count) configs to UserDefaults")
+        print("[Storage] Saved \(configurations.count) configs (\(data.count) bytes)")
     }
     
-    /// Load all widget configurations
     func loadConfigurations() throws -> [WidgetConfig] {
-        guard let data = sharedDefaults?.data(forKey: "widgetConfigurations") else {
+        guard let defaults = defaults,
+              let data = defaults.data(forKey: Self.configKey) else {
+            print("[Storage] No configs found")
             return []
         }
         
-        return try decoder.decode([WidgetConfig].self, from: data)
+        let configs = try decoder.decode([WidgetConfig].self, from: data)
+        print("[Storage] Loaded \(configs.count) configs")
+        return configs
     }
     
-    /// Delete all configurations
     func deleteAllConfigurations() throws {
-        sharedDefaults?.removeObject(forKey: "widgetConfigurations")
+        defaults?.removeObject(forKey: Self.configKey)
+        defaults?.synchronize()
     }
     
-    // MARK: - Onboarding
+    // MARK: - Single Config
     
-    var hasCompletedOnboarding: Bool {
-        get {
-            UserDefaults.standard.bool(forKey: StorageKeys.hasCompletedOnboarding)
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: StorageKeys.hasCompletedOnboarding)
-        }
-    }
-    
-    // MARK: - Backup Date
-    
-    var lastBackupDate: Date? {
-        get {
-            UserDefaults.standard.object(forKey: StorageKeys.lastBackupDate) as? Date
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: StorageKeys.lastBackupDate)
-        }
+    func getConfig(named name: String) -> WidgetConfig? {
+        guard let configs = try? loadConfigurations() else { return nil }
+        return configs.first { $0.name == name }
     }
     
     // MARK: - Export/Import
     
-    /// Export configurations to JSON data
     func exportToJSON(_ configurations: [WidgetConfig]) throws -> Data {
-        let exportData = ExportData(configurations: configurations)
-        return try encoder.encode(exportData)
+        encoder.outputFormatting = .prettyPrinted
+        return try encoder.encode(configurations)
     }
     
-    /// Import configurations from JSON data
     func importFromJSON(_ data: Data) throws -> [WidgetConfig] {
-        let exportData = try decoder.decode(ExportData.self, from: data)
-        return exportData.configurations
+        return try decoder.decode([WidgetConfig].self, from: data)
     }
     
-    // MARK: - Storage Info
+    // MARK: - Info
     
-    /// Get storage usage information
     func getStorageInfo() throws -> StorageInfo {
         let configs = try loadConfigurations()
-        let size = sharedDefaults?.data(forKey: "widgetConfigurations")?.count ?? 0
+        let size = defaults?.data(forKey: Self.configKey)?.count ?? 0
         
         return StorageInfo(
-            fileExists: true,
-            size: Int64(size),
-            configurationCount: configs.count
+            appGroupID: activeAppGroupID,
+            configurationCount: configs.count,
+            size: size
         )
     }
     
-    /// Get active App Group ID
     var activeAppGroup: String {
-        activeAppGroupID
+        return activeAppGroupID
+    }
+    
+    // MARK: - Onboarding (standard UserDefaults)
+    
+    var hasCompletedOnboarding: Bool {
+        get { UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") }
+        set { UserDefaults.standard.set(newValue, forKey: "hasCompletedOnboarding") }
     }
 }
 
 // MARK: - Storage Info
 
 struct StorageInfo {
-    let fileExists: Bool
-    let size: Int64
+    let appGroupID: String
     let configurationCount: Int
+    let size: Int
 }
 
-// MARK: - Storage Errors
+// MARK: - Errors
 
 enum StorageError: LocalizedError {
-    case containerNotAvailable
-    case encodingFailed
-    case decodingFailed
-    case fileNotFound
+    case noDefaults
     
     var errorDescription: String? {
         switch self {
-        case .containerNotAvailable:
-            return "App Group container is not available"
-        case .encodingFailed:
-            return "Failed to encode data"
-        case .decodingFailed:
-            return "Failed to decode data"
-        case .fileNotFound:
-            return "File not found"
+        case .noDefaults:
+            return "UserDefaults not available"
         }
     }
 }
