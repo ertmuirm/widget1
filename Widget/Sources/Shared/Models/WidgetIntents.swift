@@ -65,7 +65,9 @@ struct WidgetNameQuery: EntityQuery {
         print("[WidgetNameQuery.entities] Found \(data.count) bytes in UserDefaults")
         
         do {
-            let configurations = try JSONDecoder().decode([WidgetConfig].self, from: data)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let configurations = try decoder.decode([WidgetConfig].self, from: data)
             print("[WidgetNameQuery.entities] Decoded \(configurations.count) configs")
             return configurations
                 .filter { identifiers.contains($0.name) }
@@ -89,7 +91,9 @@ struct WidgetNameQuery: EntityQuery {
         print("[WidgetNameQuery.suggestedEntities] Found \(data.count) bytes")
         
         do {
-            let configurations = try JSONDecoder().decode([WidgetConfig].self, from: data)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let configurations = try decoder.decode([WidgetConfig].self, from: data)
             print("[WidgetNameQuery.suggestedEntities] Decoded \(configurations.count) configs")
             
             if configurations.isEmpty {

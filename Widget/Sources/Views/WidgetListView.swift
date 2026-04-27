@@ -33,9 +33,10 @@ struct WidgetListView: View {
                     HStack {
                         Spacer()
                         DebugOverlayView()
-                            .frame(width: 200, height: 150)
                             .padding()
+                        Spacer()
                     }
+                    Spacer()
                 }
                 .background(.ultraThinMaterial)
             }

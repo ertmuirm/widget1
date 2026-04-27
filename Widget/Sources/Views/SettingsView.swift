@@ -65,9 +65,24 @@ struct SettingsView: View {
             
             // Debug section (only in DEBUG)
             #if DEBUG
-            Section("Debug") {
+            Section("Backup & Restore") {
+                Button {
+                    backupConfigs()
+                } label: {
+                    Label("Backup Configurations", systemImage: "square.and.arrow.up")
+                }
+                .foregroundStyle(.green)
+                
+                Button {
+                    restoreConfigs()
+                } label: {
+                    Label("Restore Configurations", systemImage: "square.and.arrow.down")
+                }
+                .foregroundStyle(.blue)
+                
+                Divider()
+                
                 Button(role: .destructive) {
-                    // Delete all configurations
                     viewModel.deleteAllConfigurations()
                 } label: {
                     Label("Reset All Data", systemImage: "trash")
@@ -81,8 +96,29 @@ struct SettingsView: View {
         .preferredColorScheme(.dark)
     }
     
-    private func deleteAllConfigurations() {
-        viewModel.deleteConfiguration(at: IndexSet(0..<viewModel.configurations.count))
+    private func backupConfigs() {
+        do {
+            let configs = try SharedStorage.shared.loadConfigurations()
+            guard !configs.isEmpty else {
+                return
+            }
+            let json = try SharedStorage.shared.exportToJSON(configs)
+            UserDefaults.standard.set(json, forKey: "widgetBackup")
+        } catch {
+            print("Backup failed: \(error)")
+        }
+    }
+    
+    private func restoreConfigs() {
+        guard let data = UserDefaults.standard.data(forKey: "widgetBackup") else {
+            return
+        }
+        do {
+            let configs = try SharedStorage.shared.importFromJSON(data)
+            try SharedStorage.shared.saveConfigurations(configs)
+        } catch {
+            print("Restore failed: \(error)")
+        }
     }
 }
 
