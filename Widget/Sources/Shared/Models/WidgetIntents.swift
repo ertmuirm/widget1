@@ -184,9 +184,9 @@ struct BroadcastProvider: AppIntentTimelineProvider {
     private func loadConfig(name: String?) -> WidgetConfig? {
         guard let name = name else { return nil }
         guard let config = SharedStorage.shared.getConfig(named: name) else {
-            print("[BroadcastProvider] Config not found: (name)")
+            print("[BroadcastProvider] Config not found: " + name)
             return nil
         }
-        print("[BroadcastProvider] Found: (name) items: (config.items.count)")
+        print("[BroadcastProvider] Found: " + name + " items: " + String(config.items.count))
         return config
     }
