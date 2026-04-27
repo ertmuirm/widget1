@@ -124,6 +124,11 @@ final class SharedStorage {
         get { UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") }
         set { UserDefaults.standard.set(newValue, forKey: "hasCompletedOnboarding") }
     }
+    
+    var lastBackupDate: Date? {
+        get { UserDefaults.standard.object(forKey: "lastBackupDate") as? Date }
+        set { UserDefaults.standard.set(newValue, forKey: "lastBackupDate") }
+    }
 }
 
 // MARK: - Storage Info
