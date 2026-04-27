@@ -107,71 +107,26 @@ struct SettingsView: View {
             guard !configs.isEmpty else { return }
             let json = try SharedStorage.shared.exportToJSON(configs)
             
-            // Save to UserDefaults
+            // Save to UserDefaults (always works)
             UserDefaults.standard.set(json, forKey: "widgetBackup")
-            
-            // Save to Files app "Start" folder
-            saveToStartFolder(json: json)
+            print("✅ Backup saved to UserDefaults")
         } catch {
-            print("Backup failed: \(error)")
-        }
-    }
-    
-    private func saveToStartFolder(json: Data) {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd_HHmmss"
-        let dateStr = formatter.string(from: Date())
-        let fileName = "widget_backup_\(dateStr).json"
-        
-        // Try to save to the Start folder in Files
-        // The "Start" folder is typically at this path
-        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-        guard let docsURL = paths.first else { return }
-        
-        // Check if Start folder exists, create if not
-        let startFolder = docsURL.appendingPathComponent("Start", isDirectory: true)
-        if !FileManager.default.fileExists(atPath: startFolder.path) {
-            try? FileManager.default.createDirectory(at: startFolder, withIntermediateDirectories: true)
-        }
-        
-        let fileURL = startFolder.appendingPathComponent(fileName)
-        do {
-            try json.write(to: fileURL)
-            print("✅ Backup saved to: \(fileURL.path)")
-        } catch {
-            print("❌ Failed to save to Start folder: \(error)")
+            print("❌ Backup failed: \(error)")
         }
     }
     
     private func restoreConfigs() {
-        // Try UserDefaults backup first
-        if let data = UserDefaults.standard.data(forKey: "widgetBackup") {
-            do {
-                let configs = try SharedStorage.shared.importFromJSON(data)
-                try SharedStorage.shared.saveConfigurations(configs)
-                return
-            } catch {
-                print("Restore from UserDefaults failed: \(error)")
-            }
+        guard let data = UserDefaults.standard.data(forKey: "widgetBackup") else {
+            print("⚠️ No backup found in UserDefaults")
+            return
         }
         
-        // Try Start folder
-        let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-        if let docsURL = paths.first {
-            let startFolder = docsURL.appendingPathComponent("Start", isDirectory: true)
-            do {
-                let files = try FileManager.default.contentsOfDirectory(at: startFolder, includingPropertiesForKeys: nil)
-                    .filter { $0.pathExtension == "json" && $0.lastPathComponent.hasPrefix("widget_backup") }
-                    .sorted { $0.path > $1.path }
-                
-                if let latestFile = files.first {
-                    let data = try Data(contentsOf: latestFile)
-                    let configs = try SharedStorage.shared.importFromJSON(data)
-                    try SharedStorage.shared.saveConfigurations(configs)
-                }
-            } catch {
-                print("Restore from Start folder failed: \(error)")
-            }
+        do {
+            let configs = try SharedStorage.shared.importFromJSON(data)
+            try SharedStorage.shared.saveConfigurations(configs)
+            print("✅ Restored \(configs.count) configs")
+        } catch {
+            print("❌ Restore failed: \(error)")
         }
     }
 }

@@ -150,18 +150,35 @@ struct BroadcastProvider: AppIntentTimelineProvider {
     }
     
     func placeholder(in context: Context) -> WidgetEntry {
-        WidgetEntry(date: Date(), configuration: WidgetConfig.defaultConfiguration)
+        print("[BroadcastProvider] placeholder called")
+        return WidgetEntry(date: Date(), configuration: WidgetConfig.defaultConfiguration)
     }
 
     func snapshot(for configuration: SelectWidgetIntent, in context: Context) async -> WidgetEntry {
-        let config = loadConfig(name: configuration.selectedWidget?.name)
-        return WidgetEntry(date: Date(), configuration: config ?? WidgetConfig.defaultConfiguration)
+        let configName = configuration.selectedWidget?.name
+        print("[BroadcastProvider] snapshot called, selectedWidget: \(configName ?? "nil")")
+        
+        let config = loadConfig(name: configName)
+        let finalConfig = config ?? WidgetConfig.defaultConfiguration
+        
+        print("[BroadcastProvider] Using config: \(finalConfig.name), items: \(finalConfig.items.count), size: \(finalConfig.size)")
+        return WidgetEntry(date: Date(), configuration: finalConfig)
     }
 
     func timeline(for configuration: SelectWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        let config = loadConfig(name: configuration.selectedWidget?.name)
-        let entry = WidgetEntry(date: Date(), configuration: config ?? WidgetConfig.defaultConfiguration)
-        return Timeline(entries: [entry], policy: .atEnd)
+        let configName = configuration.selectedWidget?.name
+        print("[BroadcastProvider] timeline called, selectedWidget: \(configName ?? "nil")")
+        
+        let config = loadConfig(name: configName)
+        let finalConfig = config ?? WidgetConfig.defaultConfiguration
+        
+        print("[BroadcastProvider] Timeline config: \(finalConfig.name), items: \(finalConfig.items.count), size: \(finalConfig.size)")
+        
+        // Create timeline with entries every 15 minutes
+        let entries = (0..<4).map { offset in
+            WidgetEntry(date: Date().addingTimeInterval(TimeInterval(offset * 900)), configuration: finalConfig)
+        }
+        return Timeline(entries: entries, policy: .atEnd)
     }
     
     private func loadConfig(name: String?) -> WidgetConfig? {
