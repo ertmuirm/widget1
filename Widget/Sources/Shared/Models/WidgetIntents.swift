@@ -190,3 +190,4 @@ struct BroadcastProvider: AppIntentTimelineProvider {
         print("[BroadcastProvider] Found: " + name + " items: " + String(config.items.count))
         return config
     }
+}
