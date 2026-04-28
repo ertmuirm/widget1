@@ -23,7 +23,7 @@ struct WidgetEditorView: View {
             // Size section
             Section("Widget Size") {
                 Picker("Size", selection: $configuration.size) {
-                    ForEach(WidgetSize.allCases, id: \.self) { size in
+                    ForEach(WidgetSize.homeScreenCases, id: \.self) { size in
                         Text(size.displayName).tag(size)
                     }
                 }

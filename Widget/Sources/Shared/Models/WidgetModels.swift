@@ -90,7 +90,7 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
     /// Default configuration for placeholder
     static let defaultConfiguration = WidgetConfig(
         name: "My Widget",
-        size: .systemSmall,
+        size: .systemMedium,
         items: [
             WidgetItem(
                 id: UUID(),
@@ -122,43 +122,46 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
 // MARK: - Widget Size
 
 enum WidgetSize: String, Codable, CaseIterable {
-    case systemSmall       // 1x1 (1 item)
-    case systemMedium     // 3x3 (9 items)
-    case systemLarge    // 6x3 (18 items)
-    case systemExtraLarge // 6x6 (36 items)
-    
+    case systemSmall       // 3×3  (9 items)  — home screen Small
+    case systemMedium      // 6×3  (18 items) — home screen Medium
+    case systemLarge       // 6×6  (36 items) — home screen Large
+    case systemExtraLarge  // kept for Codable backwards-compat; hidden from UI
+
+    /// Sizes offered in the home-screen widget picker (excludes lock-screen-only / legacy sizes)
+    static let homeScreenCases: [WidgetSize] = [.systemSmall, .systemMedium, .systemLarge]
+
     var displayName: String {
         switch self {
-        case .systemSmall: return "Small (1×1)"
-        case .systemMedium: return "Medium (3×3)"
-        case .systemLarge: return "Large (6×3)"
+        case .systemSmall:      return "Small (3×3)"
+        case .systemMedium:     return "Medium (6×3)"
+        case .systemLarge:      return "Large (6×6)"
         case .systemExtraLarge: return "Extra Large (6×6)"
         }
     }
-    
+
     var maxItems: Int {
         switch self {
-        case .systemSmall: return 1
-        case .systemMedium: return 9
-        case .systemLarge: return 18
+        case .systemSmall:      return 9
+        case .systemMedium:     return 18
+        case .systemLarge:      return 36
         case .systemExtraLarge: return 36
         }
     }
-    
+
     var columns: Int {
         switch self {
-        case .systemSmall: return 1
-        case .systemMedium: return 3
-        case .systemLarge: return 6
+        case .systemSmall:      return 3
+        case .systemMedium:     return 6
+        case .systemLarge:      return 6
         case .systemExtraLarge: return 6
         }
     }
-    
+
     var rows: Int {
         switch self {
-        case .systemSmall: return 1
-        case .systemMedium: return 3
-        case .systemLarge: return 3
+        case .systemSmall:      return 3
+        case .systemMedium:     return 3
+        case .systemLarge:      return 6
         case .systemExtraLarge: return 6
         }
     }

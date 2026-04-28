@@ -2,7 +2,7 @@ import WidgetKit
 import SwiftUI
 import AppIntents
 
-// MARK: - Small Widget (1×1)
+// MARK: - Small Widget — home screen Small (3×3 grid, systemSmall)
 
 struct BroadcastSmallWidget: Widget {
     let kind = "BroadcastSmall"
@@ -16,12 +16,12 @@ struct BroadcastSmallWidget: Widget {
             WidgetEntryView(entry: entry)
         }
         .configurationDisplayName("Small Widget")
-        .description("A 1×1 customizable widget")
+        .description("A 3×3 customizable widget")
         .supportedFamilies([.systemSmall])
     }
 }
 
-// MARK: - Medium Widget (3×3)
+// MARK: - Medium Widget — home screen Medium (6×3 grid, systemMedium)
 
 struct BroadcastMediumWidget: Widget {
     let kind = "BroadcastMedium"
@@ -35,12 +35,12 @@ struct BroadcastMediumWidget: Widget {
             WidgetEntryView(entry: entry)
         }
         .configurationDisplayName("Medium Widget")
-        .description("A 3×3 customizable widget")
+        .description("A 6×3 customizable widget")
         .supportedFamilies([.systemMedium])
     }
 }
 
-// MARK: - Large Widget (6×3)
+// MARK: - Large Widget — home screen Large (6×6 grid, systemLarge)
 
 struct BroadcastLargeWidget: Widget {
     let kind = "BroadcastLarge"
@@ -54,31 +54,12 @@ struct BroadcastLargeWidget: Widget {
             WidgetEntryView(entry: entry)
         }
         .configurationDisplayName("Large Widget")
-        .description("A 6×3 customizable widget")
+        .description("A 6×6 customizable widget")
         .supportedFamilies([.systemLarge])
     }
 }
 
-// MARK: - Extra Large Widget (6×6)
-
-struct BroadcastExtraLargeWidget: Widget {
-    let kind = "BroadcastExtraLarge"
-
-    var body: some WidgetConfiguration {
-        AppIntentConfiguration(
-            kind: kind,
-            intent: SelectExtraLargeWidgetIntent.self,
-            provider: ExtraLargeBroadcastProvider()
-        ) { entry in
-            WidgetEntryView(entry: entry)
-        }
-        .configurationDisplayName("Extra Large Widget")
-        .description("A 6×6 customizable widget")
-        .supportedFamilies([.systemExtraLarge])
-    }
-}
-
-// MARK: - Lock Screen Widget
+// MARK: - Lock Screen Widget (accessory families only)
 
 struct BroadcastLockWidget: Widget {
     let kind = "BroadcastLock"
@@ -105,7 +86,7 @@ struct BroadcastLockWidget: Widget {
     WidgetEntry(date: .now, configuration: WidgetConfig(
         name: "Preview",
         size: .systemSmall,
-        items: [WidgetItem(displayType: .icon, sfSymbolName: "star.fill")]
+        items: (0..<9).map { _ in WidgetItem(displayType: .icon, sfSymbolName: "star.fill") }
     ))
 }
 

@@ -5,6 +5,8 @@
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.com.iosmirror</string>
+		<string>group.com.iosmirror.J3D2F4SMVD</string>
+		<string>group.J3D2F4SMVD.com.iosmirror</string>
 	</array>
 </dict>
 </plist>

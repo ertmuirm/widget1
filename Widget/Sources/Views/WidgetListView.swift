@@ -16,7 +16,7 @@ struct WidgetListView: View {
                     emptyView
                 } else {
                     ForEach(viewModel.configurations) { config in
-                        NavigationLink(destination: WidgetEditorView(configuration: config)) {
+                        NavigationLink(value: config.id) {
                             WidgetRowView(configuration: config)
                         }
                     }
@@ -25,6 +25,11 @@ struct WidgetListView: View {
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Widgets")
+            .navigationDestination(for: UUID.self) { id in
+                if let config = viewModel.configurations.first(where: { $0.id == id }) {
+                    WidgetEditorView(configuration: config)
+                }
+            }
             
             // Floating debug overlay
             if showDebugOverlay {

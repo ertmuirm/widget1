@@ -48,7 +48,7 @@ private func makeTimeline(configID: String?) -> Timeline<WidgetEntry> {
 }
 
 // MARK: ─────────────────────────────────────────────────────────────────
-// MARK: SMALL WIDGET (1×1)
+// MARK: SMALL WIDGET — home screen Small (3×3, systemSmall)
 // MARK: ─────────────────────────────────────────────────────────────────
 
 struct SmallWidgetEntity: AppEntity, Hashable {
@@ -80,7 +80,7 @@ struct SmallWidgetQuery: EntityQuery {
 
 struct SelectSmallWidgetIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Select Small Widget"
-    static var description = IntentDescription("Choose a small (1×1) widget configuration")
+    static var description = IntentDescription("Choose a small (3×3) widget configuration")
     @Parameter(title: "Widget") var selectedWidget: SmallWidgetEntity?
     init() {}
     init(selectedWidget: SmallWidgetEntity?) { self.selectedWidget = selectedWidget }
@@ -99,7 +99,7 @@ struct SmallBroadcastProvider: AppIntentTimelineProvider {
 }
 
 // MARK: ─────────────────────────────────────────────────────────────────
-// MARK: MEDIUM WIDGET (3×3)
+// MARK: MEDIUM WIDGET — home screen Medium (6×3, systemMedium)
 // MARK: ─────────────────────────────────────────────────────────────────
 
 struct MediumWidgetEntity: AppEntity, Hashable {
@@ -131,7 +131,7 @@ struct MediumWidgetQuery: EntityQuery {
 
 struct SelectMediumWidgetIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Select Medium Widget"
-    static var description = IntentDescription("Choose a medium (3×3) widget configuration")
+    static var description = IntentDescription("Choose a medium (6×3) widget configuration")
     @Parameter(title: "Widget") var selectedWidget: MediumWidgetEntity?
     init() {}
     init(selectedWidget: MediumWidgetEntity?) { self.selectedWidget = selectedWidget }
@@ -150,7 +150,7 @@ struct MediumBroadcastProvider: AppIntentTimelineProvider {
 }
 
 // MARK: ─────────────────────────────────────────────────────────────────
-// MARK: LARGE WIDGET (6×3)
+// MARK: LARGE WIDGET — home screen Large (6×6, systemLarge)
 // MARK: ─────────────────────────────────────────────────────────────────
 
 struct LargeWidgetEntity: AppEntity, Hashable {
@@ -182,7 +182,7 @@ struct LargeWidgetQuery: EntityQuery {
 
 struct SelectLargeWidgetIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Select Large Widget"
-    static var description = IntentDescription("Choose a large (6×3) widget configuration")
+    static var description = IntentDescription("Choose a large (6×6) widget configuration")
     @Parameter(title: "Widget") var selectedWidget: LargeWidgetEntity?
     init() {}
     init(selectedWidget: LargeWidgetEntity?) { self.selectedWidget = selectedWidget }
@@ -201,58 +201,7 @@ struct LargeBroadcastProvider: AppIntentTimelineProvider {
 }
 
 // MARK: ─────────────────────────────────────────────────────────────────
-// MARK: EXTRA LARGE WIDGET (6×6)
-// MARK: ─────────────────────────────────────────────────────────────────
-
-struct ExtraLargeWidgetEntity: AppEntity, Hashable {
-    static var typeDisplayRepresentation: TypeDisplayRepresentation {
-        TypeDisplayRepresentation(name: "Extra Large Widget")
-    }
-    static var defaultQuery = ExtraLargeWidgetQuery()
-    var id: String
-    var name: String
-    var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(name)") }
-    init(id: String, name: String) { self.id = id; self.name = name }
-}
-
-struct ExtraLargeWidgetQuery: EntityQuery {
-    func entities(for identifiers: [String]) async throws -> [ExtraLargeWidgetEntity] {
-        filteredEntities(size: .systemExtraLarge)
-            .filter { identifiers.contains($0.id) }
-            .map { ExtraLargeWidgetEntity(id: $0.id, name: $0.name) }
-    }
-    func suggestedEntities() async throws -> [ExtraLargeWidgetEntity] {
-        let list = filteredEntities(size: .systemExtraLarge)
-        if list.isEmpty { return [ExtraLargeWidgetEntity(id: "none", name: "No Extra Large Widgets")] }
-        return list.map { ExtraLargeWidgetEntity(id: $0.id, name: $0.name) }
-    }
-    func defaultResult() async -> ExtraLargeWidgetEntity? {
-        filteredEntities(size: .systemExtraLarge).first.map { ExtraLargeWidgetEntity(id: $0.id, name: $0.name) }
-    }
-}
-
-struct SelectExtraLargeWidgetIntent: WidgetConfigurationIntent {
-    static var title: LocalizedStringResource = "Select Extra Large Widget"
-    static var description = IntentDescription("Choose an extra large (6×6) widget configuration")
-    @Parameter(title: "Widget") var selectedWidget: ExtraLargeWidgetEntity?
-    init() {}
-    init(selectedWidget: ExtraLargeWidgetEntity?) { self.selectedWidget = selectedWidget }
-}
-
-struct ExtraLargeBroadcastProvider: AppIntentTimelineProvider {
-    func placeholder(in context: Context) -> WidgetEntry {
-        WidgetEntry(date: Date(), configuration: .defaultConfiguration)
-    }
-    func snapshot(for configuration: SelectExtraLargeWidgetIntent, in context: Context) async -> WidgetEntry {
-        makeEntry(configID: configuration.selectedWidget?.id)
-    }
-    func timeline(for configuration: SelectExtraLargeWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        makeTimeline(configID: configuration.selectedWidget?.id)
-    }
-}
-
-// MARK: ─────────────────────────────────────────────────────────────────
-// MARK: LOCK SCREEN WIDGETS
+// MARK: LOCK SCREEN WIDGETS (accessory families)
 // MARK: ─────────────────────────────────────────────────────────────────
 
 struct LockWidgetEntity: AppEntity, Hashable {
@@ -302,7 +251,7 @@ struct LockBroadcastProvider: AppIntentTimelineProvider {
     }
 }
 
-// MARK: - Legacy / Generic (kept for backwards compatibility with any existing placed widgets)
+// MARK: - Legacy / Generic (backwards-compat for any existing placed widgets)
 
 struct WidgetNameEntity: AppEntity, Hashable {
     static var typeDisplayRepresentation: TypeDisplayRepresentation {

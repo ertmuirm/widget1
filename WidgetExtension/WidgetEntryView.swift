@@ -73,42 +73,42 @@ struct WidgetEntryView: View {
 
     // MARK: - Grid layouts
 
+    // Small: 3 columns × 3 rows = 9 items (iOS systemSmall)
     private var smallGrid: some View {
-        Group {
-            if let item = entry.configuration.items.first {
-                itemCell(item, size: .systemSmall)
-            }
-        }
-    }
-
-    private var mediumGrid: some View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
         return LazyVGrid(columns: columns, spacing: 2) {
             ForEach(Array(entry.configuration.items.prefix(9).enumerated()), id: \.element.id) { _, item in
+                itemCell(item, size: .systemSmall)
+            }
+        }
+        .padding(4)
+    }
+
+    // Medium: 6 columns × 3 rows = 18 items (iOS systemMedium)
+    private var mediumGrid: some View {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 6)
+        return LazyVGrid(columns: columns, spacing: 2) {
+            ForEach(Array(entry.configuration.items.prefix(18).enumerated()), id: \.element.id) { _, item in
                 itemCell(item, size: .systemMedium)
             }
         }
         .padding(4)
     }
 
+    // Large: 6 columns × 6 rows = 36 items (iOS systemLarge)
     private var largeGrid: some View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 6)
         return LazyVGrid(columns: columns, spacing: 2) {
-            ForEach(Array(entry.configuration.items.prefix(18).enumerated()), id: \.element.id) { _, item in
+            ForEach(Array(entry.configuration.items.prefix(36).enumerated()), id: \.element.id) { _, item in
                 itemCell(item, size: .systemLarge)
             }
         }
         .padding(4)
     }
 
+    // Extra large treated identically to large
     private var extraLargeGrid: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 6)
-        return LazyVGrid(columns: columns, spacing: 2) {
-            ForEach(Array(entry.configuration.items.prefix(36).enumerated()), id: \.element.id) { _, item in
-                itemCell(item, size: .systemExtraLarge)
-            }
-        }
-        .padding(4)
+        largeGrid
     }
 
     // MARK: - Cell with optional URL link for tap action
@@ -189,10 +189,10 @@ struct ItemView: View {
 
     private var symbolSize: CGFloat {
         switch widgetSize {
-        case .systemSmall:      return 28
-        case .systemMedium:     return 18
-        case .systemLarge:      return 12
-        case .systemExtraLarge: return 12
+        case .systemSmall:      return 14  // 3×3 grid — each cell is small
+        case .systemMedium:     return 10  // 6×3 grid
+        case .systemLarge:      return 10  // 6×6 grid
+        case .systemExtraLarge: return 10
         }
     }
 

@@ -7,7 +7,6 @@ struct BroadcastExtensionBundle: WidgetBundle {
         BroadcastSmallWidget()
         BroadcastMediumWidget()
         BroadcastLargeWidget()
-        BroadcastExtraLargeWidget()
         BroadcastLockWidget()
     }
 }
