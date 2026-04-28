@@ -102,6 +102,15 @@ final class SharedStorage {
         return try decoder.decode([WidgetConfig].self, from: data)
     }
     
+    func getStorageInfo() throws -> StorageInfo {
+        let configs = try loadConfigurations()
+        return StorageInfo(
+            appGroupID: activeAppGroupID,
+            configurationCount: configs.count,
+            size: configs.count
+        )
+    }
+    
     var activeAppGroup: String { activeAppGroupID }
     
     var hasCompletedOnboarding: Bool {
