@@ -31,7 +31,7 @@ struct WidgetEntry: TimelineEntry {
 
 // MARK: - Shared provider logic
 
-private func makeEntry(configID: String?, fallbackSize: WidgetSize) -> WidgetEntry {
+private func makeEntry(configID: String?) -> WidgetEntry {
     let config: WidgetConfig
     if let id = configID, let found = SharedStorage.shared.getConfig(id: id) {
         config = found
@@ -41,8 +41,8 @@ private func makeEntry(configID: String?, fallbackSize: WidgetSize) -> WidgetEnt
     return WidgetEntry(date: Date(), configuration: config)
 }
 
-private func makeTimeline(configID: String?, fallbackSize: WidgetSize) -> Timeline<WidgetEntry> {
-    let entry = makeEntry(configID: configID, fallbackSize: fallbackSize)
+private func makeTimeline(configID: String?) -> Timeline<WidgetEntry> {
+    let entry = makeEntry(configID: configID)
     let next = Calendar.current.date(byAdding: .hour, value: 1, to: Date()) ?? Date()
     return Timeline(entries: [entry], policy: .after(next))
 }
@@ -91,10 +91,10 @@ struct SmallBroadcastProvider: AppIntentTimelineProvider {
         WidgetEntry(date: Date(), configuration: .defaultConfiguration)
     }
     func snapshot(for configuration: SelectSmallWidgetIntent, in context: Context) async -> WidgetEntry {
-        makeEntry(configID: configuration.selectedWidget?.id, fallbackSize: .systemSmall)
+        makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectSmallWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        makeTimeline(configID: configuration.selectedWidget?.id, fallbackSize: .systemSmall)
+        makeTimeline(configID: configuration.selectedWidget?.id)
     }
 }
 
@@ -142,10 +142,10 @@ struct MediumBroadcastProvider: AppIntentTimelineProvider {
         WidgetEntry(date: Date(), configuration: .defaultConfiguration)
     }
     func snapshot(for configuration: SelectMediumWidgetIntent, in context: Context) async -> WidgetEntry {
-        makeEntry(configID: configuration.selectedWidget?.id, fallbackSize: .systemMedium)
+        makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectMediumWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        makeTimeline(configID: configuration.selectedWidget?.id, fallbackSize: .systemMedium)
+        makeTimeline(configID: configuration.selectedWidget?.id)
     }
 }
 
@@ -193,10 +193,10 @@ struct LargeBroadcastProvider: AppIntentTimelineProvider {
         WidgetEntry(date: Date(), configuration: .defaultConfiguration)
     }
     func snapshot(for configuration: SelectLargeWidgetIntent, in context: Context) async -> WidgetEntry {
-        makeEntry(configID: configuration.selectedWidget?.id, fallbackSize: .systemLarge)
+        makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectLargeWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        makeTimeline(configID: configuration.selectedWidget?.id, fallbackSize: .systemLarge)
+        makeTimeline(configID: configuration.selectedWidget?.id)
     }
 }
 
@@ -244,10 +244,10 @@ struct ExtraLargeBroadcastProvider: AppIntentTimelineProvider {
         WidgetEntry(date: Date(), configuration: .defaultConfiguration)
     }
     func snapshot(for configuration: SelectExtraLargeWidgetIntent, in context: Context) async -> WidgetEntry {
-        makeEntry(configID: configuration.selectedWidget?.id, fallbackSize: .systemExtraLarge)
+        makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectExtraLargeWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        makeTimeline(configID: configuration.selectedWidget?.id, fallbackSize: .systemExtraLarge)
+        makeTimeline(configID: configuration.selectedWidget?.id)
     }
 }
 
@@ -295,10 +295,10 @@ struct LockBroadcastProvider: AppIntentTimelineProvider {
         WidgetEntry(date: Date(), configuration: .defaultConfiguration)
     }
     func snapshot(for configuration: SelectLockWidgetIntent, in context: Context) async -> WidgetEntry {
-        makeEntry(configID: configuration.selectedWidget?.id, fallbackSize: .systemSmall)
+        makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectLockWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        makeTimeline(configID: configuration.selectedWidget?.id, fallbackSize: .systemSmall)
+        makeTimeline(configID: configuration.selectedWidget?.id)
     }
 }
 
@@ -344,9 +344,9 @@ struct BroadcastProvider: AppIntentTimelineProvider {
         WidgetEntry(date: Date(), configuration: .defaultConfiguration)
     }
     func snapshot(for configuration: SelectWidgetIntent, in context: Context) async -> WidgetEntry {
-        makeEntry(configID: configuration.selectedWidget?.id, fallbackSize: .systemSmall)
+        makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        makeTimeline(configID: configuration.selectedWidget?.id, fallbackSize: .systemSmall)
+        makeTimeline(configID: configuration.selectedWidget?.id)
     }
 }

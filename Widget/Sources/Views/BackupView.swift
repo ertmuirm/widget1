@@ -165,12 +165,6 @@ struct ExportDocument: FileDocument {
     }
 }
 
-extension UTType {
-    static var json: UTType {
-        UTType(filenameExtension: "json") ?? .data
-    }
-}
-
 #Preview {
     NavigationStack {
         BackupView()
