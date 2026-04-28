@@ -1,30 +1,29 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Backup and restore view for exporting/importing widget configurations
 struct BackupView: View {
-    
+
     @EnvironmentObject var viewModel: WidgetViewModel
     @State private var showExportPicker = false
     @State private var showImportPicker = false
-    @State private var isExporting = false
-    @State private var isImporting = false
-    @State private var exportURL: URL?
+    @State private var exportDocument: ExportDocument?
     @State private var errorMessage: String?
     @State private var showError = false
-    
+    @State private var showSuccess = false
+    @State private var successMessage = ""
+
     var body: some View {
         List {
             Section {
-                // Export button
                 Button {
-                    exportConfigurations()
+                    prepareAndExport()
                 } label: {
                     Label("Export to Files", systemImage: "square.and.arrow.up")
                 }
                 .foregroundStyle(.white)
-                .disabled(isExporting || viewModel.configurations.isEmpty)
-                
-                // Import button
+                .disabled(viewModel.configurations.isEmpty)
+
                 Button {
                     showImportPicker = true
                 } label: {
@@ -34,9 +33,9 @@ struct BackupView: View {
             } header: {
                 Text("Backup & Restore")
             } footer: {
-                Text("Export your widget configurations to a file for backup or transfer to another device. Import configurations from a previously exported file.")
+                Text("Export your widget configurations to a JSON file. Import a previously exported file to restore them.")
             }
-            
+
             if let lastBackup = SharedStorage.shared.lastBackupDate {
                 Section {
                     HStack {
@@ -47,7 +46,7 @@ struct BackupView: View {
                     }
                 }
             }
-            
+
             if !viewModel.configurations.isEmpty {
                 Section {
                     Text("Total: \(viewModel.configurations.count) widget\(viewModel.configurations.count == 1 ? "" : "s")")
@@ -57,20 +56,23 @@ struct BackupView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Backup")
+        // fileExporter needs a non-nil document binding; we gate presentation on exportDocument
         .fileExporter(
             isPresented: $showExportPicker,
-            document: ExportDocument(data: Data()),
+            document: exportDocument ?? ExportDocument(data: Data()),
             contentType: .json,
             defaultFilename: "WidgetBackup-\(formattedDate())"
         ) { result in
             switch result {
-            case .success(let url):
-                exportURL = url
+            case .success:
                 SharedStorage.shared.lastBackupDate = Date()
+                successMessage = "Backup exported successfully."
+                showSuccess = true
             case .failure(let error):
                 errorMessage = error.localizedDescription
                 showError = true
             }
+            exportDocument = nil
         }
         .fileImporter(
             isPresented: $showImportPicker,
@@ -79,51 +81,60 @@ struct BackupView: View {
         ) { result in
             handleImport(result)
         }
+        .alert("Success", isPresented: $showSuccess) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(successMessage)
+        }
         .alert("Error", isPresented: $showError) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(errorMessage ?? "Unknown error")
+            Text(errorMessage ?? "An unknown error occurred.")
         }
     }
-    
-    private func exportConfigurations() {
-        isExporting = true
-        Task {
-            do {
-                let data = try viewModel.exportToJSON()
-                _ = data
-                
-                // Trigger file exporter
-                showExportPicker = true
-            } catch {
-                errorMessage = error.localizedDescription
-                showError = true
-            }
-            isExporting = false
+
+    // MARK: - Export
+
+    private func prepareAndExport() {
+        do {
+            let data = try viewModel.exportToJSON()
+            exportDocument = ExportDocument(data: data)
+            showExportPicker = true
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
         }
     }
-    
+
+    // MARK: - Import
+
     private func handleImport(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
             guard let url = urls.first else { return }
-            
-            Task {
-                do {
-                    let data = try Data(contentsOf: url)
-                    try viewModel.importFromJSON(data)
-                } catch {
-                    errorMessage = error.localizedDescription
+            do {
+                // Security-scoped resource access required for file importer results
+                guard url.startAccessingSecurityScopedResource() else {
+                    errorMessage = "Could not access the selected file."
                     showError = true
+                    return
                 }
+                defer { url.stopAccessingSecurityScopedResource() }
+
+                let data = try Data(contentsOf: url)
+                try viewModel.importFromJSON(data)
+                successMessage = "Configurations imported successfully."
+                showSuccess = true
+            } catch {
+                errorMessage = error.localizedDescription
+                showError = true
             }
-            
         case .failure(let error):
             errorMessage = error.localizedDescription
             showError = true
         }
     }
-    
+
     private func formattedDate() -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -135,30 +146,28 @@ struct BackupView: View {
 
 struct ExportDocument: FileDocument {
     static var readableContentTypes: [UTType] { [.json] }
-    
+
     var data: Data
-    
+
     init(data: Data) {
         self.data = data
     }
-    
+
     init(configuration: ReadConfiguration) throws {
-        guard let data = configuration.file.regularFileContents else {
+        guard let fileData = configuration.file.regularFileContents else {
             throw CocoaError(.fileReadCorruptFile)
         }
-        self.data = data
+        self.data = fileData
     }
-    
+
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
         FileWrapper(regularFileWithContents: data)
     }
 }
 
-import UniformTypeIdentifiers
-
 extension UTType {
     static var json: UTType {
-        UTType(filenameExtension: "json") ?? .json
+        UTType(filenameExtension: "json") ?? .data
     }
 }
 

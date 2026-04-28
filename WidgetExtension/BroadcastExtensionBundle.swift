@@ -4,6 +4,10 @@ import SwiftUI
 @main
 struct BroadcastExtensionBundle: WidgetBundle {
     var body: some Widget {
-        BroadcastWidget()
+        BroadcastSmallWidget()
+        BroadcastMediumWidget()
+        BroadcastLargeWidget()
+        BroadcastExtraLargeWidget()
+        BroadcastLockWidget()
     }
 }

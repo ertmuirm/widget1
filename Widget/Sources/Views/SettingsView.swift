@@ -1,90 +1,114 @@
 import SwiftUI
+import WidgetKit
 
 /// Settings and preferences view
 struct SettingsView: View {
-    
+
     @EnvironmentObject var viewModel: WidgetViewModel
-    @AppStorage("showItemLabels") private var showItemLabels = true
+
+    // Bindings backed by SharedStorage so the widget extension can read them via the app group
+    private var showItemLabels: Binding<Bool> {
+        Binding(
+            get: { SharedStorage.shared.showItemLabels },
+            set: {
+                SharedStorage.shared.showItemLabels = $0
+                // Tell WidgetKit to refresh so the new label preference takes effect immediately
+                WidgetCenter.shared.reloadAllTimelines()
+            }
+        )
+    }
+
+    private var hapticFeedbackEnabled: Binding<Bool> {
+        Binding(
+            get: { SharedStorage.shared.hapticFeedback },
+            set: { SharedStorage.shared.hapticFeedback = $0 }
+        )
+    }
+
     @AppStorage("defaultWidgetSize") private var defaultWidgetSize = "systemMedium"
-    @AppStorage("hapticFeedback") private var hapticFeedback = true
-    
+
+    @State private var backupAlertMessage = ""
+    @State private var showBackupAlert = false
+    @State private var backupAlertIsError = false
+
     var body: some View {
         List {
-            // General section
+            // General
             Section("General") {
-                Toggle("Haptic Feedback", isOn: $hapticFeedback)
+                Toggle("Haptic Feedback", isOn: hapticFeedbackEnabled)
                     .foregroundStyle(.white)
-                
+
                 Picker("Default Widget Size", selection: $defaultWidgetSize) {
                     ForEach(WidgetSize.allCases, id: \.rawValue) { size in
                         Text(size.displayName).tag(size.rawValue)
                     }
                 }
             }
-            
-            // Widget section
+
+            // Widgets
             Section("Widgets") {
-                Toggle("Show Item Labels", isOn: $showItemLabels)
+                Toggle("Show Item Labels", isOn: showItemLabels)
                     .foregroundStyle(.white)
-                
+
                 NavigationLink(destination: WidgetPreviewSettingsView()) {
                     Label("Preview Settings", systemImage: "eye")
                 }
                 .foregroundStyle(.white)
             }
-            
-            // About section
-            Section("About") {
-                HStack {
-                    Text("Version")
-                    Spacer()
-                    Text("1.0.0")
-                        .foregroundStyle(.secondary)
-                }
-                
-                HStack {
-                    Text("Build")
-                    Spacer()
-                    Text("1")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            
-            // Support section
-            Section("Support") {
-                Link(destination: URL(string: "https://github.com/iosmirror/widget")!) {
-                    Label("GitHub", systemImage: "link")
-                }
-                .foregroundStyle(.white)
-                
-                Link(destination: URL(string: "mailto:support@iosmirror.com")!) {
-                    Label("Contact", systemImage: "envelope")
-                }
-                .foregroundStyle(.white)
-            }
-            
-            // Backup section
+
+            // Backup & Restore
             Section("Backup & Restore") {
                 Button {
                     backupConfigs()
                 } label: {
-                    Label("Backup Configurations", systemImage: "square.and.arrow.up")
+                    Label("Backup to Files", systemImage: "square.and.arrow.up")
                 }
                 .foregroundStyle(.green)
-                
+
                 Button {
                     restoreConfigs()
                 } label: {
-                    Label("Restore Configurations", systemImage: "square.and.arrow.down")
+                    Label("Restore from Backup", systemImage: "square.and.arrow.down")
                 }
                 .foregroundStyle(.blue)
-                
-                Text("Backup files saved to: Files/On My iPhone/Start")
+
+                if let lastBackup = SharedStorage.shared.lastBackupDate {
+                    HStack {
+                        Text("Last Backup")
+                        Spacer()
+                        Text(lastBackup, style: .date)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Text("Backup file location: On My iPhone / Widget / Start / widget_backup.json")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            
-            // Debug section (only in DEBUG)
+
+            // About
+            Section("About") {
+                HStack {
+                    Text("Version")
+                    Spacer()
+                    Text("1.0.0").foregroundStyle(.secondary)
+                }
+                HStack {
+                    Text("Build")
+                    Spacer()
+                    Text("1").foregroundStyle(.secondary)
+                }
+            }
+
+            // Support
+            Section("Support") {
+                Link(destination: URL(string: "https://github.com/ertmuirm/widget1")!) {
+                    Label("GitHub", systemImage: "link")
+                }
+                .foregroundStyle(.white)
+            }
+
+            // Debug (DEBUG only)
             #if DEBUG
             Section("Debug") {
                 Button(role: .destructive) {
@@ -99,30 +123,48 @@ struct SettingsView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Settings")
         .preferredColorScheme(.dark)
+        .alert(backupAlertIsError ? "Error" : "Success",
+               isPresented: $showBackupAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(backupAlertMessage)
+        }
     }
-    
+
+    // MARK: - Backup / Restore
+
     private func backupConfigs() {
         do {
             if let url = try SharedStorage.shared.createBackup() {
-                print("✅ Backup saved to: \(url.lastPathComponent)")
+                backupAlertMessage = "Backup saved to:\nOn My iPhone / Widget / Start / \(url.lastPathComponent)"
+                backupAlertIsError = false
             } else {
-                print("⚠️ No configs to backup")
+                backupAlertMessage = "No widget configurations to back up."
+                backupAlertIsError = false
             }
         } catch {
-            print("❌ Backup failed: \(error)")
+            backupAlertMessage = "Backup failed: \(error.localizedDescription)"
+            backupAlertIsError = true
         }
+        showBackupAlert = true
     }
 
     private func restoreConfigs() {
         do {
             if try SharedStorage.shared.restoreFromBackup() {
-                print("✅ Restored from backup")
+                viewModel.loadConfigurations()
+                WidgetCenter.shared.reloadAllTimelines()
+                backupAlertMessage = "Configurations restored successfully."
+                backupAlertIsError = false
             } else {
-                print("⚠️ No backup found")
+                backupAlertMessage = "No backup file found.\n\nExpected location:\nOn My iPhone / Widget / Start / widget_backup.json"
+                backupAlertIsError = true
             }
         } catch {
-            print("❌ Restore failed: \(error)")
+            backupAlertMessage = "Restore failed: \(error.localizedDescription)"
+            backupAlertIsError = true
         }
+        showBackupAlert = true
     }
 }
 
@@ -130,7 +172,7 @@ struct SettingsView: View {
 
 struct WidgetPreviewSettingsView: View {
     @AppStorage("previewBackground") private var previewBackground = true
-    
+
     var body: some View {
         List {
             Section {
@@ -150,19 +192,15 @@ struct WidgetPreviewSettingsView: View {
 
 // MARK: - Theme Colors
 
-/// App theme colors
 enum ThemeColors {
     static let background = Color.black
     static let primaryText = Color.white
     static let secondaryText = Color.gray
     static let accent = Color.blue
     static let destructive = Color.red
-    
     static let cardBackground = Color(white: 0.1)
     static let divider = Color(white: 0.2)
 }
-
-// MARK: - Theme Styles
 
 extension View {
     func themeCard() -> some View {
