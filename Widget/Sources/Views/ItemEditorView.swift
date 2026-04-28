@@ -56,7 +56,7 @@ struct ItemEditorView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Font Size: \(Int(item.fontSize))")
                         Slider(value: $item.fontSize, in: 2...30, step: 1)
-                            .tint(.white)
+                            .tint(.gray)
                     }
                 }
             }
@@ -88,7 +88,7 @@ struct ItemEditorView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Background Opacity: \(Int(item.backgroundOpacity * 100))%")
                     Slider(value: $item.backgroundOpacity, in: 0...1)
-                        .tint(.white)
+                        .tint(.gray)
                 }
             }
             
@@ -133,12 +133,12 @@ struct ItemEditorView: View {
                 }
                 
                 if item.action != nil {
-                    Button(role: .destructive) {
+                    Button {
                         item.action = nil
                     } label: {
                         Label("Remove Action", systemImage: "trash")
                     }
-                    .foregroundStyle(.red)
+                    .foregroundStyle(.gray)
                 }
             }
         }
@@ -211,7 +211,7 @@ struct SymbolPickerView: View {
                         
                         if symbol == selectedSymbol {
                             Image(systemName: "checkmark")
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(.gray)
                         }
                     }
                 }
@@ -260,7 +260,7 @@ struct ActionPickerView: View {
                         
                         if isSelected {
                             Image(systemName: "checkmark")
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(.gray)
                         }
                     }
                 }

@@ -16,6 +16,7 @@ struct ContentView: View {
         }
         .environmentObject(viewModel)
         .preferredColorScheme(.dark)
+        .tint(.gray)
     }
 }
 

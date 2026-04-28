@@ -63,14 +63,14 @@ struct SettingsView: View {
                 } label: {
                     Label("Backup to Files", systemImage: "square.and.arrow.up")
                 }
-                .foregroundStyle(.green)
+                .foregroundStyle(.gray)
 
                 Button {
                     restoreConfigs()
                 } label: {
                     Label("Restore from Backup", systemImage: "square.and.arrow.down")
                 }
-                .foregroundStyle(.blue)
+                .foregroundStyle(.gray)
 
                 if let lastBackup = SharedStorage.shared.lastBackupDate {
                     HStack {
@@ -84,28 +84,6 @@ struct SettingsView: View {
                 Text("Backup file location: On My iPhone / Widget / Start / widget_backup.json")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-            }
-
-            // About
-            Section("About") {
-                HStack {
-                    Text("Version")
-                    Spacer()
-                    Text("1.0.0").foregroundStyle(.secondary)
-                }
-                HStack {
-                    Text("Build")
-                    Spacer()
-                    Text("1").foregroundStyle(.secondary)
-                }
-            }
-
-            // Support
-            Section("Support") {
-                Link(destination: URL(string: "https://github.com/ertmuirm/widget1")!) {
-                    Label("GitHub", systemImage: "link")
-                }
-                .foregroundStyle(.white)
             }
 
             // Debug (DEBUG only)
@@ -196,8 +174,7 @@ enum ThemeColors {
     static let background = Color.black
     static let primaryText = Color.white
     static let secondaryText = Color.gray
-    static let accent = Color.blue
-    static let destructive = Color.red
+    static let accent = Color.gray
     static let cardBackground = Color(white: 0.1)
     static let divider = Color(white: 0.2)
 }

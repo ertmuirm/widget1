@@ -38,7 +38,7 @@ struct WidgetEditorView: View {
                     } label: {
                         Label("Add Item", systemImage: "plus")
                     }
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(.gray)
                 } else {
                     ForEach(Array(configuration.items.enumerated()), id: \.element.id) { index, item in
                         Button {
@@ -58,7 +58,7 @@ struct WidgetEditorView: View {
                         } label: {
                             Label("Add Item", systemImage: "plus")
                         }
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(.gray)
                     }
                 }
             }
@@ -78,7 +78,7 @@ struct WidgetEditorView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Opacity: \(Int(configuration.backgroundOpacity * 100))%")
                     Slider(value: $configuration.backgroundOpacity, in: 0...1)
-                        .tint(.white)
+                        .tint(.gray)
                 }
             }
             
