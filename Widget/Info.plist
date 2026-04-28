@@ -57,5 +57,7 @@
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<key>UIApplicationShortcutItems</key>
+	<array/>
 </dict>
 </plist>
