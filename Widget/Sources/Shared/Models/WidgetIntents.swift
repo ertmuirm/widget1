@@ -27,6 +27,7 @@ struct WidgetNameEntity: AppEntity, Hashable {
 // MARK: - Widget Name Query
 
 /// EntityQuery for fetching widget names from shared App Group storage
+
 // MARK: - Helper Functions
 
 /// Get working UserDefaults with fallback
@@ -48,73 +49,43 @@ func getWorkingUserDefaults() -> UserDefaults? {
     }
     return UserDefaults.standard
 }
-
 struct WidgetNameQuery: EntityQuery {
     typealias Entity = WidgetNameEntity
-    
+
     func entities(for identifiers: [String]) async throws -> [WidgetNameEntity] {
-        print("[WidgetNameQuery.entities] Looking for: \(identifiers)")
-        
-        // Use App Group UserDefaults for widget extension
-        guard let sharedDefaults = getWorkingUserDefaults(),
-              let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
-            print("[WidgetNameQuery.entities] No data in UserDefaults for key 'widgetConfigurations'")
-            return []
-        }
-        
-        print("[WidgetNameQuery.entities] Found \(data.count) bytes in UserDefaults")
-        
         do {
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            let configurations = try decoder.decode([WidgetConfig].self, from: data)
-            print("[WidgetNameQuery.entities] Decoded \(configurations.count) configs")
-            return configurations
+            let configs = try SharedStorage.shared.loadConfigurations()
+            return configs
                 .filter { identifiers.contains($0.name) }
                 .map { WidgetNameEntity(id: $0.name, name: $0.name) }
         } catch {
-            print("[WidgetNameQuery.entities] ERROR decoding: \(error)")
-            return [WidgetNameEntity(id: "Error", name: "Decoding Error: \(error.localizedDescription)")]
+            return []
         }
     }
-    
+
     func suggestedEntities() async throws -> [WidgetNameEntity] {
-        print("[WidgetNameQuery.suggestedEntities]")
-        
-        // Use App Group UserDefaults
-        guard let sharedDefaults = getWorkingUserDefaults(),
-              let data = sharedDefaults.data(forKey: "widgetConfigurations") else {
-            print("[WidgetNameQuery.suggestedEntities] No data for key 'widgetConfigurations'")
-            return [WidgetNameEntity(id: "No Data", name: "No Data in App Group")]
-        }
-        
-        print("[WidgetNameQuery.suggestedEntities] Found \(data.count) bytes")
-        
         do {
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            let configurations = try decoder.decode([WidgetConfig].self, from: data)
-            print("[WidgetNameQuery.suggestedEntities] Decoded \(configurations.count) configs")
-            
-            if configurations.isEmpty {
-                return [WidgetNameEntity(id: "Empty", name: "Empty Configurations")]
+            let configs = try SharedStorage.shared.loadConfigurations()
+            if configs.isEmpty {
+                return [WidgetNameEntity(id: "Empty", name: "No Configurations")]
             }
-            
-            return configurations.map { WidgetNameEntity(id: $0.name, name: $0.name) }
+            return configs.map { WidgetNameEntity(id: $0.name, name: $0.name) }
         } catch {
-            print("[WidgetNameQuery.suggestedEntities] ERROR: \(error)")
-            return [WidgetNameEntity(id: "Error", name: "Decoding Error: \(error.localizedDescription)")]
+            return [WidgetNameEntity(id: "Error", name: "Error: \(error.localizedDescription)")]
         }
     }
-    
+
     func defaultResult() async -> WidgetNameEntity? {
-        guard let sharedDefaults = getWorkingUserDefaults() else { return nil }
-        guard let data = sharedDefaults.data(forKey: "widgetConfigurations"),
-              let configurations = try? JSONDecoder().decode([WidgetConfig].self, from: data),
-              let firstConfig = configurations.first else { return nil }
-        return WidgetNameEntity(id: firstConfig.name, name: firstConfig.name)
+        do {
+            let configs = try SharedStorage.shared.loadConfigurations()
+            guard let first = configs.first else { return nil }
+            return WidgetNameEntity(id: first.name, name: first.name)
+        } catch {
+            return nil
+        }
     }
 }
+
 
 // MARK: - Select Widget Intent
 
