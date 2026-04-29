@@ -35,11 +35,11 @@ final class SharedStorage {
 
     /// The keychain access group shared between the main app and widget extension.
     ///
-    /// The entitlement declares `$(AppIdentifierPrefix)com.iosmirror.shared`.
-    /// SideStore (team ID J3D2F4SMVD) expands `$(AppIdentifierPrefix)` →
-    /// `J3D2F4SMVD.` for both targets, so both processes reach the same group.
-    /// `SecTaskCreateFromSelf` is macOS-only; we detect the active group at
-    /// runtime by probing each candidate with a harmless read.
+    /// The entitlement hardcodes `J3D2F4SMVD.com.iosmirror.shared` (no variable
+    /// expansion needed). SideStore leaves already-prefixed team-ID groups alone.
+    /// We probe at runtime so the fallback (`com.iosmirror.shared`) covers the
+    /// simulator / unsigned builds. `SecTaskCreateFromSelf` is macOS-only, so we
+    /// use a harmless SecItemCopyMatching probe instead.
     static let sharedKeychainGroup: String? = {
         let candidates = [
             "J3D2F4SMVD.com.iosmirror.shared",  // SideStore / AltStore (team J3D2F4SMVD)
@@ -78,18 +78,29 @@ final class SharedStorage {
 
     // MARK: - Keychain helpers
 
-    private func keychainWrite(_ data: Data, forKey key: String) {
-        guard let group = Self.sharedKeychainGroup else { return }
+    @discardableResult
+    private func keychainWrite(_ data: Data, forKey key: String) -> OSStatus {
+        guard let group = Self.sharedKeychainGroup else { return errSecMissingEntitlement }
         var query: [String: Any] = [
-            kSecClass as String:       kSecClassGenericPassword,
-            kSecAttrService as String: Self.keychainService,
-            kSecAttrAccount as String: key,
+            kSecClass as String:           kSecClassGenericPassword,
+            kSecAttrService as String:     Self.keychainService,
+            kSecAttrAccount as String:     key,
             kSecAttrAccessGroup as String: group
         ]
         SecItemDelete(query as CFDictionary)
-        query[kSecValueData as String]    = data
+        query[kSecValueData as String]      = data
         query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-        SecItemAdd(query as CFDictionary, nil)
+        let status = SecItemAdd(query as CFDictionary, nil)
+        if status != errSecSuccess {
+            // Log write failure directly to standard UserDefaults (no recursion risk)
+            let msg = "KC-WRITE-FAIL key=\(key) group=\(group) status=\(status)"
+            let existing = UserDefaults.standard.string(forKey: Self.extensionLogKey) ?? ""
+            let lines = existing.components(separatedBy: "\n").filter { !$0.isEmpty }
+            UserDefaults.standard.set(
+                (Array(lines.suffix(30)) + [msg]).joined(separator: "\n"),
+                forKey: Self.extensionLogKey)
+        }
+        return status
     }
 
     private func keychainRead(forKey key: String) -> Data? {
@@ -152,7 +163,38 @@ final class SharedStorage {
     var groupDiagnostic: String {
         let kcGroup = Self.sharedKeychainGroup ?? "nil"
         let kcData  = keychainRead(forKey: Self.configKey) != nil
-        var lines = ["keychain:\(kcGroup): " + (kcData ? "✓data" : "✗data")]
+
+        // Live write test: write a tiny probe item and read it back, then delete.
+        // This tells us definitively if cross-process keychain is functional.
+        let writeTestStatus: String
+        if let group = Self.sharedKeychainGroup {
+            let probe = "probe".data(using: .utf8)!
+            var wq: [String: Any] = [
+                kSecClass as String:           kSecClassGenericPassword,
+                kSecAttrService as String:     Self.keychainService,
+                kSecAttrAccount as String:     "__diagprobe__",
+                kSecAttrAccessGroup as String: group
+            ]
+            SecItemDelete(wq as CFDictionary)
+            wq[kSecValueData as String]      = probe
+            wq[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+            let addSt = SecItemAdd(wq as CFDictionary, nil)
+            if addSt == errSecSuccess {
+                // Try reading back immediately
+                var rq = wq; rq[kSecReturnData as String] = true; rq[kSecMatchLimit as String] = kSecMatchLimitOne
+                rq.removeValue(forKey: kSecValueData as String); rq.removeValue(forKey: kSecAttrAccessible as String)
+                var ref: AnyObject?
+                let rdSt = SecItemCopyMatching(rq as CFDictionary, &ref)
+                SecItemDelete(wq as CFDictionary)
+                writeTestStatus = rdSt == errSecSuccess ? "write✓read✓" : "write✓read✗(\(rdSt))"
+            } else {
+                writeTestStatus = "write✗(\(addSt))"
+            }
+        } else {
+            writeTestStatus = "no-group"
+        }
+
+        var lines = ["keychain:\(kcGroup): " + (kcData ? "✓data" : "✗data") + " test:\(writeTestStatus)"]
         lines += Self.appGroupCandidates.map { id -> String in
             let hasContainer = FileManager.default.containerURL(
                 forSecurityApplicationGroupIdentifier: id) != nil
@@ -168,7 +210,7 @@ final class SharedStorage {
 
     private func scatterWrite(_ data: Data, forKey key: String) {
         // 1. Keychain (primary cross-process channel)
-        keychainWrite(data, forKey: key)
+        let kcStatus = keychainWrite(data, forKey: key)
         // 2. App-group UserDefaults suites
         for id in Self.appGroupCandidates {
             if let ud = UserDefaults(suiteName: id) {
@@ -218,9 +260,14 @@ final class SharedStorage {
 
     func saveConfigurations(_ configurations: [WidgetConfig]) throws {
         let data = try encoder.encode(configurations)
-        scatterWrite(data, forKey: Self.configKey)
-        let kcOK = keychainRead(forKey: Self.configKey) != nil
-        appendExtensionLog("SAVE: \(configurations.count) configs written (kc:\(kcOK ? "ok" : "fail"))")
+        let kcWriteStatus = keychainWrite(data, forKey: Self.configKey)
+        // Also scatter to UserDefaults/files as fallback
+        for id in Self.appGroupCandidates {
+            if let ud = UserDefaults(suiteName: id) { ud.set(data, forKey: Self.configKey); ud.synchronize() }
+        }
+        UserDefaults.standard.set(data, forKey: Self.configKey)
+        UserDefaults.standard.synchronize()
+        appendExtensionLog("SAVE: \(configurations.count) configs kc=\(kcWriteStatus==errSecSuccess ? "ok" : "fail(\(kcWriteStatus))")")
     }
 
     func loadConfigurations() throws -> [WidgetConfig] {
@@ -232,8 +279,8 @@ final class SharedStorage {
         // Migrate existing configs to keychain on first load after upgrade.
         // Whoever runs first (app or extension) promotes the data so both can read it.
         if !configs.isEmpty && keychainRead(forKey: Self.configKey) == nil {
-            scatterWrite(data, forKey: Self.configKey)
-            appendExtensionLog("LOAD: migrated \(configs.count) configs → keychain")
+            let st = keychainWrite(data, forKey: Self.configKey)
+            appendExtensionLog("LOAD: migrated \(configs.count) configs → keychain kc=\(st==errSecSuccess ? "ok" : "fail(\(st))")")
         } else {
             appendExtensionLog("LOAD: \(configs.count) configs")
         }

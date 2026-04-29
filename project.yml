@@ -57,7 +57,7 @@ targets:
         com.apple.security.application-groups:
           - group.com.iosmirror
         keychain-access-groups:
-          - $(AppIdentifierPrefix)com.iosmirror.shared
+          - J3D2F4SMVD.com.iosmirror.shared
     dependencies:
       - target: BroadcastExtension
         embed: true
@@ -91,4 +91,4 @@ targets:
         com.apple.security.application-groups:
           - group.com.iosmirror
         keychain-access-groups:
-          - $(AppIdentifierPrefix)com.iosmirror.shared
+          - J3D2F4SMVD.com.iosmirror.shared
