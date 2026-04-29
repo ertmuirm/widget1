@@ -21,14 +21,15 @@ struct WidgetEntryView: View {
 
     @ViewBuilder
     private var homeScreenWidget: some View {
-        ZStack {
+        ZStack(alignment: .topLeading) {
             if entry.configuration.items.isEmpty {
                 emptyView
             } else {
                 itemsGrid
             }
 
-            // Debug overlay
+            // Debug overlay — anchored top-leading with no Spacer so it never
+            // expands to cover the full widget and block Link tap targets.
             VStack(alignment: .leading, spacing: 1) {
                 Text("[\(entry.configuration.name)] n:\(entry.configuration.items.count)")
                     .font(.system(size: 7, design: .monospaced))
@@ -41,18 +42,14 @@ struct WidgetEntryView: View {
                         .shadow(color: .black, radius: 1)
                         .lineLimit(1)
                 }
-                Spacer()
             }
             .padding(4)
+            .allowsHitTesting(false)
         }
-        // Small widgets support only one tap target for the whole widget.
-        // Medium/Large use individual Link views per item instead.
-        .widgetURL(widgetFamily == .systemSmall ? tapURL(for: entry.configuration.items.first) : nil)
-    }
-
-    private func tapURL(for item: WidgetItem?) -> URL? {
-        guard let item else { return nil }
-        return tapURL(for: item)
+        // widgetURL acts as a fallback tap for non-Link areas (and the sole
+        // tap target on devices where Link is unavailable). Link views always
+        // take precedence over widgetURL within their own bounds on iOS 17+.
+        .widgetURL(entry.configuration.items.first.flatMap { tapURL(for: $0) })
     }
 
     @ViewBuilder
