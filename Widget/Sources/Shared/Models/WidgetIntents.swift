@@ -1,18 +1,40 @@
 import AppIntents
 import WidgetKit
 
-// MARK: - Shared helper
+// MARK: - Entity ID encoding
+//
+// Entity IDs have the format "<uuid>|<base64-json>" where the base64 portion is
+// the full WidgetConfig JSON. This lets entities(for:) reconstruct a config from
+// just the stored ID — no cross-process data sharing required. iOS re-resolves
+// entities on every timeline refresh; if the query returns an empty array the
+// selectedWidget becomes nil. Embedding the config in the ID prevents that.
 
-private func filteredEntities(size: WidgetSize) -> [(id: String, name: String)] {
-    let configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
-    return configs
-        .filter { $0.size == size }
-        .map { (id: $0.id.uuidString, name: $0.name) }
+private func encodeEntityID(_ config: WidgetConfig) -> String {
+    guard let data = try? {
+        let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601; return try enc.encode(config)
+    }() else { return config.id.uuidString }
+    return "\(config.id.uuidString)|\(data.base64EncodedString())"
 }
 
-private func allEntities() -> [(id: String, name: String)] {
-    let configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
-    return configs.map { (id: $0.id.uuidString, name: $0.name) }
+private func uuidFromEntityID(_ entityID: String) -> String {
+    String(entityID.split(separator: "|", maxSplits: 1).first ?? Substring(entityID))
+}
+
+private func decodeConfigFromID(_ entityID: String) -> WidgetConfig? {
+    let parts = entityID.split(separator: "|", maxSplits: 1)
+    guard parts.count == 2, let data = Data(base64Encoded: String(parts[1])) else { return nil }
+    let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+    return try? dec.decode(WidgetConfig.self, from: data)
+}
+
+// MARK: - Shared helpers
+
+private func filteredConfigs(size: WidgetSize) -> [WidgetConfig] {
+    ((try? SharedStorage.shared.loadConfigurations()) ?? []).filter { $0.size == size }
+}
+
+private func allConfigs() -> [WidgetConfig] {
+    (try? SharedStorage.shared.loadConfigurations()) ?? []
 }
 
 // MARK: - Widget Entry
@@ -38,33 +60,43 @@ struct WidgetEntry: TimelineEntry {
 private func makeEntry(configID: String?) -> WidgetEntry {
     let storage = SharedStorage.shared
 
-    // Keychain status (SharedStorage.sharedKeychainGroup probes at first access)
     let kcGroup = SharedStorage.sharedKeychainGroup ?? "nil"
     let kcLabel = kcGroup.hasSuffix("com.iosmirror.shared") ? "ok" : (kcGroup == "nil" ? "nil" : "?")
     let kcStatus = "kc[\(kcLabel)]"
 
-    // Per-group UserDefaults status
     let groupStatus: String = SharedStorage.appGroupCandidates.enumerated().map { i, id in
         guard let ud = UserDefaults(suiteName: id) else { return "g\(i):nil" }
         return ud.data(forKey: SharedStorage.configKey) != nil ? "g\(i):ok" : "g\(i):empty"
     }.joined(separator: "|")
 
-    let allConfigs = (try? storage.loadConfigurations()) ?? []
+    let liveConfigs = (try? storage.loadConfigurations()) ?? []
 
     let config: WidgetConfig
     let foundLabel: String
-    if let id = configID, id != "none", let found = storage.getConfig(id: id) {
-        config = found
-        foundLabel = "cfg:\(found.name)"
+
+    if let id = configID, id != "none" {
+        let uuid = uuidFromEntityID(id)
+        if let found = liveConfigs.first(where: { $0.id.uuidString == uuid }) {
+            // Live storage has the config (best case: data sharing is working)
+            config = found
+            foundLabel = "live:\(found.name)"
+        } else if let embedded = decodeConfigFromID(id) {
+            // Use config embedded in the entity ID (works without any IPC)
+            config = embedded
+            foundLabel = "embed:\(embedded.name)"
+        } else {
+            config = .defaultConfiguration
+            foundLabel = "default(notfound)"
+        }
     } else {
-        config = WidgetConfig.defaultConfiguration
-        foundLabel = "default"
+        config = .defaultConfiguration
+        foundLabel = "default(nil)"
     }
 
     let kcDataStatus = storage.keychainHasConfigs ? "data:ok" : "data:empty"
-    storage.appendExtensionLog("entry cfgs=\(allConfigs.count) \(kcStatus):\(kcDataStatus) \(groupStatus) req=\(configID ?? "nil")")
+    storage.appendExtensionLog("entry cfgs=\(liveConfigs.count) \(kcStatus):\(kcDataStatus) \(groupStatus) req=\(configID?.prefix(8) ?? "nil") \(foundLabel)")
 
-    let debugInfo = "req:\(configID ?? "nil") cfgs:\(allConfigs.count) \(foundLabel)\n\(kcStatus):\(kcDataStatus)\n\(groupStatus)"
+    let debugInfo = "req:\(configID.map { String($0.prefix(8)) } ?? "nil") cfgs:\(liveConfigs.count) \(foundLabel)\n\(kcStatus):\(kcDataStatus)\n\(groupStatus)"
     return WidgetEntry(date: Date(), configuration: config,
                        showItemLabels: storage.showItemLabels,
                        debugInfo: debugInfo)
@@ -93,17 +125,28 @@ struct SmallWidgetEntity: AppEntity, Hashable {
 
 struct SmallWidgetQuery: EntityQuery {
     func entities(for identifiers: [String]) async throws -> [SmallWidgetEntity] {
-        filteredEntities(size: .systemSmall)
-            .filter { identifiers.contains($0.id) }
-            .map { SmallWidgetEntity(id: $0.id, name: $0.name) }
+        let configs = filteredConfigs(size: .systemSmall)
+        return identifiers.map { storedID in
+            let uuid = uuidFromEntityID(storedID)
+            // Fresh data from live storage
+            if let c = configs.first(where: { $0.id.uuidString == uuid }) {
+                return SmallWidgetEntity(id: encodeEntityID(c), name: c.name)
+            }
+            // Reconstruct from embedded config in the stored ID
+            if let c = decodeConfigFromID(storedID) {
+                return SmallWidgetEntity(id: storedID, name: c.name)
+            }
+            // Preserve the selection even if config is unavailable
+            return SmallWidgetEntity(id: storedID, name: "Widget")
+        }
     }
     func suggestedEntities() async throws -> [SmallWidgetEntity] {
-        let list = filteredEntities(size: .systemSmall)
+        let list = filteredConfigs(size: .systemSmall)
         if list.isEmpty { return [SmallWidgetEntity(id: "none", name: "No Small Widgets")] }
-        return list.map { SmallWidgetEntity(id: $0.id, name: $0.name) }
+        return list.map { SmallWidgetEntity(id: encodeEntityID($0), name: $0.name) }
     }
     func defaultResult() async -> SmallWidgetEntity? {
-        filteredEntities(size: .systemSmall).first.map { SmallWidgetEntity(id: $0.id, name: $0.name) }
+        filteredConfigs(size: .systemSmall).first.map { SmallWidgetEntity(id: encodeEntityID($0), name: $0.name) }
     }
 }
 
@@ -144,17 +187,25 @@ struct MediumWidgetEntity: AppEntity, Hashable {
 
 struct MediumWidgetQuery: EntityQuery {
     func entities(for identifiers: [String]) async throws -> [MediumWidgetEntity] {
-        filteredEntities(size: .systemMedium)
-            .filter { identifiers.contains($0.id) }
-            .map { MediumWidgetEntity(id: $0.id, name: $0.name) }
+        let configs = filteredConfigs(size: .systemMedium)
+        return identifiers.map { storedID in
+            let uuid = uuidFromEntityID(storedID)
+            if let c = configs.first(where: { $0.id.uuidString == uuid }) {
+                return MediumWidgetEntity(id: encodeEntityID(c), name: c.name)
+            }
+            if let c = decodeConfigFromID(storedID) {
+                return MediumWidgetEntity(id: storedID, name: c.name)
+            }
+            return MediumWidgetEntity(id: storedID, name: "Widget")
+        }
     }
     func suggestedEntities() async throws -> [MediumWidgetEntity] {
-        let list = filteredEntities(size: .systemMedium)
+        let list = filteredConfigs(size: .systemMedium)
         if list.isEmpty { return [MediumWidgetEntity(id: "none", name: "No Medium Widgets")] }
-        return list.map { MediumWidgetEntity(id: $0.id, name: $0.name) }
+        return list.map { MediumWidgetEntity(id: encodeEntityID($0), name: $0.name) }
     }
     func defaultResult() async -> MediumWidgetEntity? {
-        filteredEntities(size: .systemMedium).first.map { MediumWidgetEntity(id: $0.id, name: $0.name) }
+        filteredConfigs(size: .systemMedium).first.map { MediumWidgetEntity(id: encodeEntityID($0), name: $0.name) }
     }
 }
 
@@ -195,17 +246,25 @@ struct LargeWidgetEntity: AppEntity, Hashable {
 
 struct LargeWidgetQuery: EntityQuery {
     func entities(for identifiers: [String]) async throws -> [LargeWidgetEntity] {
-        filteredEntities(size: .systemLarge)
-            .filter { identifiers.contains($0.id) }
-            .map { LargeWidgetEntity(id: $0.id, name: $0.name) }
+        let configs = filteredConfigs(size: .systemLarge)
+        return identifiers.map { storedID in
+            let uuid = uuidFromEntityID(storedID)
+            if let c = configs.first(where: { $0.id.uuidString == uuid }) {
+                return LargeWidgetEntity(id: encodeEntityID(c), name: c.name)
+            }
+            if let c = decodeConfigFromID(storedID) {
+                return LargeWidgetEntity(id: storedID, name: c.name)
+            }
+            return LargeWidgetEntity(id: storedID, name: "Widget")
+        }
     }
     func suggestedEntities() async throws -> [LargeWidgetEntity] {
-        let list = filteredEntities(size: .systemLarge)
+        let list = filteredConfigs(size: .systemLarge)
         if list.isEmpty { return [LargeWidgetEntity(id: "none", name: "No Large Widgets")] }
-        return list.map { LargeWidgetEntity(id: $0.id, name: $0.name) }
+        return list.map { LargeWidgetEntity(id: encodeEntityID($0), name: $0.name) }
     }
     func defaultResult() async -> LargeWidgetEntity? {
-        filteredEntities(size: .systemLarge).first.map { LargeWidgetEntity(id: $0.id, name: $0.name) }
+        filteredConfigs(size: .systemLarge).first.map { LargeWidgetEntity(id: encodeEntityID($0), name: $0.name) }
     }
 }
 
@@ -246,17 +305,25 @@ struct LockWidgetEntity: AppEntity, Hashable {
 
 struct LockWidgetQuery: EntityQuery {
     func entities(for identifiers: [String]) async throws -> [LockWidgetEntity] {
-        allEntities()
-            .filter { identifiers.contains($0.id) }
-            .map { LockWidgetEntity(id: $0.id, name: $0.name) }
+        let configs = allConfigs()
+        return identifiers.map { storedID in
+            let uuid = uuidFromEntityID(storedID)
+            if let c = configs.first(where: { $0.id.uuidString == uuid }) {
+                return LockWidgetEntity(id: encodeEntityID(c), name: c.name)
+            }
+            if let c = decodeConfigFromID(storedID) {
+                return LockWidgetEntity(id: storedID, name: c.name)
+            }
+            return LockWidgetEntity(id: storedID, name: "Widget")
+        }
     }
     func suggestedEntities() async throws -> [LockWidgetEntity] {
-        let list = allEntities()
+        let list = allConfigs()
         if list.isEmpty { return [LockWidgetEntity(id: "none", name: "No Widgets")] }
-        return list.map { LockWidgetEntity(id: $0.id, name: $0.name) }
+        return list.map { LockWidgetEntity(id: encodeEntityID($0), name: $0.name) }
     }
     func defaultResult() async -> LockWidgetEntity? {
-        allEntities().first.map { LockWidgetEntity(id: $0.id, name: $0.name) }
+        allConfigs().first.map { LockWidgetEntity(id: encodeEntityID($0), name: $0.name) }
     }
 }
 
@@ -295,17 +362,25 @@ struct WidgetNameEntity: AppEntity, Hashable {
 
 struct WidgetNameQuery: EntityQuery {
     func entities(for identifiers: [String]) async throws -> [WidgetNameEntity] {
-        allEntities()
-            .filter { identifiers.contains($0.id) }
-            .map { WidgetNameEntity(id: $0.id, name: $0.name) }
+        let configs = allConfigs()
+        return identifiers.map { storedID in
+            let uuid = uuidFromEntityID(storedID)
+            if let c = configs.first(where: { $0.id.uuidString == uuid }) {
+                return WidgetNameEntity(id: encodeEntityID(c), name: c.name)
+            }
+            if let c = decodeConfigFromID(storedID) {
+                return WidgetNameEntity(id: storedID, name: c.name)
+            }
+            return WidgetNameEntity(id: storedID, name: "Widget")
+        }
     }
     func suggestedEntities() async throws -> [WidgetNameEntity] {
-        let list = allEntities()
+        let list = allConfigs()
         if list.isEmpty { return [WidgetNameEntity(id: "none", name: "No Configurations")] }
-        return list.map { WidgetNameEntity(id: $0.id, name: $0.name) }
+        return list.map { WidgetNameEntity(id: encodeEntityID($0), name: $0.name) }
     }
     func defaultResult() async -> WidgetNameEntity? {
-        allEntities().first.map { WidgetNameEntity(id: $0.id, name: $0.name) }
+        allConfigs().first.map { WidgetNameEntity(id: encodeEntityID($0), name: $0.name) }
     }
 }
 
