@@ -1,13 +1,17 @@
 import Foundation
+import Security
 
 /// Shared persistent storage used by both the main app and the widget extension.
 ///
-/// Design principle: SCATTER writes (write to every accessible app-group candidate
-/// simultaneously) and GATHER reads (try every candidate in priority order, return
-/// the first that contains valid data). This makes the storage resilient to SideStore
-/// re-signing, which may change the active app-group ID to any of the three known
-/// formats: `group.com.iosmirror`, `group.com.iosmirror.J3D2F4SMVD`, or
-/// `group.J3D2F4SMVD.com.iosmirror`.
+/// Storage priority (write ALL, read in order):
+///   1. Shared Keychain access group — the ONLY mechanism that genuinely crosses
+///      the process boundary on SideStore/AltStore free accounts. Both targets
+///      declare `$(AppIdentifierPrefix)com.iosmirror.shared`; SideStore transforms
+///      `$(AppIdentifierPrefix)` → `J3D2F4SMVD.` for both, giving both processes
+///      the same `J3D2F4SMVD.com.iosmirror.shared` group.
+///   2. App-group UserDefaults (scatter-gather across all three candidate IDs).
+///   3. App-group container files.
+///   4. Standard UserDefaults (process-local last resort).
 final class SharedStorage {
 
     static let shared = SharedStorage()
@@ -21,12 +25,25 @@ final class SharedStorage {
     static let extensionLogKey  = "widgetExtensionLog"
 
     /// All app-group candidates, in priority order.
-    /// We write to ALL and read from the first that has valid data.
     static let appGroupCandidates: [String] = [
         "group.com.iosmirror.J3D2F4SMVD",   // SideStore: team ID appended
         "group.J3D2F4SMVD.com.iosmirror",   // SideStore: team ID prepended
         "group.com.iosmirror"                // canonical / unsigned
     ]
+
+    // MARK: - Keychain shared access group
+
+    /// The actual keychain group string after AltStore/SideStore signing, derived
+    /// at runtime from the process entitlements. Returns nil if not provisioned.
+    static let sharedKeychainGroup: String? = {
+        guard let task = SecTaskCreateFromSelf(nil) else { return nil }
+        guard let groups = SecTaskCopyValueForEntitlement(
+            task, "keychain-access-groups" as CFString, nil
+        ) as? [String] else { return nil }
+        return groups.first { $0.hasSuffix("com.iosmirror.shared") }
+    }()
+
+    private static let keychainService = "com.iosmirror.widgetdata"
 
     // MARK: - Init
 
@@ -37,11 +54,52 @@ final class SharedStorage {
         decoder.dateDecodingStrategy = .iso8601
     }
 
+    // MARK: - Keychain helpers
+
+    private func keychainWrite(_ data: Data, forKey key: String) {
+        guard let group = Self.sharedKeychainGroup else { return }
+        var query: [String: Any] = [
+            kSecClass as String:       kSecClassGenericPassword,
+            kSecAttrService as String: Self.keychainService,
+            kSecAttrAccount as String: key,
+            kSecAttrAccessGroup as String: group
+        ]
+        SecItemDelete(query as CFDictionary)
+        query[kSecValueData as String]    = data
+        query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        SecItemAdd(query as CFDictionary, nil)
+    }
+
+    private func keychainRead(forKey key: String) -> Data? {
+        guard let group = Self.sharedKeychainGroup else { return nil }
+        let query: [String: Any] = [
+            kSecClass as String:           kSecClassGenericPassword,
+            kSecAttrService as String:     Self.keychainService,
+            kSecAttrAccount as String:     key,
+            kSecAttrAccessGroup as String: group,
+            kSecReturnData as String:      true,
+            kSecMatchLimit as String:      kSecMatchLimitOne
+        ]
+        var result: AnyObject?
+        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return nil }
+        return result as? Data
+    }
+
+    private func keychainDelete(forKey key: String) {
+        guard let group = Self.sharedKeychainGroup else { return }
+        let query: [String: Any] = [
+            kSecClass as String:           kSecClassGenericPassword,
+            kSecAttrService as String:     Self.keychainService,
+            kSecAttrAccount as String:     key,
+            kSecAttrAccessGroup as String: group
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
+
     // MARK: - Accessors (for UI display)
 
-    /// The first group candidate that currently contains config data, or the first
-    /// with a valid container URL, or the last candidate as a hardcoded fallback.
     var activeAppGroupID: String {
+        if keychainRead(forKey: Self.configKey) != nil { return "keychain:\(Self.sharedKeychainGroup ?? "nil")" }
         for id in Self.appGroupCandidates {
             if let ud = UserDefaults(suiteName: id), ud.data(forKey: Self.configKey) != nil {
                 return id
@@ -55,9 +113,11 @@ final class SharedStorage {
         return Self.appGroupCandidates.last!
     }
 
-    /// Short diagnostic string listing which group candidates have accessible containers.
     var groupDiagnostic: String {
-        let results = Self.appGroupCandidates.map { id -> String in
+        let kcGroup = Self.sharedKeychainGroup ?? "nil"
+        let kcData  = keychainRead(forKey: Self.configKey) != nil
+        var lines = ["keychain:\(kcGroup): " + (kcData ? "✓data" : "✗data")]
+        lines += Self.appGroupCandidates.map { id -> String in
             let hasContainer = FileManager.default.containerURL(
                 forSecurityApplicationGroupIdentifier: id) != nil
             let hasData = UserDefaults(suiteName: id)?.data(forKey: Self.configKey) != nil
@@ -65,20 +125,22 @@ final class SharedStorage {
                 + (hasContainer ? "✓container" : "✗container")
                 + " " + (hasData ? "✓data" : "✗data")
         }
-        return results.joined(separator: "\n")
+        return lines.joined(separator: "\n")
     }
 
     // MARK: - SCATTER write helpers
 
     private func scatterWrite(_ data: Data, forKey key: String) {
-        // 1. Write to every app-group UserDefaults suite we can reach
+        // 1. Keychain (primary cross-process channel)
+        keychainWrite(data, forKey: key)
+        // 2. App-group UserDefaults suites
         for id in Self.appGroupCandidates {
             if let ud = UserDefaults(suiteName: id) {
                 ud.set(data, forKey: key)
                 ud.synchronize()
             }
         }
-        // 2. Write to every app-group container file
+        // 3. App-group container files
         for id in Self.appGroupCandidates {
             if let container = FileManager.default.containerURL(
                 forSecurityApplicationGroupIdentifier: id) {
@@ -86,7 +148,7 @@ final class SharedStorage {
                 try? data.write(to: url, options: .atomicWrite)
             }
         }
-        // 3. Standard UserDefaults as last resort (not shared with extension)
+        // 4. Standard UserDefaults (process-local last resort)
         UserDefaults.standard.set(data, forKey: key)
         UserDefaults.standard.synchronize()
     }
@@ -94,13 +156,15 @@ final class SharedStorage {
     // MARK: - GATHER read helper
 
     private func gatherRead(forKey key: String) -> Data? {
-        // 1. Try every app-group UserDefaults suite
+        // 1. Keychain (primary cross-process channel)
+        if let data = keychainRead(forKey: key), !data.isEmpty { return data }
+        // 2. App-group UserDefaults suites
         for id in Self.appGroupCandidates {
             if let data = UserDefaults(suiteName: id)?.data(forKey: key), !data.isEmpty {
                 return data
             }
         }
-        // 2. Try every app-group container file
+        // 3. App-group container files
         for id in Self.appGroupCandidates {
             if let container = FileManager.default.containerURL(
                 forSecurityApplicationGroupIdentifier: id) {
@@ -110,7 +174,7 @@ final class SharedStorage {
                 }
             }
         }
-        // 3. Standard UserDefaults
+        // 4. Standard UserDefaults
         return UserDefaults.standard.data(forKey: key)
     }
 
@@ -119,16 +183,17 @@ final class SharedStorage {
     func saveConfigurations(_ configurations: [WidgetConfig]) throws {
         let data = try encoder.encode(configurations)
         scatterWrite(data, forKey: Self.configKey)
-        appendExtensionLog("SAVE: \(configurations.count) configs written to all groups")
+        let kcOK = keychainRead(forKey: Self.configKey) != nil
+        appendExtensionLog("SAVE: \(configurations.count) configs written (kc:\(kcOK ? "ok" : "fail"))")
     }
 
     func loadConfigurations() throws -> [WidgetConfig] {
         guard let data = gatherRead(forKey: Self.configKey) else {
-            appendExtensionLog("LOAD: no data found in any group")
+            appendExtensionLog("LOAD: no data found in any store")
             return []
         }
         let configs = try decoder.decode([WidgetConfig].self, from: data)
-        appendExtensionLog("LOAD: \(configs.count) configs from group")
+        appendExtensionLog("LOAD: \(configs.count) configs")
         return configs
     }
 
@@ -141,6 +206,7 @@ final class SharedStorage {
     }
 
     func deleteAllConfigurations() throws {
+        keychainDelete(forKey: Self.configKey)
         for id in Self.appGroupCandidates {
             UserDefaults(suiteName: id)?.removeObject(forKey: Self.configKey)
             UserDefaults(suiteName: id)?.synchronize()
@@ -154,31 +220,44 @@ final class SharedStorage {
     }
 
     // MARK: - Extension Debug Log
-    // Written by BOTH the main app and the extension to all groups.
-    // The main app reads it back in DebugOverlayView to diagnose issues.
 
     func appendExtensionLog(_ message: String) {
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime]
         let line = "[\(iso.string(from: Date()))] \(message)"
 
+        // Write log to keychain
+        let existing = keychainRead(forKey: Self.extensionLogKey)
+            .flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        let lines = existing.components(separatedBy: "\n").filter { !$0.isEmpty }
+        let updated = (Array(lines.suffix(30)) + [line]).joined(separator: "\n")
+        if let data = updated.data(using: .utf8) {
+            keychainWrite(data, forKey: Self.extensionLogKey)
+        }
+
+        // Also write to all UserDefaults
         for id in Self.appGroupCandidates {
             if let ud = UserDefaults(suiteName: id) {
-                let existing = ud.string(forKey: Self.extensionLogKey) ?? ""
-                let lines = existing.components(separatedBy: "\n").filter { !$0.isEmpty }
-                let trimmed = Array(lines.suffix(30)) + [line]
-                ud.set(trimmed.joined(separator: "\n"), forKey: Self.extensionLogKey)
+                let ex = ud.string(forKey: Self.extensionLogKey) ?? ""
+                let ls = ex.components(separatedBy: "\n").filter { !$0.isEmpty }
+                ud.set((Array(ls.suffix(30)) + [line]).joined(separator: "\n"),
+                       forKey: Self.extensionLogKey)
                 ud.synchronize()
             }
         }
-        let existing = UserDefaults.standard.string(forKey: Self.extensionLogKey) ?? ""
-        let lines = existing.components(separatedBy: "\n").filter { !$0.isEmpty }
+        let ex = UserDefaults.standard.string(forKey: Self.extensionLogKey) ?? ""
+        let ls = ex.components(separatedBy: "\n").filter { !$0.isEmpty }
         UserDefaults.standard.set(
-            (Array(lines.suffix(30)) + [line]).joined(separator: "\n"),
+            (Array(ls.suffix(30)) + [line]).joined(separator: "\n"),
             forKey: Self.extensionLogKey)
     }
 
     func readExtensionLog() -> String {
+        // Try Keychain first
+        if let data = keychainRead(forKey: Self.extensionLogKey),
+           let log = String(data: data, encoding: .utf8), !log.isEmpty {
+            return log
+        }
         for id in Self.appGroupCandidates {
             if let log = UserDefaults(suiteName: id)?.string(forKey: Self.extensionLogKey),
                !log.isEmpty {
@@ -190,6 +269,7 @@ final class SharedStorage {
     }
 
     func clearExtensionLog() {
+        keychainDelete(forKey: Self.extensionLogKey)
         for id in Self.appGroupCandidates {
             UserDefaults(suiteName: id)?.removeObject(forKey: Self.extensionLogKey)
             UserDefaults(suiteName: id)?.synchronize()
@@ -199,8 +279,6 @@ final class SharedStorage {
 
     // MARK: - Backup / Restore
 
-    /// Saves a backup JSON directly to the app's Documents directory root.
-    /// Visible in Files.app as "On My iPhone / Widget / widget_backup.json".
     func createBackup() throws -> URL? {
         let configs = try loadConfigurations()
         guard !configs.isEmpty else { return nil }
@@ -245,7 +323,18 @@ final class SharedStorage {
                            size: configs.count)
     }
 
-    // MARK: - Preferences (shared via scatter-gather so extension can read them)
+    // MARK: - Preferences
+
+    private func keychainBool(forKey key: String) -> Bool? {
+        guard let data = keychainRead(forKey: key),
+              let str = String(data: data, encoding: .utf8) else { return nil }
+        return str == "true"
+    }
+
+    private func setKeychainBool(_ value: Bool, forKey key: String) {
+        let str = value ? "true" : "false"
+        if let data = str.data(using: .utf8) { keychainWrite(data, forKey: key) }
+    }
 
     var hasCompletedOnboarding: Bool {
         get { UserDefaults.standard.bool(forKey: "hasCompletedOnboarding") }
@@ -271,6 +360,8 @@ final class SharedStorage {
 
     var showItemLabels: Bool {
         get {
+            // Keychain first (cross-process)
+            if let val = keychainBool(forKey: "showItemLabels") { return val }
             for id in Self.appGroupCandidates {
                 if let val = UserDefaults(suiteName: id)?.object(forKey: "showItemLabels") as? Bool {
                     return val
@@ -279,6 +370,7 @@ final class SharedStorage {
             return true
         }
         set {
+            setKeychainBool(newValue, forKey: "showItemLabels")
             for id in Self.appGroupCandidates {
                 UserDefaults(suiteName: id)?.set(newValue, forKey: "showItemLabels")
                 UserDefaults(suiteName: id)?.synchronize()
