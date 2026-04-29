@@ -21,8 +21,6 @@ struct WidgetEntryView: View {
 
     @ViewBuilder
     private var homeScreenWidget: some View {
-        // Background is provided by containerBackground in BroadcastWidget.swift.
-        // This ZStack only renders content on top of that background.
         ZStack {
             if entry.configuration.items.isEmpty {
                 emptyView
@@ -30,15 +28,13 @@ struct WidgetEntryView: View {
                 itemsGrid
             }
 
-            // Debug overlay — always visible for on-device diagnosis without Xcode.
-            // Line 1 (yellow): config name + item count
-            // Line 2 (cyan): req id, cfgs found, per-group status (nil/empty/ok)
+            // Debug overlay
             VStack(alignment: .leading, spacing: 1) {
                 Text("[\(entry.configuration.name)] n:\(entry.configuration.items.count)")
                     .font(.system(size: 7, design: .monospaced))
                     .foregroundStyle(.yellow)
                     .shadow(color: .black, radius: 1)
-                ForEach(Array(entry.debugInfo.components(separatedBy: "\n").prefix(2).enumerated()), id: \.offset) { _, line in
+                ForEach(Array(entry.debugInfo.components(separatedBy: "\n").prefix(3).enumerated()), id: \.offset) { _, line in
                     Text(line)
                         .font(.system(size: 6, design: .monospaced))
                         .foregroundStyle(.cyan)
@@ -49,6 +45,14 @@ struct WidgetEntryView: View {
             }
             .padding(4)
         }
+        // Small widgets support only one tap target for the whole widget.
+        // Medium/Large use individual Link views per item instead.
+        .widgetURL(widgetFamily == .systemSmall ? tapURL(for: entry.configuration.items.first) : nil)
+    }
+
+    private func tapURL(for item: WidgetItem?) -> URL? {
+        guard let item else { return nil }
+        return tapURL(for: item)
     }
 
     @ViewBuilder

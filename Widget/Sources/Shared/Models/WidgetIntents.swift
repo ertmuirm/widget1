@@ -82,13 +82,16 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     }
 
     let kcAvail = SharedStorage.sharedKeychainGroup != nil ? "kc:ok" : "kc:none"
-    let udStatus = SharedStorage.appGroupCandidates.enumerated().map { i, id in
-        guard let ud = UserDefaults(suiteName: id) else { return "g\(i):nil" }
-        return ud.data(forKey: SharedStorage.configKey) != nil ? "g\(i):ok" : "g\(i):empty"
-    }.joined(separator: "|")
 
-    storage.appendExtensionLog("entry cfgs=\(liveConfigs.count) \(kcAvail) req=\(configID?.prefix(8) ?? "nil") \(source)")
-    let debugInfo = "\(source) n:\(config.items.count)\nreq:\(configID.map { String($0.prefix(8)) } ?? "nil") cfgs:\(liveConfigs.count)\n\(kcAvail) \(udStatus)"
+    // Per-item action diagnostics: type initial + ✓(has payload) or ∅(empty) or -(nil)
+    let actionDebug = config.items.prefix(6).enumerated().map { i, item -> String in
+        guard let a = item.action else { return "i\(i):-" }
+        let t = String(a.type.rawValue.prefix(1))
+        return a.payload.isEmpty ? "i\(i):\(t)∅" : "i\(i):\(t)✓"
+    }.joined(separator: " ")
+
+    storage.appendExtensionLog("entry cfgs=\(liveConfigs.count) \(kcAvail) req=\(configID?.prefix(8) ?? "nil") \(source) actions=[\(actionDebug)]")
+    let debugInfo = "\(source) n:\(config.items.count)\nreq:\(configID.map { String($0.prefix(8)) } ?? "nil") cfgs:\(liveConfigs.count)\n\(actionDebug)"
     return WidgetEntry(date: Date(), configuration: config,
                        showItemLabels: storage.showItemLabels,
                        debugInfo: debugInfo)
