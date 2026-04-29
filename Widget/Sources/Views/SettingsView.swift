@@ -46,7 +46,7 @@ struct SettingsView: View {
             }
 
             // Widgets
-            Section("Widgets") {
+            Section {
                 Toggle("Show Item Labels", isOn: showItemLabels)
                     .foregroundStyle(.white)
 
@@ -54,6 +54,11 @@ struct SettingsView: View {
                     Label("Preview Settings", systemImage: "eye")
                 }
                 .foregroundStyle(.white)
+            } header: {
+                Text("Widgets")
+            } footer: {
+                Text("\"Show Item Labels\" is read by the widget extension via the shared app group. With SideStore (free account), this only takes effect once the app group container is properly shared between the app and the extension.")
+                    .font(.caption)
             }
 
             // Backup & Restore

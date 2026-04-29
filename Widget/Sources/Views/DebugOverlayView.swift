@@ -122,10 +122,14 @@ struct DebugOverlayView: View {
             size: .systemSmall,
             items: [testItem]
         )
-        
+
         do {
-            try SharedStorage.shared.saveConfigurations([testConfig])
-            statusText = "✅ Saved test data!\n"
+            // Preserve all existing configs — only replace a previous "Test" config
+            var configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
+            configs.removeAll { $0.name == "Test" }
+            configs.append(testConfig)
+            try SharedStorage.shared.saveConfigurations(configs)
+            statusText = "✅ Added test config (total: \(configs.count))\n"
             checkAppGroupData()
         } catch {
             statusText = "❌ Save failed: \(error.localizedDescription)"
