@@ -21,16 +21,27 @@ struct WidgetEntryView: View {
 
     @ViewBuilder
     private var homeScreenWidget: some View {
-        Group {
+        ZStack(alignment: .topLeading) {
             if entry.configuration.items.isEmpty {
                 emptyView
             } else {
                 itemsGrid
             }
+
+            // Diagnostic overlay — topLeading-anchored, no Spacer, hitTesting off
+            // so it never blocks Link tap targets. Shows actual resolved URLs.
+            VStack(alignment: .leading, spacing: 1) {
+                ForEach(Array(entry.debugInfo.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
+                    Text(line)
+                        .font(.system(size: 6, design: .monospaced))
+                        .foregroundStyle(.yellow)
+                        .shadow(color: .black, radius: 1)
+                        .lineLimit(1)
+                }
+            }
+            .padding(3)
+            .allowsHitTesting(false)
         }
-        // widgetURL acts as a fallback tap for non-Link areas (and the sole
-        // tap target on devices where Link is unavailable). Link views always
-        // take precedence over widgetURL within their own bounds on iOS 17+.
         .widgetURL(entry.configuration.items.first.flatMap { resolveItemURL($0) })
     }
 
