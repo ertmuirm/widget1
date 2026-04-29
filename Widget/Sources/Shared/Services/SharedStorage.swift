@@ -40,29 +40,31 @@ final class SharedStorage {
     /// We probe at runtime so the fallback (`com.iosmirror.shared`) covers the
     /// simulator / unsigned builds. `SecTaskCreateFromSelf` is macOS-only, so we
     /// use a harmless SecItemCopyMatching probe instead.
+    /// Non-nil only when a test write to the group actually succeeds (errSecSuccess).
+    /// A read-only probe returns errSecItemNotFound even without the entitlement on
+    /// some iOS versions, so we must probe with a write to get a reliable answer.
     static let sharedKeychainGroup: String? = {
         let candidates = [
-            "J3D2F4SMVD.com.iosmirror.shared",  // SideStore / AltStore (team J3D2F4SMVD)
-            "com.iosmirror.shared"               // unsigned / simulator
+            "J3D2F4SMVD.com.iosmirror.shared",
+            "com.iosmirror.shared"
         ]
         for group in candidates {
-            let query: [String: Any] = [
+            var q: [String: Any] = [
                 kSecClass as String:           kSecClassGenericPassword,
                 kSecAttrService as String:     "com.iosmirror.widgetdata",
-                kSecAttrAccount as String:     "__groupprobe__",
-                kSecAttrAccessGroup as String: group,
-                kSecReturnData as String:      false,
-                kSecMatchLimit as String:      kSecMatchLimitOne
+                kSecAttrAccount as String:     "__writeprobe__",
+                kSecAttrAccessGroup as String: group
             ]
-            let status = SecItemCopyMatching(query as CFDictionary, nil)
-            // errSecItemNotFound means the group is accessible but item absent — group works
-            // errSecSuccess means a probe item exists — group works
-            if status == errSecItemNotFound || status == errSecSuccess {
+            SecItemDelete(q as CFDictionary)
+            q[kSecValueData as String]      = Data([0x01])
+            q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+            let status = SecItemAdd(q as CFDictionary, nil)
+            if status == errSecSuccess {
+                SecItemDelete(q as CFDictionary)
                 return group
             }
         }
-        // Fall back to first candidate; Keychain calls will fail gracefully if wrong
-        return candidates.first
+        return nil  // nil = keychain sharing unavailable (e.g. SideStore strips the entitlement)
     }()
 
     private static let keychainService = "com.iosmirror.widgetdata"

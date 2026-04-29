@@ -59,44 +59,36 @@ struct WidgetEntry: TimelineEntry {
 
 private func makeEntry(configID: String?) -> WidgetEntry {
     let storage = SharedStorage.shared
-
-    let kcGroup = SharedStorage.sharedKeychainGroup ?? "nil"
-    let kcLabel = kcGroup.hasSuffix("com.iosmirror.shared") ? "ok" : (kcGroup == "nil" ? "nil" : "?")
-    let kcStatus = "kc[\(kcLabel)]"
-
-    let groupStatus: String = SharedStorage.appGroupCandidates.enumerated().map { i, id in
-        guard let ud = UserDefaults(suiteName: id) else { return "g\(i):nil" }
-        return ud.data(forKey: SharedStorage.configKey) != nil ? "g\(i):ok" : "g\(i):empty"
-    }.joined(separator: "|")
-
     let liveConfigs = (try? storage.loadConfigurations()) ?? []
 
     let config: WidgetConfig
-    let foundLabel: String
+    let source: String
 
     if let id = configID, id != "none" {
         let uuid = uuidFromEntityID(id)
         if let found = liveConfigs.first(where: { $0.id.uuidString == uuid }) {
-            // Live storage has the config (best case: data sharing is working)
             config = found
-            foundLabel = "live:\(found.name)"
+            source = "live:\(found.name)"
         } else if let embedded = decodeConfigFromID(id) {
-            // Use config embedded in the entity ID (works without any IPC)
             config = embedded
-            foundLabel = "embed:\(embedded.name)"
+            source = "embed:\(embedded.name)"
         } else {
             config = .defaultConfiguration
-            foundLabel = "default(notfound)"
+            source = "default(notfound)"
         }
     } else {
         config = .defaultConfiguration
-        foundLabel = "default(nil)"
+        source = "default(nil)"
     }
 
-    let kcDataStatus = storage.keychainHasConfigs ? "data:ok" : "data:empty"
-    storage.appendExtensionLog("entry cfgs=\(liveConfigs.count) \(kcStatus):\(kcDataStatus) \(groupStatus) req=\(configID?.prefix(8) ?? "nil") \(foundLabel)")
+    let kcAvail = SharedStorage.sharedKeychainGroup != nil ? "kc:ok" : "kc:none"
+    let udStatus = SharedStorage.appGroupCandidates.enumerated().map { i, id in
+        guard let ud = UserDefaults(suiteName: id) else { return "g\(i):nil" }
+        return ud.data(forKey: SharedStorage.configKey) != nil ? "g\(i):ok" : "g\(i):empty"
+    }.joined(separator: "|")
 
-    let debugInfo = "req:\(configID.map { String($0.prefix(8)) } ?? "nil") cfgs:\(liveConfigs.count) \(foundLabel)\n\(kcStatus):\(kcDataStatus)\n\(groupStatus)"
+    storage.appendExtensionLog("entry cfgs=\(liveConfigs.count) \(kcAvail) req=\(configID?.prefix(8) ?? "nil") \(source)")
+    let debugInfo = "\(source) n:\(config.items.count)\nreq:\(configID.map { String($0.prefix(8)) } ?? "nil") cfgs:\(liveConfigs.count)\n\(kcAvail) \(udStatus)"
     return WidgetEntry(date: Date(), configuration: config,
                        showItemLabels: storage.showItemLabels,
                        debugInfo: debugInfo)
