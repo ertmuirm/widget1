@@ -81,7 +81,7 @@ struct SettingsView: View {
                     }
                 }
 
-                Text("Backup file location: On My iPhone / Widget / widget_backup.json")
+                Text("Backup file location: On My iPhone / Start / widget_backup.json")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -114,7 +114,7 @@ struct SettingsView: View {
     private func backupConfigs() {
         do {
             if let url = try SharedStorage.shared.createBackup() {
-                backupAlertMessage = "Backup saved to:\nOn My iPhone / Widget / \(url.lastPathComponent)"
+                backupAlertMessage = "Backup saved to:\nOn My iPhone / Start / \(url.lastPathComponent)"
                 backupAlertIsError = false
             } else {
                 backupAlertMessage = "No widget configurations to back up."
@@ -135,7 +135,7 @@ struct SettingsView: View {
                 backupAlertMessage = "Configurations restored successfully."
                 backupAlertIsError = false
             } else {
-                backupAlertMessage = "No backup file found.\n\nExpected location:\nOn My iPhone / Widget / widget_backup.json"
+                backupAlertMessage = "No backup file found.\n\nExpected location:\nOn My iPhone / Start / widget_backup.json"
                 backupAlertIsError = true
             }
         } catch {

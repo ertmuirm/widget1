@@ -14,7 +14,10 @@ struct BroadcastSmallWidget: Widget {
             provider: SmallBroadcastProvider()
         ) { entry in
             WidgetEntryView(entry: entry)
-                .containerBackground(for: .widget) { Color.clear }
+                .containerBackground(for: .widget) {
+                    entry.configuration.backgroundColor.swiftUIColor
+                        .opacity(entry.configuration.backgroundOpacity)
+                }
         }
         .configurationDisplayName("Small Widget")
         .description("A 3×3 customizable widget")
@@ -34,7 +37,10 @@ struct BroadcastMediumWidget: Widget {
             provider: MediumBroadcastProvider()
         ) { entry in
             WidgetEntryView(entry: entry)
-                .containerBackground(for: .widget) { Color.clear }
+                .containerBackground(for: .widget) {
+                    entry.configuration.backgroundColor.swiftUIColor
+                        .opacity(entry.configuration.backgroundOpacity)
+                }
         }
         .configurationDisplayName("Medium Widget")
         .description("A 6×3 customizable widget")
@@ -54,7 +60,10 @@ struct BroadcastLargeWidget: Widget {
             provider: LargeBroadcastProvider()
         ) { entry in
             WidgetEntryView(entry: entry)
-                .containerBackground(for: .widget) { Color.clear }
+                .containerBackground(for: .widget) {
+                    entry.configuration.backgroundColor.swiftUIColor
+                        .opacity(entry.configuration.backgroundOpacity)
+                }
         }
         .configurationDisplayName("Large Widget")
         .description("A 6×6 customizable widget")

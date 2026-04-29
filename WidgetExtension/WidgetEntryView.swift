@@ -21,29 +21,30 @@ struct WidgetEntryView: View {
 
     @ViewBuilder
     private var homeScreenWidget: some View {
+        // Background is provided by containerBackground in BroadcastWidget.swift.
+        // This ZStack only renders content on top of that background.
         ZStack {
-            entry.configuration.backgroundColor.swiftUIColor
-                .opacity(entry.configuration.backgroundOpacity)
-
             if entry.configuration.items.isEmpty {
                 emptyView
             } else {
                 itemsGrid
             }
 
-            #if DEBUG
+            // Debug overlay — always on so users can diagnose issues on-device without Xcode.
+            // Shows config name, item count, and key group diagnostics from makeEntry().
             VStack(alignment: .leading, spacing: 1) {
-                Text("cfg:\(entry.configuration.name) items:\(entry.configuration.items.count)")
+                Text("cfg:\(entry.configuration.name) n:\(entry.configuration.items.count)")
                     .font(.system(size: 7, design: .monospaced))
                     .foregroundStyle(.yellow)
-                Text(entry.debugInfo.components(separatedBy: "\n").prefix(3).joined(separator: " | "))
+                    .shadow(color: .black, radius: 1)
+                Text(entry.debugInfo.components(separatedBy: "\n").prefix(2).joined(separator: "|"))
                     .font(.system(size: 6, design: .monospaced))
                     .foregroundStyle(.cyan)
+                    .shadow(color: .black, radius: 1)
                     .lineLimit(2)
                 Spacer()
             }
             .padding(4)
-            #endif
         }
     }
 
@@ -113,13 +114,26 @@ struct WidgetEntryView: View {
 
     @ViewBuilder
     private func itemCell(_ item: WidgetItem, size: WidgetSize) -> some View {
-        if let action = item.action, action.type == .urlScheme,
-           let url = URL(string: action.payload), !action.payload.isEmpty {
+        if let url = tapURL(for: item) {
             Link(destination: url) {
                 ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
             }
         } else {
             ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
+        }
+    }
+
+    private func tapURL(for item: WidgetItem) -> URL? {
+        guard let action = item.action, !action.payload.isEmpty else { return nil }
+        switch action.type {
+        case .urlScheme:
+            return URL(string: action.payload)
+        case .shortcut:
+            guard let encoded = action.payload
+                    .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { return nil }
+            return URL(string: "shortcuts://run-shortcut?name=\(encoded)")
+        case .appIntent:
+            return nil
         }
     }
 
