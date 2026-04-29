@@ -229,7 +229,14 @@ final class SharedStorage {
             return []
         }
         let configs = try decoder.decode([WidgetConfig].self, from: data)
-        appendExtensionLog("LOAD: \(configs.count) configs")
+        // Migrate existing configs to keychain on first load after upgrade.
+        // Whoever runs first (app or extension) promotes the data so both can read it.
+        if !configs.isEmpty && keychainRead(forKey: Self.configKey) == nil {
+            scatterWrite(data, forKey: Self.configKey)
+            appendExtensionLog("LOAD: migrated \(configs.count) configs → keychain")
+        } else {
+            appendExtensionLog("LOAD: \(configs.count) configs")
+        }
         return configs
     }
 
