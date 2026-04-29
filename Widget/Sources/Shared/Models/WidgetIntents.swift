@@ -21,24 +21,43 @@ struct WidgetEntry: TimelineEntry {
     let date: Date
     let configuration: WidgetConfig
     let showItemLabels: Bool
+    let debugInfo: String
 
-    init(date: Date, configuration: WidgetConfig, showItemLabels: Bool = SharedStorage.shared.showItemLabels) {
+    init(date: Date, configuration: WidgetConfig,
+         showItemLabels: Bool = SharedStorage.shared.showItemLabels,
+         debugInfo: String = "") {
         self.date = date
         self.configuration = configuration
         self.showItemLabels = showItemLabels
+        self.debugInfo = debugInfo
     }
 }
 
 // MARK: - Shared provider logic
 
 private func makeEntry(configID: String?) -> WidgetEntry {
+    let storage = SharedStorage.shared
+    var lines: [String] = []
+    lines.append("reqID: \(configID ?? "nil")")
+
+    let allConfigs = (try? storage.loadConfigurations()) ?? []
+    lines.append("totalCfgs: \(allConfigs.count)")
+
     let config: WidgetConfig
-    if let id = configID, let found = SharedStorage.shared.getConfig(id: id) {
+    if let id = configID, id != "none", let found = storage.getConfig(id: id) {
         config = found
+        lines.append("found: \(found.name)")
     } else {
         config = WidgetConfig.defaultConfiguration
+        lines.append("usingDefault")
     }
-    return WidgetEntry(date: Date(), configuration: config)
+    lines.append("grp: \(storage.activeAppGroupID)")
+    lines.append(storage.groupDiagnostic)
+    storage.appendExtensionLog("makeEntry configID=\(configID ?? "nil") cfgs=\(allConfigs.count) cfg=\(config.name)")
+
+    return WidgetEntry(date: Date(), configuration: config,
+                       showItemLabels: storage.showItemLabels,
+                       debugInfo: lines.joined(separator: "\n"))
 }
 
 private func makeTimeline(configID: String?) -> Timeline<WidgetEntry> {

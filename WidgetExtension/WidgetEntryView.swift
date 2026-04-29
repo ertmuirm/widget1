@@ -32,16 +32,14 @@ struct WidgetEntryView: View {
             }
 
             #if DEBUG
-            VStack {
-                HStack {
-                    Text("\(entry.configuration.items.count)")
-                        .font(.system(size: 8))
-                        .foregroundStyle(.red)
-                    Spacer()
-                    Text(String(describing: widgetFamily))
-                        .font(.system(size: 8))
-                        .foregroundStyle(.green)
-                }
+            VStack(alignment: .leading, spacing: 1) {
+                Text("cfg:\(entry.configuration.name) items:\(entry.configuration.items.count)")
+                    .font(.system(size: 7, design: .monospaced))
+                    .foregroundStyle(.yellow)
+                Text(entry.debugInfo.components(separatedBy: "\n").prefix(3).joined(separator: " | "))
+                    .font(.system(size: 6, design: .monospaced))
+                    .foregroundStyle(.cyan)
+                    .lineLimit(2)
                 Spacer()
             }
             .padding(4)

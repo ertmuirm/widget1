@@ -133,15 +133,17 @@ struct DebugOverlayView: View {
     }
     
     private func checkAppGroupData() {
-        let info = try? SharedStorage.shared.getStorageInfo()
-        let group = SharedStorage.shared.activeAppGroup
+        let storage = SharedStorage.shared
+        let info = try? storage.getStorageInfo()
         let count = info?.configurationCount ?? 0
-        
+
         statusText = "---Status---\n"
-        statusText += "App Group: \(group)\n"
-        statusText += "Mode: UserDefaults\n"
-        statusText += "Configs: \(count)\n"
-        statusText += "Size: \(info?.size ?? 0) bytes\n"
+        statusText += "Active Group: \(storage.activeAppGroupID)\n"
+        statusText += "Configs: \(count)\n\n"
+        statusText += "---Group Candidates---\n"
+        statusText += storage.groupDiagnostic + "\n\n"
+        statusText += "---Extension Log---\n"
+        statusText += storage.readExtensionLog()
     }
     
     private func detectAppGroup() {

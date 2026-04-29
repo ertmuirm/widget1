@@ -45,20 +45,34 @@ struct DebugLogView: View {
                 } label: {
                     Label("View Log File", systemImage: "doc.text")
                 }
-                
+
                 Button {
                     exportLogs()
                 } label: {
                     Label("Export Logs", systemImage: "square.and.arrow.up")
                 }
+
+                Button {
+                    fileContent = SharedStorage.shared.readExtensionLog()
+                    showFileContent = true
+                } label: {
+                    Label("Extension Log (cross-process)", systemImage: "arrow.triangle.2.circlepath")
+                }
+
+                Button(role: .destructive) {
+                    SharedStorage.shared.clearExtensionLog()
+                } label: {
+                    Label("Clear Extension Log", systemImage: "trash")
+                }
+                .foregroundStyle(.red)
             } header: {
                 Text("File-based Logs")
             } footer: {
-                Text("Log file location: App Group container")
+                Text("Extension log is written by both the app and the widget extension to all accessible app groups.")
             }
-            
+
             if showFileContent {
-                Section("File Content") {
+                Section("Log Content") {
                     ScrollView {
                         Text(fileContent)
                             .font(.system(.caption, design: .monospaced))
