@@ -56,8 +56,6 @@ targets:
       properties:
         com.apple.security.application-groups:
           - group.com.iosmirror
-          - group.com.iosmirror.J3D2F4SMVD
-          - group.J3D2F4SMVD.com.iosmirror
     dependencies:
       - target: BroadcastExtension
         embed: true
@@ -90,5 +88,3 @@ targets:
       properties:
         com.apple.security.application-groups:
           - group.com.iosmirror
-          - group.com.iosmirror.J3D2F4SMVD
-          - group.J3D2F4SMVD.com.iosmirror

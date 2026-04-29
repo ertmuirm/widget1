@@ -30,18 +30,21 @@ struct WidgetEntryView: View {
                 itemsGrid
             }
 
-            // Debug overlay — always on so users can diagnose issues on-device without Xcode.
-            // Shows config name, item count, and key group diagnostics from makeEntry().
+            // Debug overlay — always visible for on-device diagnosis without Xcode.
+            // Line 1 (yellow): config name + item count
+            // Line 2 (cyan): req id, cfgs found, per-group status (nil/empty/ok)
             VStack(alignment: .leading, spacing: 1) {
-                Text("cfg:\(entry.configuration.name) n:\(entry.configuration.items.count)")
+                Text("[\(entry.configuration.name)] n:\(entry.configuration.items.count)")
                     .font(.system(size: 7, design: .monospaced))
                     .foregroundStyle(.yellow)
                     .shadow(color: .black, radius: 1)
-                Text(entry.debugInfo.components(separatedBy: "\n").prefix(2).joined(separator: "|"))
-                    .font(.system(size: 6, design: .monospaced))
-                    .foregroundStyle(.cyan)
-                    .shadow(color: .black, radius: 1)
-                    .lineLimit(2)
+                ForEach(Array(entry.debugInfo.components(separatedBy: "\n").prefix(2).enumerated()), id: \.offset) { _, line in
+                    Text(line)
+                        .font(.system(size: 6, design: .monospaced))
+                        .foregroundStyle(.cyan)
+                        .shadow(color: .black, radius: 1)
+                        .lineLimit(1)
+                }
                 Spacer()
             }
             .padding(4)

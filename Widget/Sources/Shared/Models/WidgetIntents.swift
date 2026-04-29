@@ -37,27 +37,33 @@ struct WidgetEntry: TimelineEntry {
 
 private func makeEntry(configID: String?) -> WidgetEntry {
     let storage = SharedStorage.shared
-    var lines: [String] = []
-    lines.append("reqID: \(configID ?? "nil")")
+
+    // Per-group status: nil = UserDefaults(suiteName:) returned nil (not in extension entitlements)
+    //                   empty = initialized but has no config data (entitlement present, no write yet)
+    //                   ok = has config data (shared container working)
+    let groupStatus: String = SharedStorage.appGroupCandidates.enumerated().map { i, id in
+        guard let ud = UserDefaults(suiteName: id) else { return "g\(i):nil" }
+        return ud.data(forKey: SharedStorage.configKey) != nil ? "g\(i):ok" : "g\(i):empty"
+    }.joined(separator: "|")
 
     let allConfigs = (try? storage.loadConfigurations()) ?? []
-    lines.append("totalCfgs: \(allConfigs.count)")
 
     let config: WidgetConfig
+    let foundLabel: String
     if let id = configID, id != "none", let found = storage.getConfig(id: id) {
         config = found
-        lines.append("found: \(found.name)")
+        foundLabel = "cfg:\(found.name)"
     } else {
         config = WidgetConfig.defaultConfiguration
-        lines.append("usingDefault")
+        foundLabel = "default"
     }
-    lines.append("grp: \(storage.activeAppGroupID)")
-    lines.append(storage.groupDiagnostic)
-    storage.appendExtensionLog("makeEntry configID=\(configID ?? "nil") cfgs=\(allConfigs.count) cfg=\(config.name)")
 
+    storage.appendExtensionLog("entry cfgs=\(allConfigs.count) \(groupStatus) req=\(configID ?? "nil")")
+
+    let debugInfo = "req:\(configID ?? "nil") cfgs:\(allConfigs.count) \(foundLabel)\n\(groupStatus)"
     return WidgetEntry(date: Date(), configuration: config,
                        showItemLabels: storage.showItemLabels,
-                       debugInfo: lines.joined(separator: "\n"))
+                       debugInfo: debugInfo)
 }
 
 private func makeTimeline(configID: String?) -> Timeline<WidgetEntry> {

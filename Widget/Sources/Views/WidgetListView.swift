@@ -4,6 +4,7 @@ import SwiftUI
 struct WidgetListView: View {
     
     @EnvironmentObject var viewModel: WidgetViewModel
+    @AppStorage("defaultWidgetSize") private var defaultWidgetSize = WidgetSize.systemMedium.rawValue
     @State private var showAddSheet = false
     @State private var showSettingsSheet = false
     @State private var showDebugSheet = false
@@ -80,7 +81,8 @@ struct WidgetListView: View {
             }
         }
         .sheet(isPresented: $showAddSheet) {
-            let newConfig = WidgetConfig()
+            let size = WidgetSize(rawValue: defaultWidgetSize) ?? .systemMedium
+            let newConfig = WidgetConfig(size: size)
             NavigationStack {
                 WidgetEditorView(configuration: newConfig, isNew: true)
             }
