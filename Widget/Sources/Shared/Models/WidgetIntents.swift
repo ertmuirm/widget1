@@ -27,6 +27,28 @@ private func decodeConfigFromID(_ entityID: String) -> WidgetConfig? {
     return try? dec.decode(WidgetConfig.self, from: data)
 }
 
+// MARK: - URL resolution (shared between makeEntry diagnostics and WidgetEntryView)
+
+/// Resolves the tap URL for a widget item. Returns nil when no action is configured,
+/// the payload is empty/whitespace-only, or the action type is appIntent.
+func resolveItemURL(_ item: WidgetItem) -> URL? {
+    guard let action = item.action else { return nil }
+    let raw = action.payload.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !raw.isEmpty else { return nil }
+    switch action.type {
+    case .urlScheme:
+        return URL(string: raw)
+            ?? URL(string: raw.addingPercentEncoding(
+                withAllowedCharacters: .urlFragmentAllowed) ?? raw)
+    case .shortcut:
+        guard let encoded = raw.addingPercentEncoding(
+            withAllowedCharacters: .urlQueryAllowed) else { return nil }
+        return URL(string: "shortcuts://run-shortcut?name=\(encoded)")
+    case .appIntent:
+        return nil
+    }
+}
+
 // MARK: - Shared helpers
 
 private func filteredConfigs(size: WidgetSize) -> [WidgetConfig] {
@@ -83,15 +105,20 @@ private func makeEntry(configID: String?) -> WidgetEntry {
 
     let kcAvail = SharedStorage.sharedKeychainGroup != nil ? "kc:ok" : "kc:none"
 
-    // Per-item action diagnostics: type initial + ✓(has payload) or ∅(empty) or -(nil)
+    // Per-item action diagnostics: show the actual resolved URL (or nil/none)
     let actionDebug = config.items.prefix(6).enumerated().map { i, item -> String in
-        guard let a = item.action else { return "i\(i):-" }
+        guard let a = item.action else { return "i\(i):none" }
         let t = String(a.type.rawValue.prefix(1))
-        return a.payload.isEmpty ? "i\(i):\(t)∅" : "i\(i):\(t)✓"
-    }.joined(separator: " ")
+        if let url = resolveItemURL(item) {
+            let abbrev = String(url.absoluteString.prefix(30))
+            return "i\(i):\(t)=\(abbrev)"
+        } else {
+            return "i\(i):\(t)=nil(raw:\(a.payload.prefix(20)))"
+        }
+    }.joined(separator: "\n")
 
     let showLabels = config.showItemLabels ?? storage.showItemLabels
-    storage.appendExtensionLog("entry cfgs=\(liveConfigs.count) \(kcAvail) req=\(configID?.prefix(8) ?? "nil") \(source) actions=[\(actionDebug)] labels=\(showLabels)")
+    storage.appendExtensionLog("entry cfgs=\(liveConfigs.count) \(kcAvail) req=\(configID?.prefix(8) ?? "nil") \(source) labels=\(showLabels)\n\(actionDebug)")
     let debugInfo = "\(source) n:\(config.items.count)\nreq:\(configID.map { String($0.prefix(8)) } ?? "nil") cfgs:\(liveConfigs.count)\n\(actionDebug)"
     return WidgetEntry(date: Date(), configuration: config,
                        showItemLabels: showLabels,

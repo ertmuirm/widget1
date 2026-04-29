@@ -31,7 +31,7 @@ struct WidgetEntryView: View {
         // widgetURL acts as a fallback tap for non-Link areas (and the sole
         // tap target on devices where Link is unavailable). Link views always
         // take precedence over widgetURL within their own bounds on iOS 17+.
-        .widgetURL(entry.configuration.items.first.flatMap { tapURL(for: $0) })
+        .widgetURL(entry.configuration.items.first.flatMap { resolveItemURL($0) })
     }
 
     @ViewBuilder
@@ -100,28 +100,12 @@ struct WidgetEntryView: View {
 
     @ViewBuilder
     private func itemCell(_ item: WidgetItem, size: WidgetSize) -> some View {
-        if let url = tapURL(for: item) {
+        if let url = resolveItemURL(item) {
             Link(destination: url) {
                 ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
             }
         } else {
             ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
-        }
-    }
-
-    private func tapURL(for item: WidgetItem) -> URL? {
-        guard let action = item.action, !action.payload.isEmpty else { return nil }
-        switch action.type {
-        case .urlScheme:
-            return URL(string: action.payload)
-                ?? URL(string: action.payload.addingPercentEncoding(
-                    withAllowedCharacters: .urlFragmentAllowed) ?? action.payload)
-        case .shortcut:
-            guard let encoded = action.payload
-                    .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { return nil }
-            return URL(string: "shortcuts://run-shortcut?name=\(encoded)")
-        case .appIntent:
-            return nil
         }
     }
 
