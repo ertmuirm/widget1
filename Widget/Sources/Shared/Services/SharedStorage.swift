@@ -33,14 +33,36 @@ final class SharedStorage {
 
     // MARK: - Keychain shared access group
 
-    /// The actual keychain group string after AltStore/SideStore signing, derived
-    /// at runtime from the process entitlements. Returns nil if not provisioned.
+    /// The keychain access group shared between the main app and widget extension.
+    ///
+    /// The entitlement declares `$(AppIdentifierPrefix)com.iosmirror.shared`.
+    /// SideStore (team ID J3D2F4SMVD) expands `$(AppIdentifierPrefix)` →
+    /// `J3D2F4SMVD.` for both targets, so both processes reach the same group.
+    /// `SecTaskCreateFromSelf` is macOS-only; we detect the active group at
+    /// runtime by probing each candidate with a harmless read.
     static let sharedKeychainGroup: String? = {
-        guard let task = SecTaskCreateFromSelf(nil) else { return nil }
-        guard let groups = SecTaskCopyValueForEntitlement(
-            task, "keychain-access-groups" as CFString, nil
-        ) as? [String] else { return nil }
-        return groups.first { $0.hasSuffix("com.iosmirror.shared") }
+        let candidates = [
+            "J3D2F4SMVD.com.iosmirror.shared",  // SideStore / AltStore (team J3D2F4SMVD)
+            "com.iosmirror.shared"               // unsigned / simulator
+        ]
+        for group in candidates {
+            let query: [String: Any] = [
+                kSecClass as String:           kSecClassGenericPassword,
+                kSecAttrService as String:     "com.iosmirror.widgetdata",
+                kSecAttrAccount as String:     "__groupprobe__",
+                kSecAttrAccessGroup as String: group,
+                kSecReturnData as String:      false,
+                kSecMatchLimit as String:      kSecMatchLimitOne
+            ]
+            let status = SecItemCopyMatching(query as CFDictionary, nil)
+            // errSecItemNotFound means the group is accessible but item absent — group works
+            // errSecSuccess means a probe item exists — group works
+            if status == errSecItemNotFound || status == errSecSuccess {
+                return group
+            }
+        }
+        // Fall back to first candidate; Keychain calls will fail gracefully if wrong
+        return candidates.first
     }()
 
     private static let keychainService = "com.iosmirror.widgetdata"
@@ -83,6 +105,20 @@ final class SharedStorage {
         var result: AnyObject?
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return nil }
         return result as? Data
+    }
+
+    /// True when the shared Keychain already contains widget config data.
+    var keychainHasConfigs: Bool {
+        guard let group = Self.sharedKeychainGroup else { return false }
+        let query: [String: Any] = [
+            kSecClass as String:           kSecClassGenericPassword,
+            kSecAttrService as String:     Self.keychainService,
+            kSecAttrAccount as String:     Self.configKey,
+            kSecAttrAccessGroup as String: group,
+            kSecReturnData as String:      false,
+            kSecMatchLimit as String:      kSecMatchLimitOne
+        ]
+        return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
     }
 
     private func keychainDelete(forKey key: String) {

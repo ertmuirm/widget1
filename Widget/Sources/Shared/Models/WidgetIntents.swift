@@ -1,5 +1,4 @@
 import AppIntents
-import Security
 import WidgetKit
 
 // MARK: - Shared helper
@@ -39,22 +38,10 @@ struct WidgetEntry: TimelineEntry {
 private func makeEntry(configID: String?) -> WidgetEntry {
     let storage = SharedStorage.shared
 
-    // Keychain status
+    // Keychain status (SharedStorage.sharedKeychainGroup probes at first access)
     let kcGroup = SharedStorage.sharedKeychainGroup ?? "nil"
-    let kcHasData: Bool
-    do {
-        // peek at keychain by trying to load — we use the same gatherRead path indirectly
-        let peekQuery: [String: Any] = [
-            kSecClass as String:           kSecClassGenericPassword,
-            kSecAttrService as String:     "com.iosmirror.widgetdata",
-            kSecAttrAccount as String:     SharedStorage.configKey,
-            kSecReturnData as String:      false,
-            kSecMatchLimit as String:      kSecMatchLimitOne
-        ]
-        var ref: AnyObject?
-        kcHasData = SecItemCopyMatching(peekQuery as CFDictionary, &ref) == errSecSuccess
-    }
-    let kcStatus = "kc[\(kcGroup.hasSuffix("com.iosmirror.shared") ? "ok" : kcGroup == "nil" ? "nil" : "?")]:\(kcHasData ? "ok" : "empty")"
+    let kcLabel = kcGroup.hasSuffix("com.iosmirror.shared") ? "ok" : (kcGroup == "nil" ? "nil" : "?")
+    let kcStatus = "kc[\(kcLabel)]"
 
     // Per-group UserDefaults status
     let groupStatus: String = SharedStorage.appGroupCandidates.enumerated().map { i, id in
@@ -74,9 +61,10 @@ private func makeEntry(configID: String?) -> WidgetEntry {
         foundLabel = "default"
     }
 
-    storage.appendExtensionLog("entry cfgs=\(allConfigs.count) \(kcStatus) \(groupStatus) req=\(configID ?? "nil")")
+    let kcDataStatus = storage.keychainHasConfigs ? "data:ok" : "data:empty"
+    storage.appendExtensionLog("entry cfgs=\(allConfigs.count) \(kcStatus):\(kcDataStatus) \(groupStatus) req=\(configID ?? "nil")")
 
-    let debugInfo = "req:\(configID ?? "nil") cfgs:\(allConfigs.count) \(foundLabel)\n\(kcStatus)\n\(groupStatus)"
+    let debugInfo = "req:\(configID ?? "nil") cfgs:\(allConfigs.count) \(foundLabel)\n\(kcStatus):\(kcDataStatus)\n\(groupStatus)"
     return WidgetEntry(date: Date(), configuration: config,
                        showItemLabels: storage.showItemLabels,
                        debugInfo: debugInfo)
