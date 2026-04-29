@@ -90,10 +90,11 @@ private func makeEntry(configID: String?) -> WidgetEntry {
         return a.payload.isEmpty ? "i\(i):\(t)∅" : "i\(i):\(t)✓"
     }.joined(separator: " ")
 
-    storage.appendExtensionLog("entry cfgs=\(liveConfigs.count) \(kcAvail) req=\(configID?.prefix(8) ?? "nil") \(source) actions=[\(actionDebug)]")
+    let showLabels = config.showItemLabels ?? storage.showItemLabels
+    storage.appendExtensionLog("entry cfgs=\(liveConfigs.count) \(kcAvail) req=\(configID?.prefix(8) ?? "nil") \(source) actions=[\(actionDebug)] labels=\(showLabels)")
     let debugInfo = "\(source) n:\(config.items.count)\nreq:\(configID.map { String($0.prefix(8)) } ?? "nil") cfgs:\(liveConfigs.count)\n\(actionDebug)"
     return WidgetEntry(date: Date(), configuration: config,
-                       showItemLabels: storage.showItemLabels,
+                       showItemLabels: showLabels,
                        debugInfo: debugInfo)
 }
 

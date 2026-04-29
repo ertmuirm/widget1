@@ -21,30 +21,12 @@ struct WidgetEntryView: View {
 
     @ViewBuilder
     private var homeScreenWidget: some View {
-        ZStack(alignment: .topLeading) {
+        Group {
             if entry.configuration.items.isEmpty {
                 emptyView
             } else {
                 itemsGrid
             }
-
-            // Debug overlay — anchored top-leading with no Spacer so it never
-            // expands to cover the full widget and block Link tap targets.
-            VStack(alignment: .leading, spacing: 1) {
-                Text("[\(entry.configuration.name)] n:\(entry.configuration.items.count)")
-                    .font(.system(size: 7, design: .monospaced))
-                    .foregroundStyle(.yellow)
-                    .shadow(color: .black, radius: 1)
-                ForEach(Array(entry.debugInfo.components(separatedBy: "\n").prefix(3).enumerated()), id: \.offset) { _, line in
-                    Text(line)
-                        .font(.system(size: 6, design: .monospaced))
-                        .foregroundStyle(.cyan)
-                        .shadow(color: .black, radius: 1)
-                        .lineLimit(1)
-                }
-            }
-            .padding(4)
-            .allowsHitTesting(false)
         }
         // widgetURL acts as a fallback tap for non-Link areas (and the sole
         // tap target on devices where Link is unavailable). Link views always
@@ -132,6 +114,8 @@ struct WidgetEntryView: View {
         switch action.type {
         case .urlScheme:
             return URL(string: action.payload)
+                ?? URL(string: action.payload.addingPercentEncoding(
+                    withAllowedCharacters: .urlFragmentAllowed) ?? action.payload)
         case .shortcut:
             guard let encoded = action.payload
                     .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else { return nil }

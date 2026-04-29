@@ -66,7 +66,10 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
     var backgroundOpacity: Double
     var createdAt: Date
     var updatedAt: Date
-    
+    /// Embedded in the entity ID so the widget extension can read it without IPC.
+    /// nil means "use system default (true)" — handled gracefully by older saved configs.
+    var showItemLabels: Bool?
+
     init(
         id: UUID = UUID(),
         name: String = "New Widget",
@@ -75,7 +78,8 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         backgroundColor: CodableColor = CodableColor(.black),
         backgroundOpacity: Double = 1.0,
         createdAt: Date = Date(),
-        updatedAt: Date = Date()
+        updatedAt: Date = Date(),
+        showItemLabels: Bool? = nil
     ) {
         self.id = id
         self.name = name
@@ -85,6 +89,7 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         self.backgroundOpacity = backgroundOpacity
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.showItemLabels = showItemLabels
     }
     
     /// Default configuration for placeholder

@@ -10,9 +10,15 @@ struct SettingsView: View {
     private var showItemLabels: Binding<Bool> {
         Binding(
             get: { SharedStorage.shared.showItemLabels },
-            set: {
-                SharedStorage.shared.showItemLabels = $0
-                // Tell WidgetKit to refresh so the new label preference takes effect immediately
+            set: { newVal in
+                SharedStorage.shared.showItemLabels = newVal
+                // Bake value into every config so it travels via the embedded entity
+                // ID and is readable by the extension without cross-process IPC.
+                let updated = viewModel.configurations.map { c -> WidgetConfig in
+                    var copy = c; copy.showItemLabels = newVal; return copy
+                }
+                try? SharedStorage.shared.saveConfigurations(updated)
+                viewModel.configurations = updated
                 WidgetCenter.shared.reloadAllTimelines()
             }
         )
