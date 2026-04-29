@@ -21,16 +21,16 @@ struct WidgetEntryView: View {
 
     @ViewBuilder
     private var homeScreenWidget: some View {
-        ZStack(alignment: .topLeading) {
+        ZStack(alignment: .topTrailing) {
             if entry.configuration.items.isEmpty {
                 emptyView
             } else {
                 itemsGrid
             }
 
-            // Diagnostic overlay — topLeading-anchored, no Spacer, hitTesting off
+            // Diagnostic overlay — topTrailing-anchored, no Spacer, hitTesting off
             // so it never blocks Link tap targets. Shows actual resolved URLs.
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .trailing, spacing: 1) {
                 ForEach(Array(entry.debugInfo.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
                     Text(line)
                         .font(.system(size: 6, design: .monospaced))
