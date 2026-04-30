@@ -70,17 +70,5 @@
 	</array>
 	<key>UIApplicationShortcutItems</key>
 	<array/>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>voip</string>
-	</array>
-	<key>INIntentsSupported</key>
-	<array>
-		<string>INStartCallIntent</string>
-	</array>
-	<key>NSUserActivityTypes</key>
-	<array>
-		<string>INStartCallIntent</string>
-	</array>
 </dict>
 </plist>

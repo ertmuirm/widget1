@@ -33,11 +33,20 @@ struct ItemEditorView: View {
                         showSymbolPicker = true
                     } label: {
                         HStack {
-                            Text("SF Symbol")
+                            Text("Icon")
                             Spacer()
                             if let symbolName = item.sfSymbolName {
-                                Image(systemName: symbolName)
-                                    .foregroundStyle(.secondary)
+                                if symbolName.hasPrefix("wi_") {
+                                    Image(symbolName)
+                                        .resizable()
+                                        .renderingMode(.template)
+                                        .scaledToFit()
+                                        .frame(width: 20, height: 20)
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    Image(systemName: symbolName)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                             Text(item.sfSymbolName ?? "Select...")
                                 .foregroundStyle(.secondary)
@@ -357,53 +366,91 @@ struct SymbolPickerView: View {
 
     @State private var searchText = ""
 
-    private let symbols = [
+    private let sfSymbols = [
         "star.fill", "house.fill", "gear", "heart.fill", "bolt.fill", "flame.fill",
         "sun.max.fill", "moon.fill", "cloud.fill", "snow", "wind", "drop.fill",
         "leaf.fill", "camera.fill", "mic.fill", "music.note", "phone.fill", "envelope.fill",
         "message.fill", "bell.fill", "tag.fill", "cart.fill", "creditcard.fill", "gift.fill",
         "airplane", "car.fill", "bus.fill", "tram.fill", "bicycle", "figure.walk",
         "figure.run", "sportscourt.fill", "gamecontroller.fill", "paintbrush.fill", "pencil",
-        "scissors", "doc.fill", "folder.fill", "trash.fill", "archivebox.fill"
+        "scissors", "doc.fill", "folder.fill", "trash.fill", "archivebox.fill",
+        "clock.fill", "timer", "calendar", "map.fill", "location.fill",
+        "wifi", "lock.fill", "eye.fill", "sparkle", "wand.and.stars"
     ]
 
-    private var filteredSymbols: [String] {
-        searchText.isEmpty ? symbols : symbols.filter { $0.localizedCaseInsensitiveContains(searchText) }
+    private var filteredSFSymbols: [String] {
+        searchText.isEmpty ? sfSymbols : sfSymbols.filter { $0.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    private var filteredCustomIcons: [(name: String, label: String)] {
+        searchText.isEmpty ? CustomIcons.all :
+            CustomIcons.all.filter {
+                $0.name.localizedCaseInsensitiveContains(searchText) ||
+                $0.label.localizedCaseInsensitiveContains(searchText)
+            }
     }
 
     var body: some View {
         NavigationStack {
-            List(filteredSymbols, id: \.self) { symbol in
-                Button {
-                    selectedSymbol = symbol
-                    dismiss()
-                } label: {
-                    HStack {
-                        Image(systemName: symbol)
-                            .font(.title2)
-                            .foregroundStyle(.white)
-                            .frame(width: 44, height: 44)
-                            .background(Color.white.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                        Text(symbol)
-                            .foregroundStyle(.white)
-
-                        Spacer()
-
-                        if symbol == selectedSymbol {
-                            Image(systemName: "checkmark")
-                                .foregroundStyle(.gray)
+            List {
+                if !filteredCustomIcons.isEmpty {
+                    Section("Custom Icons") {
+                        ForEach(filteredCustomIcons, id: \.name) { icon in
+                            symbolRow(name: icon.name, label: icon.label, isCustom: true)
+                        }
+                    }
+                }
+                if !filteredSFSymbols.isEmpty {
+                    Section("SF Symbols") {
+                        ForEach(filteredSFSymbols, id: \.self) { symbol in
+                            symbolRow(name: symbol, label: symbol, isCustom: false)
                         }
                     }
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("SF Symbols")
-            .searchable(text: $searchText, prompt: "Search symbols")
+            .navigationTitle("Choose Icon")
+            .searchable(text: $searchText, prompt: "Search icons")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func symbolRow(name: String, label: String, isCustom: Bool) -> some View {
+        Button {
+            selectedSymbol = name
+            dismiss()
+        } label: {
+            HStack {
+                Group {
+                    if isCustom {
+                        Image(name)
+                            .resizable()
+                            .renderingMode(.template)
+                            .scaledToFit()
+                            .frame(width: 24, height: 24)
+                    } else {
+                        Image(systemName: name)
+                            .font(.title2)
+                    }
+                }
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(Color.white.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                Text(label)
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                if name == selectedSymbol {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(.gray)
                 }
             }
         }

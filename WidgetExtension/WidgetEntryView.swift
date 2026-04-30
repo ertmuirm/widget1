@@ -307,9 +307,18 @@ struct ItemView: View {
             } else if item.displayType == .icon {
                 VStack(spacing: 2) {
                     if let symbol = item.sfSymbolName {
-                        Image(systemName: symbol)
-                            .font(.system(size: symbolSize))
-                            .foregroundStyle(item.foregroundColor.swiftUIColor)
+                        if symbol.hasPrefix("wi_") {
+                            Image(symbol)
+                                .resizable()
+                                .renderingMode(.template)
+                                .scaledToFit()
+                                .frame(width: symbolSize * 1.2, height: symbolSize * 1.2)
+                                .foregroundStyle(item.foregroundColor.swiftUIColor)
+                        } else {
+                            Image(systemName: symbol)
+                                .font(.system(size: symbolSize))
+                                .foregroundStyle(item.foregroundColor.swiftUIColor)
+                        }
                     }
                     if showLabel, let text = item.customText, !text.isEmpty {
                         Text(text)

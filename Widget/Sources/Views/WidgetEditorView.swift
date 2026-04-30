@@ -691,9 +691,18 @@ struct ItemRowView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 } else if item.displayType == .icon {
                     if let symbolName = item.sfSymbolName {
-                        Image(systemName: symbolName)
-                            .font(.title2)
-                            .foregroundStyle(item.foregroundColor.swiftUIColor)
+                        if symbolName.hasPrefix("wi_") {
+                            Image(symbolName)
+                                .resizable()
+                                .renderingMode(.template)
+                                .scaledToFit()
+                                .frame(width: 24, height: 24)
+                                .foregroundStyle(item.foregroundColor.swiftUIColor)
+                        } else {
+                            Image(systemName: symbolName)
+                                .font(.title2)
+                                .foregroundStyle(item.foregroundColor.swiftUIColor)
+                        }
                     }
                 } else {
                     Text(item.customText ?? "Text")

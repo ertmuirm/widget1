@@ -1,5 +1,4 @@
 import SwiftUI
-import Intents
 
 @main
 struct WidgetApp: App {
@@ -22,17 +21,6 @@ struct WidgetApp: App {
                         } else {
                             await UIApplication.shared.open(url)
                         }
-                    }
-                }
-                // Handles INStartCallIntent handed back via continueInApp response from IntentsExtension
-                .onContinueUserActivity("INStartCallIntent") { activity in
-                    guard let intent = activity.interaction?.intent as? INStartCallIntent,
-                          let contact = intent.contacts?.first,
-                          let handle = contact.personHandle,
-                          let number = handle.value else { return }
-                    CallKitManager.shared.dial(phoneNumber: number) { success in
-                        guard !success, let url = URL(string: "tel:\(number)") else { return }
-                        UIApplication.shared.open(url)
                     }
                 }
                 .onAppear {

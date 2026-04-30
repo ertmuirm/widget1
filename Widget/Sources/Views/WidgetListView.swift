@@ -201,9 +201,18 @@ struct ItemPreviewView: View {
 
             if item.displayType == .icon {
                 if let symbolName = item.sfSymbolName {
-                    Image(systemName: symbolName)
-                        .font(.system(size: size.width * 0.5))
-                        .foregroundStyle(item.foregroundColor.swiftUIColor)
+                    if symbolName.hasPrefix("wi_") {
+                        Image(symbolName)
+                            .resizable()
+                            .renderingMode(.template)
+                            .scaledToFit()
+                            .frame(width: size.width * 0.55, height: size.width * 0.55)
+                            .foregroundStyle(item.foregroundColor.swiftUIColor)
+                    } else {
+                        Image(systemName: symbolName)
+                            .font(.system(size: size.width * 0.5))
+                            .foregroundStyle(item.foregroundColor.swiftUIColor)
+                    }
                 }
             } else {
                 Text(item.customText ?? "")
