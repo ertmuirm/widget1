@@ -3,6 +3,8 @@ import CallKit
 
 class IntentHandler: INExtension, INStartCallIntentHandling {
 
+    private let callController = CXCallController()
+
     func handle(intent: INStartCallIntent, completion: @escaping (INStartCallIntentResponse) -> Void) {
         guard let contact = intent.contacts?.first,
               let handle = contact.personHandle,
@@ -15,7 +17,6 @@ class IntentHandler: INExtension, INStartCallIntentHandling {
         let action = CXStartCallAction(call: UUID(), handle: cxHandle)
         action.isVideo = (intent.callCapability == .videoCall)
 
-        let callController = CXCallController()
         callController.request(CXTransaction(action: action)) { error in
             DispatchQueue.main.async {
                 if error == nil {
