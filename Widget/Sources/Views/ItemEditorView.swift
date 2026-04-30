@@ -177,9 +177,9 @@ struct ItemEditorView: View {
             ActionPickerView(item: $item)
         }
         .sheet(isPresented: $showAppActionPicker) {
-            AppActionPickerView { selected in
-                item.action?.payload = selected.urlString
-                item.action?.displayName = selected.displayLabel
+            AppActionPickerView { urlString, displayLabel in
+                item.action?.payload = urlString
+                item.action?.displayName = displayLabel
             }
         }
     }

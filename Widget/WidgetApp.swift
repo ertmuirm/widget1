@@ -2,20 +2,37 @@ import SwiftUI
 
 @main
 struct WidgetApp: App {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var showingBlackScreen = false
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .onOpenURL { url in
-                    if url.scheme == "openapp" {
-                        // Bundle-ID launch: openapp://launch?bundle=com.example.app
-                        if let bundleID = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                            .queryItems?.first(where: { $0.name == "bundle" })?.value {
-                            openAppByBundleID(bundleID)
-                        }
-                    } else {
-                        UIApplication.shared.open(url)
-                    }
+            ZStack {
+                ContentView()
+                if showingBlackScreen {
+                    Color.black.ignoresSafeArea()
                 }
+            }
+            .onOpenURL { url in
+                showingBlackScreen = true
+                if url.scheme == "openapp" {
+                    // Bundle-ID launch: openapp://launch?bundle=com.example.app
+                    if let bundleID = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                        .queryItems?.first(where: { $0.name == "bundle" })?.value {
+                        openAppByBundleID(bundleID)
+                    }
+                } else {
+                    UIApplication.shared.open(url)
+                }
+            }
+            .onChange(of: scenePhase) { phase in
+                if phase == .active {
+                    showingBlackScreen = false
+                }
+            }
+            .onAppear {
+                InstalledAppsManager.shared.scan()
+            }
         }
     }
 }
