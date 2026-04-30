@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import Vision
 
 /// Widget editor for creating and editing widget configurations
 struct WidgetEditorView: View {
@@ -131,16 +132,23 @@ struct WidgetEditorView: View {
             Text("Images (\(configuration.slides?.count ?? 0))")
         }
 
-        Section("Add Images") {
+        Section("Add Slides") {
             PhotosPicker(selection: $photoPickerItems, matching: .images) {
-                Label("Choose from Photos", systemImage: "photo.on.rectangle")
+                Label("Add from Photos", systemImage: "photo.on.rectangle")
             }
             .foregroundStyle(.white)
 
             Button {
                 showFileImporter = true
             } label: {
-                Label("Import from Files", systemImage: "folder")
+                Label("Add from Files", systemImage: "folder")
+            }
+            .foregroundStyle(.white)
+
+            Button {
+                addQRSlide()
+            } label: {
+                Label("Add QR Code Slide", systemImage: "qrcode")
             }
             .foregroundStyle(.white)
         }
@@ -231,9 +239,13 @@ struct WidgetEditorView: View {
                     } label: {
                         ItemRowView(item: item)
                     }
-                }
-                .onDelete { indexSet in
-                    configuration.items.remove(atOffsets: indexSet)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            configuration.items.removeAll { $0.id == item.id }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                 }
                 .onMove { from, to in
                     configuration.items.move(fromOffsets: from, toOffset: to)
@@ -374,6 +386,14 @@ struct WidgetEditorView: View {
         addSlide(imageData: data)
     }
 
+    private func addQRSlide() {
+        let slide = ImageSlide(filename: "", qrCodeContent: "")
+        if configuration.slides == nil { configuration.slides = [] }
+        configuration.slides?.append(slide)
+        let newIndex = (configuration.slides?.count ?? 1) - 1
+        editingSlideIndex = EditingItemIndex(id: newIndex)
+    }
+
     private func addSlide(imageData: Data) {
         guard let image = UIImage(data: imageData) else { return }
         let downsized = image.downsizedForWidget()
@@ -411,28 +431,49 @@ struct SlideRowView: View {
                     .fill(Color.gray.opacity(0.3))
                     .frame(width: 44, height: 44)
 
-                let img = slide.imageData.flatMap { UIImage(data: $0) }
-                    ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
-                if let image = img {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 44, height: 44)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                if slide.isQRCode {
+                    if let content = slide.qrCodeContent, !content.isEmpty,
+                       let qr = UIImage.qrCode(from: content, size: 88) {
+                        Image(uiImage: qr)
+                            .interpolation(.none)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else {
+                        Image(systemName: "qrcode")
+                            .foregroundStyle(.secondary)
+                    }
                 } else {
-                    Image(systemName: "photo")
-                        .foregroundStyle(.secondary)
+                    let img = slide.imageData.flatMap { UIImage(data: $0) }
+                        ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
+                    if let image = img {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else {
+                        Image(systemName: "photo")
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Image \(index + 1)")
+                Text(slide.isQRCode ? "QR Code \(index + 1)" : "Image \(index + 1)")
                     .font(.headline)
                     .foregroundStyle(.white)
                 HStack(spacing: 6) {
-                    Text("Scale \(String(format: "%.1f", slide.scale))×")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if slide.isQRCode {
+                        Text(slide.qrCodeContent.map { $0.prefix(20) + ($0.count > 20 ? "…" : "") } ?? "No content")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Scale \(String(format: "%.1f", slide.scale))×")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                     if slide.action != nil {
                         Image(systemName: "hand.tap.fill")
                             .font(.caption2)
@@ -459,6 +500,9 @@ struct SlideEditorView: View {
 
     @State private var showActionPicker = false
     @State private var showAppActionPicker = false
+    @State private var qrScanPickerItems: [PhotosPickerItem] = []
+    @State private var showQRFileImporter = false
+    @State private var scanError: String?
 
     // Proxy so ActionPickerView / AppActionPickerView can bind to a WidgetItem
     private var actionItemBinding: Binding<WidgetItem> {
@@ -474,53 +518,118 @@ struct SlideEditorView: View {
 
     var body: some View {
         List {
-            Section("Preview") {
-                let img = slide.imageData.flatMap { UIImage(data: $0) }
-                    ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
-                if let image = img {
-                    GeometryReader { geo in
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .scaleEffect(CGFloat(slide.scale))
-                            .offset(
-                                x: CGFloat(slide.offsetX) * geo.size.width,
-                                y: CGFloat(slide.offsetY) * geo.size.height
-                            )
-                            .frame(width: geo.size.width, height: geo.size.height)
-                            .clipped()
+            if slide.isQRCode {
+                // QR Code slide content
+                Section {
+                    TextField("URL or text to encode", text: Binding(
+                        get: { slide.qrCodeContent ?? "" },
+                        set: { slide.qrCodeContent = $0.isEmpty ? nil : $0 }
+                    ))
+                    .foregroundStyle(.white)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+
+                    PhotosPicker(selection: $qrScanPickerItems, maxSelectionCount: 1, matching: .images) {
+                        Label("Scan from Photos", systemImage: "qrcode.viewfinder")
                     }
-                    .frame(height: 200)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .listRowInsets(EdgeInsets())
+                    .foregroundStyle(.white)
+                    .onChange(of: qrScanPickerItems) { items in
+                        if let first = items.first { scanQRFromPhoto(first) }
+                        qrScanPickerItems = []
+                    }
+
+                    Button { showQRFileImporter = true } label: {
+                        Label("Scan from Files", systemImage: "folder.badge.questionmark")
+                    }
+                    .foregroundStyle(.white)
+
+                    if let err = scanError {
+                        Text(err).font(.caption).foregroundStyle(.orange)
+                    }
+                } header: {
+                    Text("QR Code Content")
+                }
+
+                if let content = slide.qrCodeContent, !content.isEmpty,
+                   let qr = UIImage.qrCode(from: content, size: 300) {
+                    Section("Preview") {
+                        VStack(spacing: 6) {
+                            Image(uiImage: qr)
+                                .interpolation(.none)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxHeight: 200)
+                                .frame(maxWidth: .infinity)
+                            if let label = slide.qrCodeLabel, !label.isEmpty {
+                                Text(label)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(.white)
+                            }
+                        }
+                        .padding(.vertical, 6)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                    }
+                }
+
+                Section("Label (optional)") {
+                    TextField("Label shown below QR code", text: Binding(
+                        get: { slide.qrCodeLabel ?? "" },
+                        set: { slide.qrCodeLabel = $0.isEmpty ? nil : $0 }
+                    ))
+                    .foregroundStyle(.white)
+                }
+
+            } else {
+                Section("Preview") {
+                    let img = slide.imageData.flatMap { UIImage(data: $0) }
+                        ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
+                    if let image = img {
+                        GeometryReader { geo in
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .scaleEffect(CGFloat(slide.scale))
+                                .offset(
+                                    x: CGFloat(slide.offsetX) * geo.size.width,
+                                    y: CGFloat(slide.offsetY) * geo.size.height
+                                )
+                                .frame(width: geo.size.width, height: geo.size.height)
+                                .clipped()
+                        }
+                        .frame(height: 200)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .listRowInsets(EdgeInsets())
+                    }
                 }
             }
 
-            Section("Position & Scale") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Zoom: \(String(format: "%.1f", slide.scale))×")
-                    Slider(value: $slide.scale, in: 1.0...4.0, step: 0.1)
-                        .tint(.gray)
-                }
+            if !slide.isQRCode {
+                Section("Position & Scale") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Zoom: \(String(format: "%.1f", slide.scale))×")
+                        Slider(value: $slide.scale, in: 1.0...4.0, step: 0.1)
+                            .tint(.gray)
+                    }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Horizontal: \(String(format: "%.2f", slide.offsetX))")
-                    Slider(value: $slide.offsetX, in: -0.5...0.5)
-                        .tint(.gray)
-                }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Horizontal: \(String(format: "%.2f", slide.offsetX))")
+                        Slider(value: $slide.offsetX, in: -0.5...0.5)
+                            .tint(.gray)
+                    }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Vertical: \(String(format: "%.2f", slide.offsetY))")
-                    Slider(value: $slide.offsetY, in: -0.5...0.5)
-                        .tint(.gray)
-                }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Vertical: \(String(format: "%.2f", slide.offsetY))")
+                        Slider(value: $slide.offsetY, in: -0.5...0.5)
+                            .tint(.gray)
+                    }
 
-                Button("Reset Position") {
-                    slide.offsetX = 0
-                    slide.offsetY = 0
-                    slide.scale = 1.0
+                    Button("Reset Position") {
+                        slide.offsetX = 0
+                        slide.offsetY = 0
+                        slide.scale = 1.0
+                    }
+                    .foregroundStyle(.gray)
                 }
-                .foregroundStyle(.gray)
             }
 
             // Action section — overrides the widget-level default action for this slide
@@ -610,8 +719,59 @@ struct SlideEditorView: View {
                 slide.action?.displayName = displayLabel
             }
         }
+        .fileImporter(
+            isPresented: $showQRFileImporter,
+            allowedContentTypes: [.image],
+            allowsMultipleSelection: false
+        ) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                scanQRFromFile(url)
+            }
+        }
     }
 
+    private func scanQRFromPhoto(_ photoItem: PhotosPickerItem) {
+        scanError = nil
+        photoItem.loadTransferable(type: Data.self) { result in
+            guard case .success(let data?) = result,
+                  let ciImage = CIImage(data: data) else {
+                DispatchQueue.main.async { self.scanError = "Could not load image." }
+                return
+            }
+            performQRScan(on: ciImage)
+        }
+    }
+
+    private func scanQRFromFile(_ url: URL) {
+        scanError = nil
+        guard url.startAccessingSecurityScopedResource() else {
+            scanError = "Could not access file."
+            return
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+        guard let data = try? Data(contentsOf: url),
+              let ciImage = CIImage(data: data) else {
+            scanError = "Could not load image."
+            return
+        }
+        performQRScan(on: ciImage)
+    }
+
+    private func performQRScan(on ciImage: CIImage) {
+        let request = VNDetectBarcodesRequest()
+        let handler = VNImageRequestHandler(ciImage: ciImage, options: [:])
+        DispatchQueue.global(qos: .userInitiated).async {
+            try? handler.perform([request])
+            DispatchQueue.main.async {
+                if let payload = request.results?.first?.payloadStringValue {
+                    self.slide.qrCodeContent = payload
+                    self.scanError = nil
+                } else {
+                    self.scanError = "No QR code or barcode detected."
+                }
+            }
+        }
+    }
 }
 
 // MARK: - Item Row View
@@ -669,9 +829,12 @@ struct ItemRowView: View {
                     .foregroundStyle(.white)
 
                 if let action = item.action {
-                    Text(action.type.displayName)
+                    let detail = action.displayName
+                        ?? (action.payload.isEmpty ? nil : action.payload)
+                    Text(detail.map { "\(action.type.displayName): \($0)" } ?? action.type.displayName)
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 } else {
                     Text("No action")
                         .font(.caption)

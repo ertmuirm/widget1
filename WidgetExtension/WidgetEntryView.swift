@@ -72,7 +72,7 @@ struct WidgetEntryView: View {
                     .aspectRatio(1, contentMode: .fit)
             }
         }
-        .padding(-16)
+        .padding(-10)
     }
 
     private var mediumGrid: some View {
@@ -83,7 +83,7 @@ struct WidgetEntryView: View {
                     .aspectRatio(1, contentMode: .fit)
             }
         }
-        .padding(-16)
+        .padding(-10)
     }
 
     private var largeGrid: some View {
@@ -94,7 +94,7 @@ struct WidgetEntryView: View {
                     .aspectRatio(1, contentMode: .fit)
             }
         }
-        .padding(-16)
+        .padding(-10)
     }
 
     private var extraLargeGrid: some View { largeGrid }
@@ -142,26 +142,45 @@ struct WidgetEntryView: View {
                 }
             } else {
                 let slide = slides[index]
-                let image = slide.imageData.flatMap { UIImage(data: $0) }
-                    ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
-                if let image {
-                    GeometryReader { geo in
-                        Image(uiImage: image)
+                if slide.isQRCode, let content = slide.qrCodeContent,
+                   let qr = UIImage.qrCode(from: content) {
+                    VStack(spacing: 4) {
+                        Image(uiImage: qr)
+                            .interpolation(.none)
                             .resizable()
-                            .scaledToFill()
-                            .scaleEffect(CGFloat(slide.scale))
-                            .offset(
-                                x: CGFloat(slide.offsetX) * geo.size.width,
-                                y: CGFloat(slide.offsetY) * geo.size.height
-                            )
-                            .frame(width: geo.size.width, height: geo.size.height)
-                            .clipped()
+                            .scaledToFit()
+                            .padding(8)
+                        if let label = slide.qrCodeLabel, !label.isEmpty {
+                            Text(label)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                                .padding(.bottom, 4)
+                        }
                     }
                 } else {
-                    Color.gray.opacity(0.3)
-                    Image(systemName: "photo")
-                        .font(.title)
-                        .foregroundStyle(.secondary)
+                    let image = slide.imageData.flatMap { UIImage(data: $0) }
+                        ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
+                    if let image {
+                        GeometryReader { geo in
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFill()
+                                .scaleEffect(CGFloat(slide.scale))
+                                .offset(
+                                    x: CGFloat(slide.offsetX) * geo.size.width,
+                                    y: CGFloat(slide.offsetY) * geo.size.height
+                                )
+                                .frame(width: geo.size.width, height: geo.size.height)
+                                .clipped()
+                        }
+                    } else {
+                        Color.gray.opacity(0.3)
+                        Image(systemName: "photo")
+                            .font(.title)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 // Three-zone tap overlay: left third (prev), center (action), right third (next)

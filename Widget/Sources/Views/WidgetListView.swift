@@ -19,8 +19,16 @@ struct WidgetListView: View {
                     NavigationLink(value: config.id) {
                         WidgetRowView(configuration: config)
                     }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            if let idx = viewModel.configurations.firstIndex(where: { $0.id == config.id }) {
+                                viewModel.deleteConfiguration(at: IndexSet([idx]))
+                            }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                 }
-                .onDelete(perform: viewModel.deleteConfiguration)
             }
         }
         .listStyle(.insetGrouped)
@@ -140,7 +148,11 @@ struct WidgetRowView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                Text("\(configuration.items.count) item\(configuration.items.count == 1 ? "" : "s")")
+                let itemCount = configuration.widgetKind == .imageSlideshow
+                    ? (configuration.slides?.count ?? 0)
+                    : configuration.items.count
+                let unit = configuration.widgetKind == .imageSlideshow ? "image" : "item"
+                Text("\(itemCount) \(unit)\(itemCount == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -165,7 +177,29 @@ struct WidgetPreviewView: View {
                 configuration.backgroundColor.swiftUIColor
                     .opacity(configuration.backgroundOpacity)
 
-                if configuration.items.isEmpty {
+                if configuration.widgetKind == .imageSlideshow {
+                    let slides = configuration.slides ?? []
+                    let idx = min(configuration.currentSlideIndex ?? 0, max(0, slides.count - 1))
+                    if slides.isEmpty {
+                        Image(systemName: "photo.on.rectangle.angled")
+                            .font(.title2)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        let slide = slides[idx]
+                        let img = slide.imageData.flatMap { UIImage(data: $0) }
+                            ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
+                        if let img {
+                            Image(uiImage: img)
+                                .resizable()
+                                .scaledToFill()
+                                .scaleEffect(CGFloat(slide.scale))
+                        } else {
+                            Image(systemName: "photo")
+                                .font(.title2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } else if configuration.items.isEmpty {
                     Image(systemName: "plus")
                         .font(.title2)
                         .foregroundStyle(.secondary)

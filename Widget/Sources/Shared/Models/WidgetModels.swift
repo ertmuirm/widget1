@@ -88,29 +88,38 @@ enum WidgetKind: String, Codable {
 
 // MARK: - Image Slide
 
-/// One image in an Image Slideshow widget
+/// One image (or QR code) in an Image Slideshow widget
 struct ImageSlide: Codable, Identifiable, Equatable {
     let id: UUID
-    var filename: String   // file stored in shared images directory
+    var filename: String   // file stored in shared images directory (empty for QR slides)
     var offsetX: Double    // -0.5 … 0.5 (fraction of widget width)
     var offsetY: Double    // -0.5 … 0.5 (fraction of widget height)
     var scale: Double      // 1.0 = fit, >1 = zoomed in
     var action: WidgetAction?
+    /// QR code content — when non-nil this slide shows a QR code instead of a photo.
+    var qrCodeContent: String?
+    /// Optional label shown below the QR code.
+    var qrCodeLabel: String?
     /// In-memory JPEG data. Never serialized — populated at load time from SharedStorage.
     var imageData: Data?
 
     // imageData is intentionally excluded from JSON to keep config sizes small.
-    enum CodingKeys: CodingKey { case id, filename, offsetX, offsetY, scale, action }
+    enum CodingKeys: CodingKey { case id, filename, offsetX, offsetY, scale, action, qrCodeContent, qrCodeLabel }
+
+    var isQRCode: Bool { qrCodeContent != nil && !qrCodeContent!.isEmpty }
 
     init(id: UUID = UUID(), filename: String,
          offsetX: Double = 0, offsetY: Double = 0, scale: Double = 1.0,
-         action: WidgetAction? = nil, imageData: Data? = nil) {
+         action: WidgetAction? = nil, qrCodeContent: String? = nil,
+         qrCodeLabel: String? = nil, imageData: Data? = nil) {
         self.id = id
         self.filename = filename
         self.offsetX = offsetX
         self.offsetY = offsetY
         self.scale = scale
         self.action = action
+        self.qrCodeContent = qrCodeContent
+        self.qrCodeLabel = qrCodeLabel
         self.imageData = imageData
     }
 }

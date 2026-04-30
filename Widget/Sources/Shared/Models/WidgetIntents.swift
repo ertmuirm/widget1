@@ -88,7 +88,13 @@ private func makeEntry(configID: String?) -> WidgetEntry {
         let uuid = uuidFromEntityID(id)
         if let found = liveConfigs.first(where: { $0.id.uuidString == uuid }) {
             config = found
-        } else if let embedded = decodeConfigFromID(id) {
+        } else if var embedded = decodeConfigFromID(id) {
+            // Populate imageData for slides not already populated by loadConfigurations
+            if embedded.slides != nil {
+                for j in embedded.slides!.indices where embedded.slides![j].imageData == nil {
+                    embedded.slides![j].imageData = storage.loadWidgetImageData(filename: embedded.slides![j].filename)
+                }
+            }
             config = embedded
         } else {
             config = .defaultConfiguration
