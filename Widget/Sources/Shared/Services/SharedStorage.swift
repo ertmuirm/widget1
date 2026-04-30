@@ -392,19 +392,55 @@ final class SharedStorage {
     }
 
     func saveWidgetImage(_ data: Data, filename: String) {
-        let url = widgetImagesDirectory().appendingPathComponent(filename)
-        try? data.write(to: url, options: .atomicWrite)
+        // Scatter-write to every accessible app-group container AND Documents so
+        // both the main app and the widget extension can load the file regardless
+        // of which shared container each process resolves.
+        var wroteToGroup = false
+        for id in Self.appGroupCandidates {
+            if let container = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: id) {
+                let dir = container.appendingPathComponent("widget_images")
+                try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                try? data.write(to: dir.appendingPathComponent(filename), options: .atomicWrite)
+                wroteToGroup = true
+            }
+        }
+        // Always write to Documents as a last-resort fallback
+        let docDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("widget_images")
+        try? FileManager.default.createDirectory(at: docDir, withIntermediateDirectories: true)
+        try? data.write(to: docDir.appendingPathComponent(filename), options: .atomicWrite)
     }
 
     #if canImport(UIKit)
     func loadWidgetImage(filename: String) -> UIImage? {
-        let url = widgetImagesDirectory().appendingPathComponent(filename)
+        // Search every app-group container first, then Documents
+        for id in Self.appGroupCandidates {
+            if let container = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: id) {
+                let url = container.appendingPathComponent("widget_images")
+                    .appendingPathComponent(filename)
+                if let image = UIImage(contentsOfFile: url.path) { return image }
+            }
+        }
+        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("widget_images")
+            .appendingPathComponent(filename)
         return UIImage(contentsOfFile: url.path)
     }
     #endif
 
     func deleteWidgetImage(filename: String) {
-        let url = widgetImagesDirectory().appendingPathComponent(filename)
+        for id in Self.appGroupCandidates {
+            if let container = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: id) {
+                try? FileManager.default.removeItem(
+                    at: container.appendingPathComponent("widget_images")
+                        .appendingPathComponent(filename))
+            }
+        }
+        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("widget_images").appendingPathComponent(filename)
         try? FileManager.default.removeItem(at: url)
     }
 

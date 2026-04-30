@@ -83,6 +83,7 @@ struct BroadcastLockWidget: Widget {
             provider: LockBroadcastProvider()
         ) { entry in
             WidgetEntryView(entry: entry)
+                .containerBackground(for: .widget) { Color.clear }
         }
         .configurationDisplayName("Lock Screen Widget")
         .description("A customizable lock screen widget")

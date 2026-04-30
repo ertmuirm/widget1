@@ -232,7 +232,10 @@ class InstalledAppsManager: ObservableObject {
                 self.scannedApps = apps
                 self.installedBundleIDs = bundleIDs
                 self.installedURLSchemes = urlSchemes
-                self.hasCompletedScan = true
+                // Only mark scan complete when the private API returned real data.
+                // If bundleIDs is empty the API was unavailable; keep hasCompletedScan
+                // false so isInstalled() defaults to true (show all apps).
+                self.hasCompletedScan = !bundleIDs.isEmpty
                 self.isScanning = false
             }
         }

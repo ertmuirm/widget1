@@ -1,20 +1,31 @@
 import SwiftUI
 
-/// Main content view - entry point for the app
+/// Main content view.
+/// Default page (index 0): solid black screen — this is what iOS shows when any widget
+/// tap opens the host app without a specific deep link. Swiping left reveals the
+/// widget configuration UI so the black screen acts as a transparent pass-through.
 struct ContentView: View {
-    
+
     @StateObject private var viewModel = WidgetViewModel()
     @State private var showOnboarding = !SharedStorage.shared.hasCompletedOnboarding
-    
+
     var body: some View {
-        NavigationStack {
-            if showOnboarding {
-                OnboardingView(showOnboarding: $showOnboarding)
-            } else {
-                WidgetListView()
+        TabView {
+            // Page 0 — black screen (default when opened via widget tap)
+            Color.black
+                .ignoresSafeArea()
+
+            // Page 1 — widget configuration (swipe left to access)
+            NavigationStack {
+                if showOnboarding {
+                    OnboardingView(showOnboarding: $showOnboarding)
+                } else {
+                    WidgetListView()
+                }
             }
+            .environmentObject(viewModel)
         }
-        .environmentObject(viewModel)
+        .tabViewStyle(.page(indexDisplayMode: .never))
         .preferredColorScheme(.dark)
         .tint(.gray)
     }
@@ -24,43 +35,39 @@ struct ContentView: View {
 
 struct OnboardingView: View {
     @Binding var showOnboarding: Bool
-    @State private var currentPage = 0
-    
+
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
-            
-            // Welcome icon
+
             Image(systemName: "square.grid.2x2.fill")
                 .font(.system(size: 80))
                 .foregroundStyle(.white)
-            
+
             VStack(spacing: 12) {
                 Text("Welcome to Widget")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .foregroundStyle(.white)
-                
+
                 Text("Create custom widgets for your Home Screen, Lock Screen, and Control Center")
                     .font(.body)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             }
-            
+
             Spacer()
-            
-            // Feature highlights
+
             VStack(alignment: .leading, spacing: 16) {
-                FeatureRow(icon: "square.grid.2x2", title: "Home Screen Widgets", description: "1×1, 3×3, 6×3, 6×6 sizes")
-                FeatureRow(icon: "lock.display", title: "Lock Screen Widgets", description: "Inline, Circular, Rectangular")
-                FeatureRow(icon: "hand.tap", title: "Interactive Actions", description: "URL schemes, App Intents, Shortcuts")
+                FeatureRow(icon: "square.grid.2x2",  title: "Home Screen Widgets", description: "Small, Medium, Large sizes")
+                FeatureRow(icon: "lock.display",      title: "Lock Screen Widgets",  description: "Inline, Circular, Rectangular")
+                FeatureRow(icon: "hand.tap",          title: "Interactive Actions",  description: "URL schemes, App Actions, Shortcuts")
             }
             .padding(.horizontal, 24)
-            
+
             Spacer()
-            
-            // Get Started button
+
             Button {
                 SharedStorage.shared.hasCompletedOnboarding = true
                 showOnboarding = false
@@ -84,7 +91,7 @@ struct FeatureRow: View {
     let icon: String
     let title: String
     let description: String
-    
+
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: icon)
@@ -93,7 +100,7 @@ struct FeatureRow: View {
                 .frame(width: 44, height: 44)
                 .background(Color.white.opacity(0.15))
                 .clipShape(RoundedRectangle(cornerRadius: 10))
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.headline)
@@ -102,7 +109,7 @@ struct FeatureRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            
+
             Spacer()
         }
     }

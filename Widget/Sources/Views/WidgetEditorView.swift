@@ -41,6 +41,7 @@ struct WidgetEditorView: View {
 
             if isImageWidget {
                 slidesSection
+                slideshowActionSection
             } else if isLockScreenWidget {
                 lockScreenItemSection
             } else {
@@ -141,6 +142,40 @@ struct WidgetEditorView: View {
                 Label("Import from Files", systemImage: "folder")
             }
             .foregroundStyle(.white)
+        }
+    }
+
+    // MARK: - Slideshow center-tap action section
+
+    @ViewBuilder
+    private var slideshowActionSection: some View {
+        Section {
+            Text("Tapping the center third of the image widget triggers this action. Left and right thirds scroll through images.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Button {
+                if configuration.items.isEmpty { configuration.items.append(WidgetItem()) }
+                editingItemIndex = EditingItemIndex(id: 0)
+            } label: {
+                if let item = configuration.items.first, item.action != nil {
+                    ItemRowView(item: item)
+                } else {
+                    Label("Set Center Action (Optional)", systemImage: "hand.tap")
+                        .foregroundStyle(.gray)
+                }
+            }
+
+            if configuration.items.first?.action != nil {
+                Button(role: .destructive) {
+                    configuration.items.removeAll()
+                } label: {
+                    Label("Remove Action", systemImage: "trash")
+                }
+                .foregroundStyle(.gray)
+            }
+        } header: {
+            Text("Center Tap Action")
         }
     }
 

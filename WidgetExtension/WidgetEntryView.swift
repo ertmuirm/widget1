@@ -111,6 +111,9 @@ struct WidgetEntryView: View {
         let slides = entry.configuration.slides ?? []
         let rawIndex = entry.configuration.currentSlideIndex ?? 0
         let index = slides.isEmpty ? 0 : min(rawIndex, slides.count - 1)
+        let actionURL = entry.configuration.items.first.flatMap { resolveItemURL($0) }
+        let hasNavigation = slides.count > 1
+        let hasAction = actionURL != nil
 
         ZStack {
             if slides.isEmpty {
@@ -145,24 +148,49 @@ struct WidgetEntryView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                // Corner navigation buttons (next / previous)
-                if slides.count > 1 {
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Button(intent: AdvanceImageIntent(
-                                widgetID: entry.configuration.id.uuidString, forward: false)) {
-                                Color.clear.frame(width: 44, height: 44)
+                // Three-zone tap overlay: left third (prev), center (action), right third (next)
+                if hasNavigation || hasAction {
+                    HStack(spacing: 0) {
+                        // Left third — previous slide
+                        Group {
+                            if hasNavigation {
+                                Button(intent: AdvanceImageIntent(
+                                    widgetID: entry.configuration.id.uuidString, forward: false)) {
+                                    Color.clear
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                Color.clear
                             }
-                            .buttonStyle(.plain)
-                            Spacer()
-                            Button(intent: AdvanceImageIntent(
-                                widgetID: entry.configuration.id.uuidString, forward: true)) {
-                                Color.clear.frame(width: 44, height: 44)
-                            }
-                            .buttonStyle(.plain)
                         }
-                        .padding(4)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
+
+                        // Center third — configured action
+                        Group {
+                            if let url = actionURL {
+                                Link(destination: url) { Color.clear }
+                            } else {
+                                Color.clear
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
+
+                        // Right third — next slide
+                        Group {
+                            if hasNavigation {
+                                Button(intent: AdvanceImageIntent(
+                                    widgetID: entry.configuration.id.uuidString, forward: true)) {
+                                    Color.clear
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                Color.clear
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(Rectangle())
                     }
                 }
             }
@@ -173,12 +201,17 @@ struct WidgetEntryView: View {
 
     @ViewBuilder
     private var lockScreenWidget: some View {
-        switch widgetFamily {
-        case .accessoryCircular:    accessoryCircularWidget
-        case .accessoryInline:      accessoryInlineWidget
-        case .accessoryRectangular: accessoryRectangularWidget
-        default:                    accessoryCircularWidget
+        let actionURL = entry.configuration.items.first.flatMap { resolveItemURL($0) }
+
+        Group {
+            switch widgetFamily {
+            case .accessoryCircular:    accessoryCircularWidget
+            case .accessoryInline:      accessoryInlineWidget
+            case .accessoryRectangular: accessoryRectangularWidget
+            default:                    accessoryCircularWidget
+            }
         }
+        .widgetURL(actionURL)
     }
 
     @ViewBuilder
@@ -256,6 +289,7 @@ struct ItemView: View {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
             } else if item.displayType == .icon {
                 VStack(spacing: 2) {
@@ -296,8 +330,8 @@ struct LockScreenItemView: View {
                let image = SharedStorage.shared.loadWidgetImage(filename: filename) {
                 Image(uiImage: image)
                     .resizable()
-                    .scaledToFill()
-                    .clipShape(Circle())
+                    .renderingMode(.original)
+                    .scaledToFit()
                     .frame(width: 16, height: 16)
             } else if item.displayType == .icon {
                 if let symbol = item.sfSymbolName {
