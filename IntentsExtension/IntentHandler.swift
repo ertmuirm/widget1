@@ -5,12 +5,13 @@ class IntentHandler: INExtension, INStartCallIntentHandling {
 
     func handle(intent: INStartCallIntent, completion: @escaping (INStartCallIntentResponse) -> Void) {
         guard let contact = intent.contacts?.first,
-              let handle = contact.personHandle else {
+              let handle = contact.personHandle,
+              let phoneNumber = handle.value else {
             completion(INStartCallIntentResponse(code: .failure, userActivity: nil))
             return
         }
 
-        let cxHandle = CXHandle(type: .phoneNumber, value: handle.value)
+        let cxHandle = CXHandle(type: .phoneNumber, value: phoneNumber)
         let action = CXStartCallAction(call: UUID(), handle: cxHandle)
         action.isVideo = (intent.callCapability == .videoCall)
 
