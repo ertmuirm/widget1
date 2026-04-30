@@ -1,5 +1,8 @@
 import Foundation
 import Security
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// Shared persistent storage used by both the main app and the widget extension.
 ///
@@ -367,6 +370,42 @@ final class SharedStorage {
             UserDefaults(suiteName: id)?.synchronize()
         }
         UserDefaults.standard.removeObject(forKey: Self.extensionLogKey)
+    }
+
+    // MARK: - Widget Image Storage
+
+    /// Directory where widget slide images are stored.
+    /// Tries app group container first (accessible by both targets), falls back to Documents.
+    func widgetImagesDirectory() -> URL {
+        for id in Self.appGroupCandidates {
+            if let container = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: id) {
+                let dir = container.appendingPathComponent("widget_images")
+                try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                return dir
+            }
+        }
+        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("widget_images")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    func saveWidgetImage(_ data: Data, filename: String) {
+        let url = widgetImagesDirectory().appendingPathComponent(filename)
+        try? data.write(to: url, options: .atomicWrite)
+    }
+
+    #if canImport(UIKit)
+    func loadWidgetImage(filename: String) -> UIImage? {
+        let url = widgetImagesDirectory().appendingPathComponent(filename)
+        return UIImage(contentsOfFile: url.path)
+    }
+    #endif
+
+    func deleteWidgetImage(filename: String) {
+        let url = widgetImagesDirectory().appendingPathComponent(filename)
+        try? FileManager.default.removeItem(at: url)
     }
 
     // MARK: - Backup / Restore

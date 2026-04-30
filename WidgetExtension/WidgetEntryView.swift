@@ -1,5 +1,6 @@
 import SwiftUI
 import WidgetKit
+import AppIntents
 
 /// Main widget entry view that renders based on widget family
 struct WidgetEntryView: View {
@@ -9,7 +10,11 @@ struct WidgetEntryView: View {
     var body: some View {
         switch widgetFamily {
         case .systemSmall, .systemMedium, .systemLarge, .systemExtraLarge:
-            homeScreenWidget
+            if entry.configuration.widgetKind == .imageSlideshow {
+                imageSlideshowWidget
+            } else {
+                homeScreenWidget
+            }
         case .accessoryCircular, .accessoryInline, .accessoryRectangular:
             lockScreenWidget
         default:
@@ -17,32 +22,17 @@ struct WidgetEntryView: View {
         }
     }
 
-    // MARK: - Home Screen
+    // MARK: - Home Screen (grid)
 
     @ViewBuilder
     private var homeScreenWidget: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack {
             if entry.configuration.items.isEmpty {
                 emptyView
             } else {
                 itemsGrid
             }
-
-            // Diagnostic overlay — topTrailing-anchored, no Spacer, hitTesting off
-            // so it never blocks Link tap targets. Shows actual resolved URLs.
-            VStack(alignment: .trailing, spacing: 1) {
-                ForEach(Array(entry.debugInfo.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
-                    Text(line)
-                        .font(.system(size: 6, design: .monospaced))
-                        .foregroundStyle(.yellow)
-                        .shadow(color: .black, radius: 1)
-                        .lineLimit(1)
-                }
-            }
-            .padding(3)
-            .allowsHitTesting(false)
         }
-        .widgetURL(entry.configuration.items.first.flatMap { resolveItemURL($0) })
     }
 
     @ViewBuilder
@@ -69,7 +59,6 @@ struct WidgetEntryView: View {
 
     // MARK: - Grid layouts
 
-    // Small: 3 columns × 3 rows = 9 items (iOS systemSmall)
     private var smallGrid: some View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
         return LazyVGrid(columns: columns, spacing: 2) {
@@ -80,7 +69,6 @@ struct WidgetEntryView: View {
         .padding(4)
     }
 
-    // Medium: 6 columns × 3 rows = 18 items (iOS systemMedium)
     private var mediumGrid: some View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 6)
         return LazyVGrid(columns: columns, spacing: 2) {
@@ -91,7 +79,6 @@ struct WidgetEntryView: View {
         .padding(4)
     }
 
-    // Large: 6 columns × 6 rows = 36 items (iOS systemLarge)
     private var largeGrid: some View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 6)
         return LazyVGrid(columns: columns, spacing: 2) {
@@ -102,12 +89,9 @@ struct WidgetEntryView: View {
         .padding(4)
     }
 
-    // Extra large treated identically to large
-    private var extraLargeGrid: some View {
-        largeGrid
-    }
+    private var extraLargeGrid: some View { largeGrid }
 
-    // MARK: - Cell with optional URL link for tap action
+    // MARK: - Cell with optional URL link
 
     @ViewBuilder
     private func itemCell(_ item: WidgetItem, size: WidgetSize) -> some View {
@@ -117,6 +101,71 @@ struct WidgetEntryView: View {
             }
         } else {
             ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
+        }
+    }
+
+    // MARK: - Image Slideshow
+
+    @ViewBuilder
+    private var imageSlideshowWidget: some View {
+        let slides = entry.configuration.slides ?? []
+        let rawIndex = entry.configuration.currentSlideIndex ?? 0
+        let index = slides.isEmpty ? 0 : min(rawIndex, slides.count - 1)
+
+        ZStack {
+            if slides.isEmpty {
+                Color.black
+                VStack(spacing: 8) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.title)
+                        .foregroundStyle(.secondary)
+                    Text("Add Images")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                let slide = slides[index]
+                if let image = SharedStorage.shared.loadWidgetImage(filename: slide.filename) {
+                    GeometryReader { geo in
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .scaleEffect(CGFloat(slide.scale))
+                            .offset(
+                                x: CGFloat(slide.offsetX) * geo.size.width,
+                                y: CGFloat(slide.offsetY) * geo.size.height
+                            )
+                            .frame(width: geo.size.width, height: geo.size.height)
+                            .clipped()
+                    }
+                } else {
+                    Color.gray.opacity(0.3)
+                    Image(systemName: "photo")
+                        .font(.title)
+                        .foregroundStyle(.secondary)
+                }
+
+                // Corner navigation buttons (next / previous)
+                if slides.count > 1 {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Button(intent: AdvanceImageIntent(
+                                widgetID: entry.configuration.id.uuidString, forward: false)) {
+                                Color.clear.frame(width: 44, height: 44)
+                            }
+                            .buttonStyle(.plain)
+                            Spacer()
+                            Button(intent: AdvanceImageIntent(
+                                widgetID: entry.configuration.id.uuidString, forward: true)) {
+                                Color.clear.frame(width: 44, height: 44)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(4)
+                    }
+                }
+            }
         }
     }
 
@@ -135,7 +184,13 @@ struct WidgetEntryView: View {
     @ViewBuilder
     private var accessoryCircularWidget: some View {
         if let item = entry.configuration.items.first {
-            if item.displayType == .icon, let symbol = item.sfSymbolName {
+            if item.displayType == .image, let filename = item.customImageFilename,
+               let image = SharedStorage.shared.loadWidgetImage(filename: filename) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .clipShape(Circle())
+            } else if item.displayType == .icon, let symbol = item.sfSymbolName {
                 Image(systemName: symbol)
                     .font(.system(size: 20))
             } else {
@@ -184,9 +239,9 @@ struct ItemView: View {
 
     private var symbolSize: CGFloat {
         switch widgetSize {
-        case .systemSmall:      return 14  // 3×3 grid — each cell is small
-        case .systemMedium:     return 10  // 6×3 grid
-        case .systemLarge:      return 10  // 6×6 grid
+        case .systemSmall:      return 14
+        case .systemMedium:     return 10
+        case .systemLarge:      return 10
         case .systemExtraLarge: return 10
         }
     }
@@ -196,14 +251,19 @@ struct ItemView: View {
             item.backgroundColor.swiftUIColor
                 .opacity(item.backgroundOpacity)
 
-            if item.displayType == .icon {
+            if item.displayType == .image, let filename = item.customImageFilename,
+               let image = SharedStorage.shared.loadWidgetImage(filename: filename) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .clipped()
+            } else if item.displayType == .icon {
                 VStack(spacing: 2) {
                     if let symbol = item.sfSymbolName {
                         Image(systemName: symbol)
                             .font(.system(size: symbolSize))
                             .foregroundStyle(item.foregroundColor.swiftUIColor)
                     }
-                    // Label below icon when showLabel is enabled
                     if showLabel, let text = item.customText, !text.isEmpty {
                         Text(text)
                             .font(.system(size: max(symbolSize * 0.4, 6)))
@@ -232,7 +292,14 @@ struct LockScreenItemView: View {
 
     var body: some View {
         ZStack {
-            if item.displayType == .icon {
+            if item.displayType == .image, let filename = item.customImageFilename,
+               let image = SharedStorage.shared.loadWidgetImage(filename: filename) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .clipShape(Circle())
+                    .frame(width: 16, height: 16)
+            } else if item.displayType == .icon {
                 if let symbol = item.sfSymbolName {
                     Image(systemName: symbol)
                         .font(.system(size: 12))

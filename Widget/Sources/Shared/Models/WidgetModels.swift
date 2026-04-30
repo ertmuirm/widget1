@@ -11,17 +11,19 @@ struct WidgetItem: Codable, Identifiable, Equatable {
     var displayType: DisplayType
     var sfSymbolName: String?
     var customText: String?
+    var customImageFilename: String?  // used when displayType == .image
     var fontSize: CGFloat
     var foregroundColor: CodableColor
     var backgroundColor: CodableColor
     var backgroundOpacity: Double
     var action: WidgetAction?
-    
+
     init(
         id: UUID = UUID(),
         displayType: DisplayType = .icon,
         sfSymbolName: String? = "star.fill",
         customText: String? = nil,
+        customImageFilename: String? = nil,
         fontSize: CGFloat = 14,
         foregroundColor: CodableColor = CodableColor(.white),
         backgroundColor: CodableColor = CodableColor(.clear),
@@ -32,6 +34,7 @@ struct WidgetItem: Codable, Identifiable, Equatable {
         self.displayType = displayType
         self.sfSymbolName = sfSymbolName
         self.customText = customText
+        self.customImageFilename = customImageFilename
         self.fontSize = fontSize
         self.foregroundColor = foregroundColor
         self.backgroundColor = backgroundColor
@@ -45,12 +48,48 @@ struct WidgetItem: Codable, Identifiable, Equatable {
 enum DisplayType: String, Codable, CaseIterable {
     case icon
     case text
-    
+    case image
+
     var displayName: String {
         switch self {
-        case .icon: return "Icon"
-        case .text: return "Text"
+        case .icon:  return "Icon"
+        case .text:  return "Text"
+        case .image: return "Image"
         }
+    }
+}
+
+// MARK: - Widget Kind
+
+enum WidgetKind: String, Codable {
+    case grid
+    case imageSlideshow
+
+    var displayName: String {
+        switch self {
+        case .grid:            return "Grid"
+        case .imageSlideshow:  return "Image Slideshow"
+        }
+    }
+}
+
+// MARK: - Image Slide
+
+/// One image in an Image Slideshow widget
+struct ImageSlide: Codable, Identifiable, Equatable {
+    let id: UUID
+    var filename: String   // file stored in shared images directory
+    var offsetX: Double    // -0.5 … 0.5 (fraction of widget width)
+    var offsetY: Double    // -0.5 … 0.5 (fraction of widget height)
+    var scale: Double      // 1.0 = fit, >1 = zoomed in
+
+    init(id: UUID = UUID(), filename: String,
+         offsetX: Double = 0, offsetY: Double = 0, scale: Double = 1.0) {
+        self.id = id
+        self.filename = filename
+        self.offsetX = offsetX
+        self.offsetY = offsetY
+        self.scale = scale
     }
 }
 
@@ -66,9 +105,14 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
     var backgroundOpacity: Double
     var createdAt: Date
     var updatedAt: Date
-    /// Embedded in the entity ID so the widget extension can read it without IPC.
     /// nil means "use system default (true)" — handled gracefully by older saved configs.
     var showItemLabels: Bool?
+    /// nil means .grid (backwards compatible)
+    var widgetKind: WidgetKind?
+    /// Images for .imageSlideshow widgets
+    var slides: [ImageSlide]?
+    /// Currently displayed slide index for .imageSlideshow widgets
+    var currentSlideIndex: Int?
 
     init(
         id: UUID = UUID(),
@@ -79,7 +123,10 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         backgroundOpacity: Double = 1.0,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
-        showItemLabels: Bool? = nil
+        showItemLabels: Bool? = nil,
+        widgetKind: WidgetKind? = nil,
+        slides: [ImageSlide]? = nil,
+        currentSlideIndex: Int? = nil
     ) {
         self.id = id
         self.name = name
@@ -90,6 +137,9 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.showItemLabels = showItemLabels
+        self.widgetKind = widgetKind
+        self.slides = slides
+        self.currentSlideIndex = currentSlideIndex
     }
     
     /// Default configuration for placeholder

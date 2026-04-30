@@ -90,6 +90,26 @@ struct BroadcastLockWidget: Widget {
     }
 }
 
+// MARK: - Image Slideshow Widget
+
+struct BroadcastImageWidget: Widget {
+    let kind = "BroadcastImage"
+
+    var body: some WidgetConfiguration {
+        AppIntentConfiguration(
+            kind: kind,
+            intent: SelectImageWidgetIntent.self,
+            provider: ImageBroadcastProvider()
+        ) { entry in
+            WidgetEntryView(entry: entry)
+                .containerBackground(for: .widget) { Color.black }
+        }
+        .configurationDisplayName("Image Widget")
+        .description("Display and cycle through your images")
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+    }
+}
+
 // MARK: - Previews
 
 #Preview("Small", as: .systemSmall) {

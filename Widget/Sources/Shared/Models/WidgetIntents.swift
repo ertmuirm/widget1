@@ -64,15 +64,12 @@ struct WidgetEntry: TimelineEntry {
     let date: Date
     let configuration: WidgetConfig
     let showItemLabels: Bool
-    let debugInfo: String
 
     init(date: Date, configuration: WidgetConfig,
-         showItemLabels: Bool = SharedStorage.shared.showItemLabels,
-         debugInfo: String = "") {
+         showItemLabels: Bool = SharedStorage.shared.showItemLabels) {
         self.date = date
         self.configuration = configuration
         self.showItemLabels = showItemLabels
-        self.debugInfo = debugInfo
     }
 }
 
@@ -83,45 +80,21 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let liveConfigs = (try? storage.loadConfigurations()) ?? []
 
     let config: WidgetConfig
-    let source: String
-
     if let id = configID, id != "none" {
         let uuid = uuidFromEntityID(id)
         if let found = liveConfigs.first(where: { $0.id.uuidString == uuid }) {
             config = found
-            source = "live:\(found.name)"
         } else if let embedded = decodeConfigFromID(id) {
             config = embedded
-            source = "embed:\(embedded.name)"
         } else {
             config = .defaultConfiguration
-            source = "default(notfound)"
         }
     } else {
         config = .defaultConfiguration
-        source = "default(nil)"
     }
 
-    let kcAvail = SharedStorage.sharedKeychainGroup != nil ? "kc:ok" : "kc:none"
-
-    // Per-item action diagnostics: show the actual resolved URL (or nil/none)
-    let actionDebug = config.items.prefix(6).enumerated().map { i, item -> String in
-        guard let a = item.action else { return "i\(i):none" }
-        let t = String(a.type.rawValue.prefix(1))
-        if let url = resolveItemURL(item) {
-            let abbrev = String(url.absoluteString.prefix(30))
-            return "i\(i):\(t)=\(abbrev)"
-        } else {
-            return "i\(i):\(t)=nil(raw:\(a.payload.prefix(20)))"
-        }
-    }.joined(separator: "\n")
-
     let showLabels = config.showItemLabels ?? storage.showItemLabels
-    storage.appendExtensionLog("entry cfgs=\(liveConfigs.count) \(kcAvail) req=\(configID?.prefix(8) ?? "nil") \(source) labels=\(showLabels)\n\(actionDebug)")
-    let debugInfo = "\(source) n:\(config.items.count)\nreq:\(configID.map { String($0.prefix(8)) } ?? "nil") cfgs:\(liveConfigs.count)\n\(actionDebug)"
-    return WidgetEntry(date: Date(), configuration: config,
-                       showItemLabels: showLabels,
-                       debugInfo: debugInfo)
+    return WidgetEntry(date: Date(), configuration: config, showItemLabels: showLabels)
 }
 
 private func makeTimeline(configID: String?) -> Timeline<WidgetEntry> {
@@ -423,5 +396,95 @@ struct BroadcastProvider: AppIntentTimelineProvider {
     }
     func timeline(for configuration: SelectWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
         makeTimeline(configID: configuration.selectedWidget?.id)
+    }
+}
+
+// MARK: ─────────────────────────────────────────────────────────────────
+// MARK: IMAGE SLIDESHOW WIDGET
+// MARK: ─────────────────────────────────────────────────────────────────
+
+private func imageSlideshowConfigs() -> [WidgetConfig] {
+    allConfigs().filter { $0.widgetKind == .imageSlideshow }
+}
+
+struct ImageWidgetEntity: AppEntity, Hashable {
+    static var typeDisplayRepresentation: TypeDisplayRepresentation {
+        TypeDisplayRepresentation(name: "Image Widget")
+    }
+    static var defaultQuery = ImageWidgetQuery()
+    var id: String
+    var name: String
+    var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(name)") }
+    init(id: String, name: String) { self.id = id; self.name = name }
+}
+
+struct ImageWidgetQuery: EntityQuery {
+    func entities(for identifiers: [String]) async throws -> [ImageWidgetEntity] {
+        let configs = imageSlideshowConfigs()
+        return identifiers.map { storedID in
+            let uuid = uuidFromEntityID(storedID)
+            if let c = configs.first(where: { $0.id.uuidString == uuid }) {
+                return ImageWidgetEntity(id: encodeEntityID(c), name: c.name)
+            }
+            if let c = decodeConfigFromID(storedID) {
+                return ImageWidgetEntity(id: storedID, name: c.name)
+            }
+            return ImageWidgetEntity(id: storedID, name: "Image Widget")
+        }
+    }
+    func suggestedEntities() async throws -> [ImageWidgetEntity] {
+        let list = imageSlideshowConfigs()
+        if list.isEmpty { return [ImageWidgetEntity(id: "none", name: "No Image Widgets")] }
+        return list.map { ImageWidgetEntity(id: encodeEntityID($0), name: $0.name) }
+    }
+    func defaultResult() async -> ImageWidgetEntity? {
+        imageSlideshowConfigs().first.map { ImageWidgetEntity(id: encodeEntityID($0), name: $0.name) }
+    }
+}
+
+struct SelectImageWidgetIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource = "Select Image Widget"
+    static var description = IntentDescription("Choose an image slideshow widget")
+    @Parameter(title: "Widget") var selectedWidget: ImageWidgetEntity?
+    init() {}
+    init(selectedWidget: ImageWidgetEntity?) { self.selectedWidget = selectedWidget }
+}
+
+struct ImageBroadcastProvider: AppIntentTimelineProvider {
+    func placeholder(in context: Context) -> WidgetEntry {
+        WidgetEntry(date: Date(), configuration: .defaultConfiguration)
+    }
+    func snapshot(for configuration: SelectImageWidgetIntent, in context: Context) async -> WidgetEntry {
+        makeEntry(configID: configuration.selectedWidget?.id)
+    }
+    func timeline(for configuration: SelectImageWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
+        makeTimeline(configID: configuration.selectedWidget?.id)
+    }
+}
+
+// MARK: - Advance Image Intent (cycles slides in an image slideshow widget)
+
+struct AdvanceImageIntent: AppIntent {
+    static var title: LocalizedStringResource = "Advance Image"
+
+    @Parameter(title: "Widget ID") var widgetID: String
+    @Parameter(title: "Forward")   var forward: Bool
+
+    init() { widgetID = ""; forward = true }
+    init(widgetID: String, forward: Bool) { self.widgetID = widgetID; self.forward = forward }
+
+    func perform() async throws -> some IntentResult {
+        var configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
+        guard let idx = configs.firstIndex(where: { $0.id.uuidString == widgetID }) else {
+            return .result()
+        }
+        let count = configs[idx].slides?.count ?? 0
+        guard count > 1 else { return .result() }
+        let current = configs[idx].currentSlideIndex ?? 0
+        configs[idx].currentSlideIndex = forward
+            ? (current + 1) % count
+            : (current - 1 + count) % count
+        try? SharedStorage.shared.saveConfigurations(configs)
+        return .result()
     }
 }

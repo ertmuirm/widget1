@@ -15,14 +15,18 @@ struct WidgetApp: App {
             }
             .onOpenURL { url in
                 showingBlackScreen = true
-                if url.scheme == "openapp" {
-                    // Bundle-ID launch: openapp://launch?bundle=com.example.app
-                    if let bundleID = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                        .queryItems?.first(where: { $0.name == "bundle" })?.value {
-                        openAppByBundleID(bundleID)
+                // Yield to let the black screen render before activating the target app
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(80))
+                    if url.scheme == "openapp" {
+                        // Bundle-ID launch: openapp://launch?bundle=com.example.app
+                        if let bundleID = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                            .queryItems?.first(where: { $0.name == "bundle" })?.value {
+                            openAppByBundleID(bundleID)
+                        }
+                    } else {
+                        UIApplication.shared.open(url)
                     }
-                } else {
-                    UIApplication.shared.open(url)
                 }
             }
             .onChange(of: scenePhase) { phase in

@@ -1,16 +1,19 @@
 import SwiftUI
+import PhotosUI
 
 /// Editor for individual widget items
 struct ItemEditorView: View {
-    
+
     @Environment(\.dismiss) private var dismiss
-    
+
     @Binding var item: WidgetItem
-    
+
     @State private var showSymbolPicker = false
     @State private var showActionPicker = false
     @State private var showAppActionPicker = false
-    
+    @State private var photoPickerItems: [PhotosPickerItem] = []
+    @State private var showFileImporter = false
+
     var body: some View {
         List {
             // Display type section
@@ -22,7 +25,7 @@ struct ItemEditorView: View {
                 }
                 .pickerStyle(.segmented)
             }
-            
+
             // Icon section
             if item.displayType == .icon {
                 Section("Icon") {
@@ -45,6 +48,50 @@ struct ItemEditorView: View {
                     }
                     .foregroundStyle(.white)
                 }
+            } else if item.displayType == .image {
+                // Image section (for lock screen / item-level images)
+                Section("Image") {
+                    if let filename = item.customImageFilename,
+                       let image = SharedStorage.shared.loadWidgetImage(filename: filename) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 120)
+                            .frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                    }
+
+                    PhotosPicker(selection: $photoPickerItems, maxSelectionCount: 1, matching: .images) {
+                        Label(item.customImageFilename == nil ? "Choose from Photos" : "Replace Image",
+                              systemImage: "photo.on.rectangle")
+                    }
+                    .foregroundStyle(.white)
+                    .onChange(of: photoPickerItems) { items in
+                        if let first = items.first { loadPhotoItem(first) }
+                        photoPickerItems = []
+                    }
+
+                    Button {
+                        showFileImporter = true
+                    } label: {
+                        Label(item.customImageFilename == nil ? "Import from Files" : "Replace from Files",
+                              systemImage: "folder")
+                    }
+                    .foregroundStyle(.white)
+
+                    if item.customImageFilename != nil {
+                        Button(role: .destructive) {
+                            if let fn = item.customImageFilename {
+                                SharedStorage.shared.deleteWidgetImage(filename: fn)
+                            }
+                            item.customImageFilename = nil
+                        } label: {
+                            Label("Remove Image", systemImage: "trash")
+                        }
+                        .foregroundStyle(.red)
+                    }
+                }
             } else {
                 // Text section
                 Section("Text") {
@@ -53,7 +100,7 @@ struct ItemEditorView: View {
                         set: { item.customText = $0 }
                     ))
                     .foregroundStyle(.white)
-                    
+
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Font Size: \(Int(item.fontSize))")
                         Slider(value: $item.fontSize, in: 2...30, step: 1)
@@ -61,38 +108,40 @@ struct ItemEditorView: View {
                     }
                 }
             }
-            
-            // Colors section
-            Section("Colors") {
-                HStack {
-                    Text("Foreground")
-                    Spacer()
-                    ColorPicker("", selection: Binding(
-                        get: { item.foregroundColor.swiftUIColor },
-                        set: { item.foregroundColor = CodableColor($0) }
-                    ))
-                    .labelsHidden()
-                }
-                .foregroundStyle(.white)
-                
-                HStack {
-                    Text("Background")
-                    Spacer()
-                    ColorPicker("", selection: Binding(
-                        get: { item.backgroundColor.swiftUIColor },
-                        set: { item.backgroundColor = CodableColor($0) }
-                    ))
-                    .labelsHidden()
-                }
-                .foregroundStyle(.white)
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Background Opacity: \(Int(item.backgroundOpacity * 100))%")
-                    Slider(value: $item.backgroundOpacity, in: 0...1)
-                        .tint(.gray)
+
+            // Colors section (not shown for image type)
+            if item.displayType != .image {
+                Section("Colors") {
+                    HStack {
+                        Text("Foreground")
+                        Spacer()
+                        ColorPicker("", selection: Binding(
+                            get: { item.foregroundColor.swiftUIColor },
+                            set: { item.foregroundColor = CodableColor($0) }
+                        ))
+                        .labelsHidden()
+                    }
+                    .foregroundStyle(.white)
+
+                    HStack {
+                        Text("Background")
+                        Spacer()
+                        ColorPicker("", selection: Binding(
+                            get: { item.backgroundColor.swiftUIColor },
+                            set: { item.backgroundColor = CodableColor($0) }
+                        ))
+                        .labelsHidden()
+                    }
+                    .foregroundStyle(.white)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Background Opacity: \(Int(item.backgroundOpacity * 100))%")
+                        Slider(value: $item.backgroundOpacity, in: 0...1)
+                            .tint(.gray)
+                    }
                 }
             }
-            
+
             // Action section
             Section("Action") {
                 Button {
@@ -162,9 +211,7 @@ struct ItemEditorView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Done") {
-                    dismiss()
-                }
+                Button("Done") { dismiss() }
             }
         }
         .sheet(isPresented: $showSymbolPicker) {
@@ -182,6 +229,45 @@ struct ItemEditorView: View {
                 item.action?.displayName = displayLabel
             }
         }
+        .fileImporter(
+            isPresented: $showFileImporter,
+            allowedContentTypes: [.image],
+            allowsMultipleSelection: false
+        ) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                loadImageFile(url)
+            }
+        }
+    }
+
+    // MARK: - Image loading
+
+    private func loadPhotoItem(_ item: PhotosPickerItem) {
+        item.loadTransferable(type: Data.self) { result in
+            DispatchQueue.main.async {
+                guard case .success(let data) = result, let data else { return }
+                self.saveImageData(data)
+            }
+        }
+    }
+
+    private func loadImageFile(_ url: URL) {
+        guard url.startAccessingSecurityScopedResource() else { return }
+        defer { url.stopAccessingSecurityScopedResource() }
+        guard let data = try? Data(contentsOf: url) else { return }
+        saveImageData(data)
+    }
+
+    private func saveImageData(_ data: Data) {
+        guard let image = UIImage(data: data),
+              let jpeg = image.jpegData(compressionQuality: 0.8) else { return }
+        // Delete old image if replacing
+        if let old = item.customImageFilename {
+            SharedStorage.shared.deleteWidgetImage(filename: old)
+        }
+        let filename = "\(UUID().uuidString).jpg"
+        SharedStorage.shared.saveWidgetImage(jpeg, filename: filename)
+        item.customImageFilename = filename
     }
 }
 
@@ -190,9 +276,9 @@ struct ItemEditorView: View {
 struct SymbolPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedSymbol: String
-    
+
     @State private var searchText = ""
-    
+
     private let symbols = [
         "star.fill", "house.fill", "gear", "heart.fill", "bolt.fill", "flame.fill",
         "sun.max.fill", "moon.fill", "cloud.fill", "snow", "wind", "drop.fill",
@@ -202,14 +288,11 @@ struct SymbolPickerView: View {
         "figure.run", "sportscourt.fill", "gamecontroller.fill", "paintbrush.fill", "pencil",
         "scissors", "doc.fill", "folder.fill", "trash.fill", "archivebox.fill"
     ]
-    
+
     private var filteredSymbols: [String] {
-        if searchText.isEmpty {
-            return symbols
-        }
-        return symbols.filter { $0.localizedCaseInsensitiveContains(searchText) }
+        searchText.isEmpty ? symbols : symbols.filter { $0.localizedCaseInsensitiveContains(searchText) }
     }
-    
+
     var body: some View {
         NavigationStack {
             List(filteredSymbols, id: \.self) { symbol in
@@ -224,12 +307,12 @@ struct SymbolPickerView: View {
                             .frame(width: 44, height: 44)
                             .background(Color.white.opacity(0.1))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
-                        
+
                         Text(symbol)
                             .foregroundStyle(.white)
-                        
+
                         Spacer()
-                        
+
                         if symbol == selectedSymbol {
                             Image(systemName: "checkmark")
                                 .foregroundStyle(.gray)
@@ -242,9 +325,7 @@ struct SymbolPickerView: View {
             .searchable(text: $searchText, prompt: "Search symbols")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+                    Button("Cancel") { dismiss() }
                 }
             }
         }
@@ -256,12 +337,12 @@ struct SymbolPickerView: View {
 struct ActionPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var item: WidgetItem
-    
+
     var body: some View {
         List {
             ForEach(ActionType.allCases, id: \.self) { actionType in
                 let isSelected = item.action?.type == actionType
-                
+
                 Button {
                     item.action = WidgetAction(type: actionType, payload: "")
                     dismiss()
@@ -271,14 +352,14 @@ struct ActionPickerView: View {
                             Text(actionType.displayName)
                                 .font(.headline)
                                 .foregroundStyle(.white)
-                            
+
                             Text(actionType.description)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                        
+
                         Spacer()
-                        
+
                         if isSelected {
                             Image(systemName: "checkmark")
                                 .foregroundStyle(.gray)
@@ -291,9 +372,7 @@ struct ActionPickerView: View {
         .navigationTitle("Select Action")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") {
-                    dismiss()
-                }
+                Button("Cancel") { dismiss() }
             }
         }
     }

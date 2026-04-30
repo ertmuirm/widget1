@@ -2,49 +2,31 @@ import SwiftUI
 
 /// List of all widget configurations
 struct WidgetListView: View {
-    
+
     @EnvironmentObject var viewModel: WidgetViewModel
     @AppStorage("defaultWidgetSize") private var defaultWidgetSize = WidgetSize.systemMedium.rawValue
     @State private var showAddSheet = false
+    @State private var showAddImageSheet = false
     @State private var showSettingsSheet = false
-    @State private var showDebugSheet = false
-    @State private var showDebugOverlay = false
-    
+
     var body: some View {
-        ZStack {
-            List {
-                if viewModel.configurations.isEmpty {
-                    emptyView
-                } else {
-                    ForEach(viewModel.configurations) { config in
-                        NavigationLink(value: config.id) {
-                            WidgetRowView(configuration: config)
-                        }
+        List {
+            if viewModel.configurations.isEmpty {
+                emptyView
+            } else {
+                ForEach(viewModel.configurations) { config in
+                    NavigationLink(value: config.id) {
+                        WidgetRowView(configuration: config)
                     }
-                    .onDelete(perform: viewModel.deleteConfiguration)
                 }
+                .onDelete(perform: viewModel.deleteConfiguration)
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Widgets")
-            .navigationDestination(for: UUID.self) { id in
-                if let config = viewModel.configurations.first(where: { $0.id == id }) {
-                    WidgetEditorView(configuration: config)
-                }
-            }
-            
-            // Floating debug overlay
-            if showDebugOverlay {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        DebugOverlayView()
-                            .padding()
-                        Spacer()
-                    }
-                    Spacer()
-                }
-                .background(.ultraThinMaterial)
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Widgets")
+        .navigationDestination(for: UUID.self) { id in
+            if let config = viewModel.configurations.first(where: { $0.id == id }) {
+                WidgetEditorView(configuration: config)
             }
         }
         .toolbar {
@@ -56,26 +38,21 @@ struct WidgetListView: View {
                         .font(.title3)
                 }
             }
-            
+
             ToolbarItem(placement: .primaryAction) {
-                Button {
-                    showAddSheet = true
+                Menu {
+                    Button {
+                        showAddSheet = true
+                    } label: {
+                        Label("Grid Widget", systemImage: "square.grid.2x2")
+                    }
+                    Button {
+                        showAddImageSheet = true
+                    } label: {
+                        Label("Image Widget", systemImage: "photo.on.rectangle.angled")
+                    }
                 } label: {
                     Image(systemName: "plus.circle.fill")
-                        .font(.title3)
-                }
-            }
-            
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button("Debug Overlay") {
-                        showDebugOverlay.toggle()
-                    }
-                    Button("Debug Logs") {
-                        showDebugSheet = true
-                    }
-                } label: {
-                    Image(systemName: "doc.text")
                         .font(.title3)
                 }
             }
@@ -87,28 +64,34 @@ struct WidgetListView: View {
                 WidgetEditorView(configuration: newConfig, isNew: true)
             }
         }
+        .sheet(isPresented: $showAddImageSheet) {
+            let newConfig = WidgetConfig(
+                name: "Image Widget",
+                size: .systemSmall,
+                widgetKind: .imageSlideshow,
+                slides: []
+            )
+            NavigationStack {
+                WidgetEditorView(configuration: newConfig, isNew: true)
+            }
+        }
         .sheet(isPresented: $showSettingsSheet) {
             NavigationStack {
                 SettingsView()
             }
         }
-        .sheet(isPresented: $showDebugSheet) {
-            NavigationStack {
-                DebugLogView()
-            }
-        }
     }
-    
+
     private var emptyView: some View {
         VStack(spacing: 16) {
             Image(systemName: "square.grid.2x2")
                 .font(.system(size: 60))
                 .foregroundStyle(.secondary)
-            
+
             Text("No Widgets Yet")
                 .font(.headline)
                 .foregroundStyle(.white)
-            
+
             Text("Tap + to create your first widget")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -123,29 +106,28 @@ struct WidgetListView: View {
 
 struct WidgetRowView: View {
     let configuration: WidgetConfig
-    
+
     var body: some View {
         HStack(spacing: 12) {
-            // Widget preview
             WidgetPreviewView(configuration: configuration, size: CGSize(width: 60, height: 60))
                 .frame(width: 60, height: 60)
                 .background(Color.gray.opacity(0.2))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(configuration.name)
                     .font(.headline)
                     .foregroundStyle(.white)
-                
+
                 Text(configuration.size.displayName)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                
+
                 Text("\(configuration.items.count) item\(configuration.items.count == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            
+
             Spacer()
         }
         .padding(.vertical, 4)
@@ -157,17 +139,15 @@ struct WidgetRowView: View {
 struct WidgetPreviewView: View {
     let configuration: WidgetConfig
     let size: CGSize
-    
+
     var body: some View {
         GeometryReader { geometry in
             let itemSize = calculateItemSize(containerSize: geometry.size)
-            
+
             ZStack {
-                // Background
                 configuration.backgroundColor.swiftUIColor
                     .opacity(configuration.backgroundOpacity)
-                
-                // Items grid
+
                 if configuration.items.isEmpty {
                     Image(systemName: "plus")
                         .font(.title2)
@@ -184,7 +164,7 @@ struct WidgetPreviewView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
-    
+
     private func calculateItemSize(containerSize: CGSize) -> CGSize {
         let columns = configuration.size.columns
         let spacing: CGFloat = 2
@@ -197,11 +177,11 @@ struct WidgetPreviewView: View {
 struct ItemPreviewView: View {
     let item: WidgetItem
     let size: CGSize
-    
+
     var body: some View {
         ZStack {
             item.backgroundColor.swiftUIColor.opacity(item.backgroundOpacity)
-            
+
             if item.displayType == .icon {
                 if let symbolName = item.sfSymbolName {
                     Image(systemName: symbolName)

@@ -24,13 +24,6 @@ struct SettingsView: View {
         )
     }
 
-    private var hapticFeedbackEnabled: Binding<Bool> {
-        Binding(
-            get: { SharedStorage.shared.hapticFeedback },
-            set: { SharedStorage.shared.hapticFeedback = $0 }
-        )
-    }
-
     @AppStorage("defaultWidgetSize") private var defaultWidgetSize = "systemMedium"
 
     @State private var backupAlertMessage = ""
@@ -41,9 +34,6 @@ struct SettingsView: View {
         List {
             // General
             Section("General") {
-                Toggle("Haptic Feedback", isOn: hapticFeedbackEnabled)
-                    .foregroundStyle(.white)
-
                 Picker("Default Widget Size", selection: $defaultWidgetSize) {
                     ForEach(WidgetSize.homeScreenCases, id: \.rawValue) { size in
                         Text(size.displayName).tag(size.rawValue)
