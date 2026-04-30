@@ -9,6 +9,7 @@ struct ItemEditorView: View {
     
     @State private var showSymbolPicker = false
     @State private var showActionPicker = false
+    @State private var showAppActionPicker = false
     
     var body: some View {
         List {
@@ -98,41 +99,55 @@ struct ItemEditorView: View {
                     showActionPicker = true
                 } label: {
                     HStack {
-                        Text("Action")
+                        Text("Action Type")
                         Spacer()
-                        if let action = item.action {
-                            Text(action.type.displayName)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Text("Select action...")
-                                .foregroundStyle(.secondary)
-                        }
+                        Text(item.action?.type.displayName ?? "None")
+                            .foregroundStyle(.secondary)
                         Image(systemName: "chevron.right")
                             .font(.caption)
                             .foregroundStyle(.tertiary)
                     }
                 }
                 .foregroundStyle(.white)
-                
-                if let action = item.action, action.type == .urlScheme {
-                    TextField("URL Scheme", text: Binding(
-                        get: { action.payload },
-                        set: { item.action?.payload = $0 }
-                    ))
-                    .foregroundStyle(.white)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                }
-                
-                if let action = item.action, (action.type == .appIntent || action.type == .shortcut) {
-                    TextField(action.type == .appIntent ? "App Intent Name" : "Shortcut Name", text: Binding(
-                        get: { action.payload },
-                        set: { item.action?.payload = $0 }
-                    ))
-                    .foregroundStyle(.white)
-                }
-                
-                if item.action != nil {
+
+                if let action = item.action {
+                    switch action.type {
+                    case .urlScheme:
+                        TextField("URL (e.g. concurmobile://)", text: Binding(
+                            get: { action.payload },
+                            set: { item.action?.payload = $0 }
+                        ))
+                        .foregroundStyle(.white)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+
+                    case .appIntent:
+                        Button {
+                            showAppActionPicker = true
+                        } label: {
+                            HStack {
+                                Text("App Action")
+                                Spacer()
+                                Text(action.displayName ?? (action.payload.isEmpty ? "Select…" : action.payload))
+                                    .foregroundStyle(action.payload.isEmpty ? .tertiary : .secondary)
+                                    .lineLimit(1)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .foregroundStyle(.white)
+
+                    case .shortcut:
+                        TextField("Shortcut Name", text: Binding(
+                            get: { action.payload },
+                            set: { item.action?.payload = $0 }
+                        ))
+                        .foregroundStyle(.white)
+                        .autocorrectionDisabled()
+                    }
+
                     Button {
                         item.action = nil
                     } label: {
@@ -160,6 +175,12 @@ struct ItemEditorView: View {
         }
         .sheet(isPresented: $showActionPicker) {
             ActionPickerView(item: $item)
+        }
+        .sheet(isPresented: $showAppActionPicker) {
+            AppActionPickerView { selected in
+                item.action?.payload = selected.urlString
+                item.action?.displayName = selected.displayLabel
+            }
         }
     }
 }

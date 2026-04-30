@@ -178,10 +178,12 @@ enum WidgetSize: String, Codable, CaseIterable {
 struct WidgetAction: Codable, Equatable {
     var type: ActionType
     var payload: String
-    
-    init(type: ActionType = .urlScheme, payload: String = "") {
+    var displayName: String?
+
+    init(type: ActionType = .urlScheme, payload: String = "", displayName: String? = nil) {
         self.type = type
         self.payload = payload
+        self.displayName = displayName
     }
 }
 
@@ -191,20 +193,20 @@ enum ActionType: String, Codable, CaseIterable {
     case urlScheme
     case appIntent
     case shortcut
-    
+
     var displayName: String {
         switch self {
-        case .urlScheme: return "URL Scheme"
-        case .appIntent: return "App Intent"
-        case .shortcut: return "Shortcut"
+        case .urlScheme:  return "URL Scheme"
+        case .appIntent:  return "App Action"
+        case .shortcut:   return "Shortcut"
         }
     }
-    
+
     var description: String {
         switch self {
-        case .urlScheme: return "Open a URL"
-        case .appIntent: return "Run an App Intent"
-        case .shortcut: return "Run a Shortcut"
+        case .urlScheme:  return "Enter a custom URL or deep link"
+        case .appIntent:  return "Pick from a list of supported apps"
+        case .shortcut:   return "Run a named Shortcut"
         }
     }
 }

@@ -36,7 +36,8 @@ func resolveItemURL(_ item: WidgetItem) -> URL? {
     let raw = action.payload.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !raw.isEmpty else { return nil }
     switch action.type {
-    case .urlScheme:
+    case .urlScheme, .appIntent:
+        // .appIntent stores a URL scheme selected from the predefined list
         return URL(string: raw)
             ?? URL(string: raw.addingPercentEncoding(
                 withAllowedCharacters: .urlFragmentAllowed) ?? raw)
@@ -44,8 +45,6 @@ func resolveItemURL(_ item: WidgetItem) -> URL? {
         guard let encoded = raw.addingPercentEncoding(
             withAllowedCharacters: .urlQueryAllowed) else { return nil }
         return URL(string: "shortcuts://run-shortcut?name=\(encoded)")
-    case .appIntent:
-        return nil
     }
 }
 
