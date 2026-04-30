@@ -59,8 +59,35 @@ targets:
         keychain-access-groups:
           - J3D2F4SMVD.com.iosmirror.shared
     dependencies:
+      - sdk: Intents.framework
       - target: BroadcastExtension
         embed: true
+      - target: IntentsExtension
+        embed: true
+
+  IntentsExtension:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: IntentsExtension
+        excludes:
+          - "**/.DS_Store"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.iosmirror.intents
+        INFOPLIST_FILE: IntentsExtension/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGNING_ALLOWED: NO
+        SKIP_INSTALL: YES
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"
+    dependencies:
+      - sdk: Intents.framework
+      - sdk: CallKit.framework
 
   BroadcastExtension:
     type: app-extension

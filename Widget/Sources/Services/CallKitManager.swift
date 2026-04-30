@@ -49,12 +49,10 @@ extension CallKitManager: CXProviderDelegate {
     func providerDidReset(_ provider: CXProvider) {}
 
     func provider(_ provider: CXProvider, perform action: CXStartCallAction) {
-        // Tell CallKit the call is connecting. For a full VoIP implementation
-        // you would establish your audio session and SIP/WebRTC call here.
-        // For cellular bridging the system routes through the carrier.
+        // For a phoneNumber handle the system routes through the cellular carrier.
+        // Only report startedConnecting; let the system/carrier report connectedAt.
         provider.reportOutgoingCall(with: action.callUUID, startedConnectingAt: Date())
         action.fulfill()
-        provider.reportOutgoingCall(with: action.callUUID, connectedAt: Date())
     }
 
     func provider(_ provider: CXProvider, perform action: CXEndCallAction) {

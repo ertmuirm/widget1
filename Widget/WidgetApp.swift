@@ -1,4 +1,5 @@
 import SwiftUI
+import Intents
 
 @main
 struct WidgetApp: App {
@@ -22,6 +23,17 @@ struct WidgetApp: App {
                         }
                     }
                 }
+                // Handles INStartCallIntent handed back to app (continueInApp response)
+                .onContinueUserActivity(NSStringFromClass(INStartCallIntent.self)) { activity in
+                    guard let intent = activity.interaction?.intent as? INStartCallIntent,
+                          let contact = intent.contacts?.first,
+                          let handle = contact.personHandle else { return }
+                    let number = handle.value
+                    CallKitManager.shared.dial(phoneNumber: number) { success in
+                        guard !success, let url = URL(string: "tel:\(number)") else { return }
+                        UIApplication.shared.open(url)
+                    }
+                }
                 .onAppear {
                     InstalledAppsManager.shared.scan()
                 }
@@ -35,11 +47,45 @@ private func dialPhoneNumber(url: URL) {
     let raw = url.absoluteString
     let number = raw.hasPrefix("tel:") ? String(raw.dropFirst(4)) : raw
 
+    // Primary: INStartCallIntent (same mechanism as iOS Shortcuts — no confirmation dialog)
+    if dialViaINStartCallIntent(phoneNumber: number) { return }
+
+    // Fallback: CallKit CXStartCallAction (native call UI, no dialog)
     CallKitManager.shared.dial(phoneNumber: number) { success in
         guard !success else { return }
-        // CallKit rejected the request — fall back to tel: URL (shows system dialog)
+        // Last resort: tel: URL (may show system confirmation dialog)
         UIApplication.shared.open(url)
     }
+}
+
+/// Invokes INStartCallIntent through our registered Intents Extension.
+/// Returns true if the intent was dispatched (extension will handle it via CallKit).
+@discardableResult
+private func dialViaINStartCallIntent(phoneNumber: String) -> Bool {
+    let handle = INPersonHandle(value: phoneNumber, type: .phoneNumber)
+    let person = INPerson(
+        personHandle: handle,
+        nameComponents: nil,
+        displayName: nil,
+        image: nil,
+        contactIdentifier: nil,
+        customIdentifier: nil
+    )
+    let intent = INStartCallIntent(
+        callCapability: .audioCall,
+        contactIdentifier: nil,
+        selectedContacts: [person],
+        callRecordFilter: nil,
+        unsatisfiedReason: nil
+    )
+
+    // Donate so Siri / system can learn this calling pattern
+    INInteraction(intent: intent, response: nil).donate(completion: nil)
+
+    // Hand off to our IntentsExtension via user activity (routes through system intent pipeline)
+    guard let activity = NSUserActivity(intent: intent) else { return false }
+    activity.becomeCurrent()
+    return true
 }
 
 // MARK: - Bundle-ID app launch via LSApplicationWorkspace (private API)

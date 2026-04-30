@@ -12,6 +12,7 @@ struct WidgetEditorView: View {
 
     // Grid item editing
     @State private var editingItemIndex: EditingItemIndex?
+    @State private var isReordering = false
 
     // Image slide editing
     @State private var editingSlideIndex: EditingItemIndex?
@@ -214,16 +215,19 @@ struct WidgetEditorView: View {
     }
 
     private var gridItemsSection: some View {
-        Section("Items (\(configuration.items.count)/\(configuration.maxItems))") {
+        Section {
             if configuration.items.isEmpty {
                 Button { addItem() } label: {
                     Label("Add Item", systemImage: "plus")
                 }
                 .foregroundStyle(.gray)
             } else {
-                ForEach(Array(configuration.items.enumerated()), id: \.element.id) { index, item in
+                ForEach($configuration.items) { $item in
                     Button {
-                        editingItemIndex = EditingItemIndex(id: index)
+                        if !isReordering,
+                           let idx = configuration.items.firstIndex(where: { $0.id == item.id }) {
+                            editingItemIndex = EditingItemIndex(id: idx)
+                        }
                     } label: {
                         ItemRowView(item: item)
                     }
@@ -231,15 +235,33 @@ struct WidgetEditorView: View {
                 .onDelete { indexSet in
                     configuration.items.remove(atOffsets: indexSet)
                 }
+                .onMove { from, to in
+                    configuration.items.move(fromOffsets: from, toOffset: to)
+                }
 
-                if configuration.items.count < configuration.maxItems {
+                if !isReordering && configuration.items.count < configuration.maxItems {
                     Button { addItem() } label: {
                         Label("Add Item", systemImage: "plus")
                     }
                     .foregroundStyle(.gray)
                 }
             }
+        } header: {
+            HStack {
+                Text("Items (\(configuration.items.count)/\(configuration.maxItems))")
+                    .textCase(nil)
+                Spacer()
+                if !configuration.items.isEmpty {
+                    Button(isReordering ? "Done" : "Reorder") {
+                        withAnimation { isReordering.toggle() }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textCase(nil)
+                }
+            }
         }
+        .environment(\.editMode, .constant(isReordering ? .active : .inactive))
     }
 
     // MARK: - Background section
