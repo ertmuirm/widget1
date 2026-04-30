@@ -197,46 +197,47 @@ struct ItemEditorView: View {
                         .autocorrectionDisabled()
 
                     case .call:
-                        let isWA = action.payload.hasPrefix("https://wa.me/")
+                        // 0 = Phone, 1 = WhatsApp Audio, 2 = WhatsApp Video
+                        let callMethod: Int = {
+                            if action.payload.hasPrefix("whatsapp://videocall") { return 2 }
+                            if action.payload.hasPrefix("whatsapp://call")      { return 1 }
+                            return 0
+                        }()
                         let rawNumber: String = {
                             if action.payload.hasPrefix("tel:") {
                                 return String(action.payload.dropFirst(4))
-                            } else if action.payload.hasPrefix("https://wa.me/") {
-                                let n = String(action.payload.dropFirst("https://wa.me/".count))
+                            }
+                            if action.payload.hasPrefix("whatsapp://call?phone=") {
+                                let n = String(action.payload.dropFirst("whatsapp://call?phone=".count))
+                                return n.isEmpty ? "" : "+\(n)"
+                            }
+                            if action.payload.hasPrefix("whatsapp://videocall?phone=") {
+                                let n = String(action.payload.dropFirst("whatsapp://videocall?phone=".count))
                                 return n.isEmpty ? "" : "+\(n)"
                             }
                             return ""
                         }()
 
-                        TextField("Phone number (e.g. +15551234567)", text: Binding(
+                        TextField("Phone number (+15551234567)", text: Binding(
                             get: { rawNumber },
                             set: { val in
                                 let cleaned = val.filter { $0.isNumber || $0 == "+" }
-                                if isWA {
-                                    let digits = cleaned.hasPrefix("+") ? String(cleaned.dropFirst()) : cleaned
-                                    item.action?.payload = "https://wa.me/\(digits)"
-                                } else {
-                                    item.action?.payload = "tel:\(cleaned)"
-                                }
+                                item.action?.payload = makeCallPayload(number: cleaned, method: callMethod)
                             }
                         ))
                         .foregroundStyle(.white)
                         .keyboardType(.phonePad)
 
                         Picker("Call via", selection: Binding(
-                            get: { isWA },
-                            set: { useWA in
+                            get: { callMethod },
+                            set: { newMethod in
                                 let cleaned = rawNumber.filter { $0.isNumber || $0 == "+" }
-                                if useWA {
-                                    let digits = cleaned.hasPrefix("+") ? String(cleaned.dropFirst()) : cleaned
-                                    item.action?.payload = "https://wa.me/\(digits)"
-                                } else {
-                                    item.action?.payload = "tel:\(cleaned)"
-                                }
+                                item.action?.payload = makeCallPayload(number: cleaned, method: newMethod)
                             }
                         )) {
-                            Text("Phone App").tag(false)
-                            Text("WhatsApp").tag(true)
+                            Text("Phone App").tag(0)
+                            Text("WhatsApp Audio").tag(1)
+                            Text("WhatsApp Video").tag(2)
                         }
                         .pickerStyle(.segmented)
                     }
@@ -281,6 +282,23 @@ struct ItemEditorView: View {
             if case .success(let urls) = result, let url = urls.first {
                 loadImageFile(url)
             }
+        }
+    }
+
+    // MARK: - Call payload builder
+
+    /// Builds the stored payload for a .call action.
+    /// Phone: `tel:+NUMBER`  |  WhatsApp audio: `whatsapp://call?phone=NUMBER`
+    ///                          WhatsApp video: `whatsapp://videocall?phone=NUMBER`
+    /// method: 0 = Phone, 1 = WhatsApp Audio, 2 = WhatsApp Video
+    private func makeCallPayload(number: String, method: Int) -> String {
+        let cleaned = number.filter { $0.isNumber || $0 == "+" }
+        // WhatsApp expects digits only (no leading +)
+        let digits = cleaned.hasPrefix("+") ? String(cleaned.dropFirst()) : cleaned
+        switch method {
+        case 1:  return "whatsapp://call?phone=\(digits)"
+        case 2:  return "whatsapp://videocall?phone=\(digits)"
+        default: return "tel:\(cleaned)"
         }
     }
 

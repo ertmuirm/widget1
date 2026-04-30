@@ -466,6 +466,16 @@ struct ImageBroadcastProvider: AppIntentTimelineProvider {
     }
 }
 
+// MARK: - No-Op Intent (prevents app from opening when empty widget areas are tapped)
+
+/// Placed on every empty grid cell and the widget background so that tapping
+/// anywhere without a real action does nothing instead of opening the host app.
+struct NoOpIntent: AppIntent {
+    static var title: LocalizedStringResource = "No Action"
+    static var openAppWhenRun: Bool = false
+    func perform() async throws -> some IntentResult { .result() }
+}
+
 // MARK: - Advance Image Intent (cycles slides in an image slideshow widget)
 
 struct AdvanceImageIntent: AppIntent {

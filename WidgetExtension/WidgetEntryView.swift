@@ -27,6 +27,11 @@ struct WidgetEntryView: View {
     @ViewBuilder
     private var homeScreenWidget: some View {
         ZStack {
+            // Background NoOp covers padding and gap areas so they never open the app
+            Button(intent: NoOpIntent()) { Color.clear }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .buttonStyle(.plain)
+
             if entry.configuration.items.isEmpty {
                 emptyView
             } else {
@@ -100,7 +105,11 @@ struct WidgetEntryView: View {
                 ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
             }
         } else {
-            ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
+            // No action configured: NoOpIntent prevents the tap from opening the app
+            Button(intent: NoOpIntent()) {
+                ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
+            }
+            .buttonStyle(.plain)
         }
     }
 
