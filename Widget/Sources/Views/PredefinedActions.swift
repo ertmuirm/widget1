@@ -29,12 +29,17 @@ func bundleIDURL(_ bundleID: String) -> String {
 let predefinedGroups: [(category: String, apps: [AppActionGroup])] = [
     ("AI Assistants", [
         AppActionGroup(category: "AI Assistants", name: "ChatGPT",    openURL: "chatgpt://",        deepLinks: []),
-        AppActionGroup(category: "AI Assistants", name: "Gemini",     openURL: "googlegeminiai://", deepLinks: [
-            DeepLink(name: "Open Microphone", urlString: "googlegeminiai://open-mic"),
-            DeepLink(name: "Open in Google App", urlString: "googleapp://robin"),
+        AppActionGroup(category: "AI Assistants", name: "Gemini", openURL: bundleIDURL("com.google.GeminiApp"), deepLinks: [
+            DeepLink(name: "Open App (URL scheme)",  urlString: "googlegeminiai://"),
+            DeepLink(name: "Open Microphone",        urlString: "googlegeminiai://open-mic"),
+            DeepLink(name: "Open in Google App",     urlString: "googleapp://robin"),
         ]),
-        AppActionGroup(category: "AI Assistants", name: "Perplexity", openURL: "perplexity://",    deepLinks: []),
-        AppActionGroup(category: "AI Assistants", name: "Grok",       openURL: "grok://",          deepLinks: []),
+        AppActionGroup(category: "AI Assistants", name: "Perplexity", openURL: bundleIDURL("com.perplexity.labs.Perplexity"), deepLinks: [
+            DeepLink(name: "Open App (URL scheme)", urlString: "perplexity://"),
+        ]),
+        AppActionGroup(category: "AI Assistants", name: "Grok", openURL: bundleIDURL("com.xai.grok"), deepLinks: [
+            DeepLink(name: "Open App (URL scheme)", urlString: "grok://"),
+        ]),
         AppActionGroup(category: "AI Assistants", name: "Doubao 豆包", openURL: "doubao://",        deepLinks: []),
         AppActionGroup(category: "AI Assistants", name: "Replika",    openURL: "replika://",       deepLinks: []),
     ]),

@@ -395,14 +395,12 @@ final class SharedStorage {
         // Scatter-write to every accessible app-group container AND Documents so
         // both the main app and the widget extension can load the file regardless
         // of which shared container each process resolves.
-        var wroteToGroup = false
         for id in Self.appGroupCandidates {
             if let container = FileManager.default.containerURL(
                 forSecurityApplicationGroupIdentifier: id) {
                 let dir = container.appendingPathComponent("widget_images")
                 try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
                 try? data.write(to: dir.appendingPathComponent(filename), options: .atomicWrite)
-                wroteToGroup = true
             }
         }
         // Always write to Documents as a last-resort fallback
@@ -410,11 +408,21 @@ final class SharedStorage {
             .appendingPathComponent("widget_images")
         try? FileManager.default.createDirectory(at: docDir, withIntermediateDirectories: true)
         try? data.write(to: docDir.appendingPathComponent(filename), options: .atomicWrite)
+
+        // Also persist in app-group UserDefaults — same channel that reliably
+        // crosses the process boundary on SideStore (same mechanism as configs).
+        let udKey = "wi_\(filename)"
+        for id in Self.appGroupCandidates {
+            if let ud = UserDefaults(suiteName: id) {
+                ud.set(data, forKey: udKey)
+                ud.synchronize()
+            }
+        }
     }
 
     #if canImport(UIKit)
     func loadWidgetImage(filename: String) -> UIImage? {
-        // Search every app-group container first, then Documents
+        // 1. App-group container files (fastest path when container resolves)
         for id in Self.appGroupCandidates {
             if let container = FileManager.default.containerURL(
                 forSecurityApplicationGroupIdentifier: id) {
@@ -423,10 +431,18 @@ final class SharedStorage {
                 if let image = UIImage(contentsOfFile: url.path) { return image }
             }
         }
-        let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        // 2. Documents directory (main-app process only)
+        let docURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("widget_images")
             .appendingPathComponent(filename)
-        return UIImage(contentsOfFile: url.path)
+        if let image = UIImage(contentsOfFile: docURL.path) { return image }
+        // 3. App-group UserDefaults — guaranteed cross-process on SideStore
+        let udKey = "wi_\(filename)"
+        for id in Self.appGroupCandidates {
+            if let data = UserDefaults(suiteName: id)?.data(forKey: udKey),
+               let image = UIImage(data: data) { return image }
+        }
+        return nil
     }
     #endif
 
@@ -442,6 +458,11 @@ final class SharedStorage {
         let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("widget_images").appendingPathComponent(filename)
         try? FileManager.default.removeItem(at: url)
+        let udKey = "wi_\(filename)"
+        for id in Self.appGroupCandidates {
+            UserDefaults(suiteName: id)?.removeObject(forKey: udKey)
+            UserDefaults(suiteName: id)?.synchronize()
+        }
     }
 
     // MARK: - Backup / Restore

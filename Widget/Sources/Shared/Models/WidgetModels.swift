@@ -84,14 +84,17 @@ struct ImageSlide: Codable, Identifiable, Equatable {
     var offsetX: Double    // -0.5 … 0.5 (fraction of widget width)
     var offsetY: Double    // -0.5 … 0.5 (fraction of widget height)
     var scale: Double      // 1.0 = fit, >1 = zoomed in
+    var action: WidgetAction?
 
     init(id: UUID = UUID(), filename: String,
-         offsetX: Double = 0, offsetY: Double = 0, scale: Double = 1.0) {
+         offsetX: Double = 0, offsetY: Double = 0, scale: Double = 1.0,
+         action: WidgetAction? = nil) {
         self.id = id
         self.filename = filename
         self.offsetX = offsetX
         self.offsetY = offsetY
         self.scale = scale
+        self.action = action
     }
 }
 

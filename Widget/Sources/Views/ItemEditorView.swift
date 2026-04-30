@@ -207,13 +207,12 @@ struct ItemEditorView: View {
                             if action.payload.hasPrefix("tel:") {
                                 return String(action.payload.dropFirst(4))
                             }
+                            // Payloads now stored with leading + (E.164)
                             if action.payload.hasPrefix("whatsapp://call?phone=") {
-                                let n = String(action.payload.dropFirst("whatsapp://call?phone=".count))
-                                return n.isEmpty ? "" : "+\(n)"
+                                return String(action.payload.dropFirst("whatsapp://call?phone=".count))
                             }
                             if action.payload.hasPrefix("whatsapp://videocall?phone=") {
-                                let n = String(action.payload.dropFirst("whatsapp://videocall?phone=".count))
-                                return n.isEmpty ? "" : "+\(n)"
+                                return String(action.payload.dropFirst("whatsapp://videocall?phone=".count))
                             }
                             return ""
                         }()
@@ -293,11 +292,11 @@ struct ItemEditorView: View {
     /// method: 0 = Phone, 1 = WhatsApp Audio, 2 = WhatsApp Video
     private func makeCallPayload(number: String, method: Int) -> String {
         let cleaned = number.filter { $0.isNumber || $0 == "+" }
-        // WhatsApp expects digits only (no leading +)
-        let digits = cleaned.hasPrefix("+") ? String(cleaned.dropFirst()) : cleaned
+        // WhatsApp requires E.164 format with leading +
+        let e164 = cleaned.isEmpty ? "" : (cleaned.hasPrefix("+") ? cleaned : "+\(cleaned)")
         switch method {
-        case 1:  return "whatsapp://call?phone=\(digits)"
-        case 2:  return "whatsapp://videocall?phone=\(digits)"
+        case 1:  return "whatsapp://call?phone=\(e164)"
+        case 2:  return "whatsapp://videocall?phone=\(e164)"
         default: return "tel:\(cleaned)"
         }
     }

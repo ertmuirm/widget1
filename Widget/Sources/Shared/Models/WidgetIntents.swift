@@ -29,15 +29,12 @@ private func decodeConfigFromID(_ entityID: String) -> WidgetConfig? {
 
 // MARK: - URL resolution (shared between makeEntry diagnostics and WidgetEntryView)
 
-/// Resolves the tap URL for a widget item. Returns nil when no action is configured,
-/// the payload is empty/whitespace-only, or the action type is appIntent.
-func resolveItemURL(_ item: WidgetItem) -> URL? {
-    guard let action = item.action else { return nil }
+/// Resolves a tap URL from a `WidgetAction`. Returns nil for empty/whitespace payloads.
+func resolveURL(for action: WidgetAction) -> URL? {
     let raw = action.payload.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !raw.isEmpty else { return nil }
     switch action.type {
     case .urlScheme, .appIntent, .call:
-        // .appIntent and .call both store a fully-formed URL in payload
         return URL(string: raw)
             ?? URL(string: raw.addingPercentEncoding(
                 withAllowedCharacters: .urlFragmentAllowed) ?? raw)
@@ -46,6 +43,12 @@ func resolveItemURL(_ item: WidgetItem) -> URL? {
             withAllowedCharacters: .urlQueryAllowed) else { return nil }
         return URL(string: "shortcuts://run-shortcut?name=\(encoded)")
     }
+}
+
+/// Resolves the tap URL for a widget item. Returns nil when no action is configured.
+func resolveItemURL(_ item: WidgetItem) -> URL? {
+    guard let action = item.action else { return nil }
+    return resolveURL(for: action)
 }
 
 // MARK: - Shared helpers

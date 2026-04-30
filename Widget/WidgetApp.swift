@@ -44,15 +44,10 @@ struct WidgetApp: App {
 // MARK: - Phone dialling
 
 private func dialPhoneNumber(url: URL) {
-    let raw = url.absoluteString
-    let number = raw.hasPrefix("tel:") ? String(raw.dropFirst(4)) : raw
-
-    // CallKit CXStartCallAction — native call UI, no confirmation dialog
-    CallKitManager.shared.dial(phoneNumber: number) { success in
-        guard !success else { return }
-        // Fallback: tel: URL (may show system confirmation dialog)
-        UIApplication.shared.open(url)
-    }
+    // Open tel: URL directly for a real cellular call.
+    // CXStartCallAction routes through our VoIP provider which has no carrier backend,
+    // so it would show the calling UI without actually connecting to the network.
+    UIApplication.shared.open(url)
 }
 
 // MARK: - Bundle-ID app launch via LSApplicationWorkspace (private API)

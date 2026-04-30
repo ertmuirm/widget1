@@ -120,7 +120,9 @@ struct WidgetEntryView: View {
         let slides = entry.configuration.slides ?? []
         let rawIndex = entry.configuration.currentSlideIndex ?? 0
         let index = slides.isEmpty ? 0 : min(rawIndex, slides.count - 1)
-        let actionURL = entry.configuration.items.first.flatMap { resolveItemURL($0) }
+        let slideAction = slides.isEmpty ? nil : slides[index].action
+        let actionURL = slideAction.flatMap { resolveURL(for: $0) }
+            ?? entry.configuration.items.first.flatMap { resolveItemURL($0) }
         let hasNavigation = slides.count > 1
         let hasAction = actionURL != nil
 

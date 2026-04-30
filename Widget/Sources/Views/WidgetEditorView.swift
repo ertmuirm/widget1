@@ -151,7 +151,7 @@ struct WidgetEditorView: View {
     @ViewBuilder
     private var slideshowActionSection: some View {
         Section {
-            Text("Tapping the center third of the image widget triggers this action. Left and right thirds scroll through images.")
+            Text("Default action when tapping the center third of the widget. Individual images can override this. Left and right thirds scroll through images.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -162,7 +162,7 @@ struct WidgetEditorView: View {
                 if let item = configuration.items.first, item.action != nil {
                     ItemRowView(item: item)
                 } else {
-                    Label("Set Center Action (Optional)", systemImage: "hand.tap")
+                    Label("Set Default Action (Optional)", systemImage: "hand.tap")
                         .foregroundStyle(.gray)
                 }
             }
@@ -176,7 +176,7 @@ struct WidgetEditorView: View {
                 .foregroundStyle(.gray)
             }
         } header: {
-            Text("Center Tap Action")
+            Text("Default Center Tap Action")
         }
     }
 
@@ -423,9 +423,16 @@ struct SlideRowView: View {
                 Text("Image \(index + 1)")
                     .font(.headline)
                     .foregroundStyle(.white)
-                Text("Scale \(String(format: "%.1f", slide.scale))×")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text("Scale \(String(format: "%.1f", slide.scale))×")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if slide.action != nil {
+                        Image(systemName: "hand.tap.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.blue)
+                    }
+                }
             }
 
             Spacer()
@@ -443,6 +450,21 @@ struct SlideRowView: View {
 struct SlideEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var slide: ImageSlide
+
+    @State private var showActionPicker = false
+    @State private var showAppActionPicker = false
+
+    // Proxy so ActionPickerView / AppActionPickerView can bind to a WidgetItem
+    private var actionItemBinding: Binding<WidgetItem> {
+        Binding(
+            get: {
+                var item = WidgetItem()
+                item.action = slide.action
+                return item
+            },
+            set: { slide.action = $0.action }
+        )
+    }
 
     var body: some View {
         List {
@@ -492,6 +514,117 @@ struct SlideEditorView: View {
                 }
                 .foregroundStyle(.gray)
             }
+
+            // Action section — overrides the widget-level default action for this slide
+            Section {
+                Button {
+                    showActionPicker = true
+                } label: {
+                    HStack {
+                        Text("Action Type")
+                        Spacer()
+                        Text(slide.action?.type.displayName ?? "None")
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .foregroundStyle(.white)
+
+                if let action = slide.action {
+                    switch action.type {
+                    case .urlScheme:
+                        TextField("URL (e.g. https://...)", text: Binding(
+                            get: { action.payload },
+                            set: { slide.action?.payload = $0 }
+                        ))
+                        .foregroundStyle(.white)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .keyboardType(.URL)
+
+                    case .appIntent:
+                        Button {
+                            showAppActionPicker = true
+                        } label: {
+                            HStack {
+                                Text("App Action")
+                                Spacer()
+                                Text(action.displayName ?? (action.payload.isEmpty ? "Select…" : action.payload))
+                                    .foregroundStyle(action.payload.isEmpty ? .tertiary : .secondary)
+                                    .lineLimit(1)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .foregroundStyle(.white)
+
+                    case .shortcut:
+                        TextField("Shortcut Name", text: Binding(
+                            get: { action.payload },
+                            set: { slide.action?.payload = $0 }
+                        ))
+                        .foregroundStyle(.white)
+                        .autocorrectionDisabled()
+
+                    case .call:
+                        let callMethod: Int = {
+                            if action.payload.hasPrefix("whatsapp://videocall") { return 2 }
+                            if action.payload.hasPrefix("whatsapp://call")      { return 1 }
+                            return 0
+                        }()
+                        let rawNumber: String = {
+                            if action.payload.hasPrefix("tel:") {
+                                return String(action.payload.dropFirst(4))
+                            }
+                            if action.payload.hasPrefix("whatsapp://call?phone=") {
+                                return String(action.payload.dropFirst("whatsapp://call?phone=".count))
+                            }
+                            if action.payload.hasPrefix("whatsapp://videocall?phone=") {
+                                return String(action.payload.dropFirst("whatsapp://videocall?phone=".count))
+                            }
+                            return ""
+                        }()
+
+                        TextField("Phone number (+15551234567)", text: Binding(
+                            get: { rawNumber },
+                            set: { val in
+                                let cleaned = val.filter { $0.isNumber || $0 == "+" }
+                                slide.action?.payload = makeSlideCallPayload(number: cleaned, method: callMethod)
+                            }
+                        ))
+                        .foregroundStyle(.white)
+                        .keyboardType(.phonePad)
+
+                        Picker("Call via", selection: Binding(
+                            get: { callMethod },
+                            set: { newMethod in
+                                let cleaned = rawNumber.filter { $0.isNumber || $0 == "+" }
+                                slide.action?.payload = makeSlideCallPayload(number: cleaned, method: newMethod)
+                            }
+                        )) {
+                            Text("Phone App").tag(0)
+                            Text("WhatsApp Audio").tag(1)
+                            Text("WhatsApp Video").tag(2)
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
+                    Button(role: .destructive) {
+                        slide.action = nil
+                    } label: {
+                        Label("Remove Action", systemImage: "trash")
+                    }
+                    .foregroundStyle(.gray)
+                }
+            } header: {
+                Text("Action")
+            } footer: {
+                Text("Overrides the default widget action for this image only.")
+                    .font(.caption)
+            }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Edit Image")
@@ -500,6 +633,25 @@ struct SlideEditorView: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Done") { dismiss() }
             }
+        }
+        .sheet(isPresented: $showActionPicker) {
+            ActionPickerView(item: actionItemBinding)
+        }
+        .sheet(isPresented: $showAppActionPicker) {
+            AppActionPickerView { urlString, displayLabel in
+                slide.action?.payload = urlString
+                slide.action?.displayName = displayLabel
+            }
+        }
+    }
+
+    private func makeSlideCallPayload(number: String, method: Int) -> String {
+        let cleaned = number.filter { $0.isNumber || $0 == "+" }
+        let e164 = cleaned.isEmpty ? "" : (cleaned.hasPrefix("+") ? cleaned : "+\(cleaned)")
+        switch method {
+        case 1:  return "whatsapp://call?phone=\(e164)"
+        case 2:  return "whatsapp://videocall?phone=\(e164)"
+        default: return "tel:\(cleaned)"
         }
     }
 }
