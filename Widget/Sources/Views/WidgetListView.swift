@@ -201,8 +201,18 @@ struct ItemPreviewView: View {
 
             if item.displayType == .qrCode, let content = item.qrCodeContent, !content.isEmpty,
                let qr = UIImage.qrCode(from: content, size: max(size.width, 60) * 2) {
-                Image(uiImage: qr).interpolation(.none).resizable().scaledToFit()
-                    .padding(2)
+                let hasLabel = !(item.qrCodeLabel ?? "").isEmpty
+                VStack(spacing: 1) {
+                    Image(uiImage: qr).interpolation(.none).resizable().scaledToFit()
+                        .padding(.horizontal, 2).padding(.top, 2)
+                    if hasLabel {
+                        Text(item.qrCodeLabel!)
+                            .font(.system(size: max(item.qrCodeLabelSize * size.width / 40, 5), weight: .medium))
+                            .foregroundStyle(item.foregroundColor.swiftUIColor)
+                            .lineLimit(1).minimumScaleFactor(0.4)
+                            .padding(.bottom, 2)
+                    }
+                }
             } else if item.displayType == .image, let fn = item.customImageFilename,
                       let img = SharedStorage.shared.loadWidgetImage(filename: fn) {
                 Image(uiImage: img).resizable().scaledToFill()

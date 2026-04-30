@@ -13,6 +13,8 @@ struct WidgetItem: Codable, Identifiable, Equatable {
     var customText: String?
     var customImageFilename: String?  // used when displayType == .image
     var qrCodeContent: String?        // used when displayType == .qrCode
+    var qrCodeLabel: String?          // optional label shown below the QR code
+    var qrCodeLabelSize: CGFloat      // font size for the label
     var fontSize: CGFloat
     var foregroundColor: CodableColor
     var backgroundColor: CodableColor
@@ -26,6 +28,8 @@ struct WidgetItem: Codable, Identifiable, Equatable {
         customText: String? = nil,
         customImageFilename: String? = nil,
         qrCodeContent: String? = nil,
+        qrCodeLabel: String? = nil,
+        qrCodeLabelSize: CGFloat = 8,
         fontSize: CGFloat = 14,
         foregroundColor: CodableColor = CodableColor(.white),
         backgroundColor: CodableColor = CodableColor(.clear),
@@ -38,6 +42,8 @@ struct WidgetItem: Codable, Identifiable, Equatable {
         self.customText = customText
         self.customImageFilename = customImageFilename
         self.qrCodeContent = qrCodeContent
+        self.qrCodeLabel = qrCodeLabel
+        self.qrCodeLabelSize = qrCodeLabelSize
         self.fontSize = fontSize
         self.foregroundColor = foregroundColor
         self.backgroundColor = backgroundColor

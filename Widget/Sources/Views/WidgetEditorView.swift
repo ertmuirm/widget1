@@ -684,9 +684,15 @@ struct ItemRowView: View {
 
                 if item.displayType == .qrCode, let content = item.qrCodeContent, !content.isEmpty,
                    let qr = UIImage.qrCode(from: content, size: 88) {
-                    Image(uiImage: qr).interpolation(.none).resizable().scaledToFit()
-                        .frame(width: 44, height: 44)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    VStack(spacing: 1) {
+                        Image(uiImage: qr).interpolation(.none).resizable().scaledToFit()
+                        if let label = item.qrCodeLabel, !label.isEmpty {
+                            Text(label).font(.system(size: 6)).lineLimit(1)
+                                .foregroundStyle(item.foregroundColor.swiftUIColor)
+                        }
+                    }
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 } else if item.displayType == .image, let filename = item.customImageFilename,
                    let image = SharedStorage.shared.loadWidgetImage(filename: filename) {
                     Image(uiImage: image)

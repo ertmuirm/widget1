@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import Vision
 
 /// Editor for individual widget items
 struct ItemEditorView: View {
@@ -12,7 +13,9 @@ struct ItemEditorView: View {
     @State private var showActionPicker = false
     @State private var showAppActionPicker = false
     @State private var photoPickerItems: [PhotosPickerItem] = []
+    @State private var qrScanPickerItems: [PhotosPickerItem] = []
     @State private var showFileImporter = false
+    @State private var scanError: String?
 
     var body: some View {
         List {
@@ -102,7 +105,7 @@ struct ItemEditorView: View {
                     }
                 }
             } else if item.displayType == .qrCode {
-                Section("QR Code Content") {
+                Section {
                     TextField("URL or text to encode", text: Binding(
                         get: { item.qrCodeContent ?? "" },
                         set: { item.qrCodeContent = $0.isEmpty ? nil : $0 }
@@ -111,15 +114,65 @@ struct ItemEditorView: View {
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
 
-                    if let content = item.qrCodeContent, !content.isEmpty,
-                       let qr = UIImage.qrCode(from: content, size: 160) {
-                        Image(uiImage: qr)
-                            .interpolation(.none)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxHeight: 160)
-                            .frame(maxWidth: .infinity)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                    // Scan QR / barcode from a photo
+                    PhotosPicker(selection: $qrScanPickerItems, maxSelectionCount: 1, matching: .images) {
+                        Label("Scan from Image", systemImage: "qrcode.viewfinder")
+                    }
+                    .foregroundStyle(.white)
+                    .onChange(of: qrScanPickerItems) { items in
+                        if let first = items.first { scanQRFromPhoto(first) }
+                        qrScanPickerItems = []
+                    }
+
+                    if let err = scanError {
+                        Text(err).font(.caption).foregroundStyle(.orange)
+                    }
+                } header: {
+                    Text("QR Code Content")
+                } footer: {
+                    Text("Type a URL or text, or pick an image containing a QR/barcode to extract its content automatically.")
+                        .font(.caption)
+                }
+
+                // Live QR preview
+                if let content = item.qrCodeContent, !content.isEmpty,
+                   let qr = UIImage.qrCode(from: content, size: 300) {
+                    Section("Preview") {
+                        VStack(spacing: 6) {
+                            Image(uiImage: qr)
+                                .interpolation(.none)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxHeight: 180)
+                                .frame(maxWidth: .infinity)
+                            if let label = item.qrCodeLabel, !label.isEmpty {
+                                Text(label)
+                                    .font(.system(size: item.qrCodeLabelSize, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.5)
+                            }
+                        }
+                        .padding(.vertical, 6)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 8, bottom: 4, trailing: 8))
+                    }
+                }
+
+                Section("Label (optional)") {
+                    TextField("Label shown below QR code", text: Binding(
+                        get: { item.qrCodeLabel ?? "" },
+                        set: { item.qrCodeLabel = $0.isEmpty ? nil : $0 }
+                    ))
+                    .foregroundStyle(.white)
+
+                    if item.qrCodeLabel?.isEmpty == false {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Label Font Size: \(Int(item.qrCodeLabelSize)) pt")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Slider(value: $item.qrCodeLabelSize, in: 6...24, step: 1)
+                                .tint(.gray)
+                        }
                     }
                 }
             } else {
@@ -376,6 +429,32 @@ struct ItemEditorView: View {
         let filename = "\(UUID().uuidString).\(ext)"
         SharedStorage.shared.saveWidgetImage(saveData, filename: filename)
         item.customImageFilename = filename
+    }
+
+    // MARK: - QR/barcode scan from photo
+
+    private func scanQRFromPhoto(_ photoItem: PhotosPickerItem) {
+        scanError = nil
+        photoItem.loadTransferable(type: Data.self) { result in
+            guard case .success(let data?) = result,
+                  let ciImage = CIImage(data: data) else {
+                DispatchQueue.main.async { self.scanError = "Could not load image." }
+                return
+            }
+            let request = VNDetectBarcodesRequest()
+            let handler = VNImageRequestHandler(ciImage: ciImage, options: [:])
+            DispatchQueue.global(qos: .userInitiated).async {
+                try? handler.perform([request])
+                DispatchQueue.main.async {
+                    if let payload = request.results?.first?.payloadStringValue {
+                        self.item.qrCodeContent = payload
+                        self.scanError = nil
+                    } else {
+                        self.scanError = "No QR code or barcode detected in the image."
+                    }
+                }
+            }
+        }
     }
 }
 
