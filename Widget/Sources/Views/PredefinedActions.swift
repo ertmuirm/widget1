@@ -172,9 +172,9 @@ class InstalledAppsManager: ObservableObject {
 
     private func fetchUserApps() -> [AppActionGroup] {
         guard
-            let cls = NSClassFromString("LSApplicationWorkspace"),
-            let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue(),
-            let raw = (ws as AnyObject).perform(NSSelectorFromString("allApplications"))?.takeUnretainedValue(),
+            let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
+            let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject,
+            let raw = ws.perform(NSSelectorFromString("allApplications"))?.takeUnretainedValue(),
             let nsArray = raw as? NSArray
         else { return [] }
 

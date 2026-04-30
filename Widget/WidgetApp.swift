@@ -42,8 +42,8 @@ struct WidgetApp: App {
 /// Fails silently if the API is unavailable or the app is not installed.
 private func openAppByBundleID(_ bundleID: String) {
     guard
-        let cls = NSClassFromString("LSApplicationWorkspace"),
-        let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue()
+        let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
+        let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject
     else { return }
-    _ = (ws as AnyObject).perform(NSSelectorFromString("openApplicationWithBundleID:"), with: bundleID)
+    ws.perform(NSSelectorFromString("openApplicationWithBundleID:"), with: bundleID)
 }
