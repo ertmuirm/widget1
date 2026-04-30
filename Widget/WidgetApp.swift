@@ -10,11 +10,12 @@ struct WidgetApp: App {
                 .onOpenURL { url in
                     Task { @MainActor in
                         // Brief yield so the black ContentView renders before handing off
-                        try? await Task.sleep(for: .milliseconds(30))
+                        try? await Task.sleep(for: .milliseconds(250))
                         if url.scheme == "openapp" {
-                            if let bundleID = URLComponents(url: url, resolvingAgainstBaseURL: false)?
-                                .queryItems?.first(where: { $0.name == "bundle" })?.value {
-                                openAppByBundleID(bundleID)
+                            let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+                            if let bundleID = comps?.queryItems?.first(where: { $0.name == "bundle" })?.value {
+                                let fallback = comps?.queryItems?.first(where: { $0.name == "fallback" })?.value
+                                openAppByBundleID(bundleID, fallbackURLString: fallback)
                             }
                         } else if url.scheme == "tel" {
                             dialPhoneNumber(url: url)
@@ -52,10 +53,17 @@ private func dialPhoneNumber(url: URL) {
 
 // MARK: - Bundle-ID app launch via LSApplicationWorkspace (private API)
 
-private func openAppByBundleID(_ bundleID: String) {
-    guard
-        let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
-        let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject
-    else { return }
-    ws.perform(NSSelectorFromString("openApplicationWithBundleID:"), with: bundleID)
+private func openAppByBundleID(_ bundleID: String, fallbackURLString: String? = nil) {
+    var launched = false
+    if let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
+       let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject {
+        let sel = NSSelectorFromString("openApplicationWithBundleID:")
+        if ws.responds(to: sel) {
+            ws.perform(sel, with: bundleID)
+            launched = true
+        }
+    }
+    if !launched, let str = fallbackURLString, let url = URL(string: str) {
+        Task { await UIApplication.shared.open(url) }
+    }
 }

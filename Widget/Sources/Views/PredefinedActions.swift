@@ -20,8 +20,10 @@ struct DeepLink: Identifiable {
 
 // MARK: - Helpers
 
-func bundleIDURL(_ bundleID: String) -> String {
-    "openapp://launch?bundle=\(bundleID)"
+func bundleIDURL(_ bundleID: String, fallback: String? = nil) -> String {
+    var s = "openapp://launch?bundle=\(bundleID)"
+    if let fb = fallback { s += "&fallback=\(fb)" }
+    return s
 }
 
 // MARK: - Predefined list
@@ -29,17 +31,14 @@ func bundleIDURL(_ bundleID: String) -> String {
 let predefinedGroups: [(category: String, apps: [AppActionGroup])] = [
     ("AI Assistants", [
         AppActionGroup(category: "AI Assistants", name: "ChatGPT",    openURL: "chatgpt://",        deepLinks: []),
-        AppActionGroup(category: "AI Assistants", name: "Gemini", openURL: bundleIDURL("com.google.GeminiApp"), deepLinks: [
-            DeepLink(name: "Open App (URL scheme)",  urlString: "googlegeminiai://"),
+        AppActionGroup(category: "AI Assistants", name: "Gemini", openURL: bundleIDURL("com.google.GeminiApp", fallback: "googlegeminiai://"), deepLinks: [
             DeepLink(name: "Open Microphone",        urlString: "googlegeminiai://open-mic"),
             DeepLink(name: "Open in Google App",     urlString: "googleapp://robin"),
         ]),
         AppActionGroup(category: "AI Assistants", name: "Perplexity", openURL: bundleIDURL("com.perplexity.labs.Perplexity"), deepLinks: [
             DeepLink(name: "Open App (URL scheme)", urlString: "perplexity://"),
         ]),
-        AppActionGroup(category: "AI Assistants", name: "Grok", openURL: bundleIDURL("com.xai.grok"), deepLinks: [
-            DeepLink(name: "Open App (URL scheme)", urlString: "grok://"),
-        ]),
+        AppActionGroup(category: "AI Assistants", name: "Grok", openURL: bundleIDURL("com.xai.grok", fallback: "grok://"), deepLinks: []),
         AppActionGroup(category: "AI Assistants", name: "Doubao 豆包", openURL: "doubao://",        deepLinks: []),
         AppActionGroup(category: "AI Assistants", name: "Replika",    openURL: "replika://",       deepLinks: []),
     ]),
@@ -151,7 +150,7 @@ let predefinedGroups: [(category: String, apps: [AppActionGroup])] = [
         AppActionGroup(category: "Business", name: "S&P Capital IQ", openURL: bundleIDURL("com.capitaliq.mobile.MarketIntelligence"), deepLinks: []),
     ]),
     ("Travel & Hotels", [
-        AppActionGroup(category: "Travel & Hotels", name: "Singapore Airlines", openURL: "singaporeair://",  deepLinks: []),
+        AppActionGroup(category: "Travel & Hotels", name: "Singapore Airlines", openURL: bundleIDURL("com.singaporeair.iphone", fallback: "singaporeair://"), deepLinks: []),
         AppActionGroup(category: "Travel & Hotels", name: "Hilton Honors",      openURL: "hiltonhhonors://", deepLinks: []),
         AppActionGroup(category: "Travel & Hotels", name: "Marriott Bonvoy",    openURL: "marriott://",      deepLinks: []),
     ]),

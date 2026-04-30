@@ -35,9 +35,15 @@ func resolveURL(for action: WidgetAction) -> URL? {
     guard !raw.isEmpty else { return nil }
     switch action.type {
     case .urlScheme, .appIntent, .call:
-        return URL(string: raw)
-            ?? URL(string: raw.addingPercentEncoding(
-                withAllowedCharacters: .urlFragmentAllowed) ?? raw)
+        var normalized = raw
+        // Migrate old WhatsApp payloads that stored + in phone= param
+        // WhatsApp URL parser treats + as space, causing "invalid call link"
+        if normalized.hasPrefix("whatsapp://") {
+            normalized = normalized.replacingOccurrences(of: "phone=+", with: "phone=")
+        }
+        return URL(string: normalized)
+            ?? URL(string: normalized.addingPercentEncoding(
+                withAllowedCharacters: .urlFragmentAllowed) ?? normalized)
     case .shortcut:
         guard let encoded = raw.addingPercentEncoding(
             withAllowedCharacters: .urlQueryAllowed) else { return nil }

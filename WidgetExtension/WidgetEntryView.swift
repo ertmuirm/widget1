@@ -139,7 +139,9 @@ struct WidgetEntryView: View {
                 }
             } else {
                 let slide = slides[index]
-                if let image = SharedStorage.shared.loadWidgetImage(filename: slide.filename) {
+                let image = slide.imageData.flatMap { UIImage(data: $0) }
+                    ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
+                if let image {
                     GeometryReader { geo in
                         Image(uiImage: image)
                             .resizable()

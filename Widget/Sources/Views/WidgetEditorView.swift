@@ -308,16 +308,19 @@ struct WidgetEditorView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-            } else if index < slides.count,
-                      let image = SharedStorage.shared.loadWidgetImage(filename: slides[index].filename) {
+            } else if index < slides.count {
                 let slide = slides[index]
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .scaleEffect(CGFloat(slide.scale))
-                    .offset(x: CGFloat(slide.offsetX) * 150, y: CGFloat(slide.offsetY) * 100)
-                    .frame(maxWidth: .infinity, maxHeight: 200)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                let image = slide.imageData.flatMap { UIImage(data: $0) }
+                    ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .scaleEffect(CGFloat(slide.scale))
+                        .offset(x: CGFloat(slide.offsetX) * 150, y: CGFloat(slide.offsetY) * 100)
+                        .frame(maxWidth: .infinity, maxHeight: 200)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
             }
 
             // Page indicator
@@ -377,7 +380,7 @@ struct WidgetEditorView: View {
         guard let jpeg = downsized.jpegData(compressionQuality: 0.75) else { return }
         let filename = "\(UUID().uuidString).jpg"
         SharedStorage.shared.saveWidgetImage(jpeg, filename: filename)
-        let slide = ImageSlide(filename: filename)
+        let slide = ImageSlide(filename: filename, imageData: jpeg)
         if configuration.slides == nil { configuration.slides = [] }
         configuration.slides?.append(slide)
     }
@@ -408,7 +411,9 @@ struct SlideRowView: View {
                     .fill(Color.gray.opacity(0.3))
                     .frame(width: 44, height: 44)
 
-                if let image = SharedStorage.shared.loadWidgetImage(filename: slide.filename) {
+                let img = slide.imageData.flatMap { UIImage(data: $0) }
+                    ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
+                if let image = img {
                     Image(uiImage: image)
                         .resizable()
                         .scaledToFill()
@@ -470,7 +475,9 @@ struct SlideEditorView: View {
     var body: some View {
         List {
             Section("Preview") {
-                if let image = SharedStorage.shared.loadWidgetImage(filename: slide.filename) {
+                let img = slide.imageData.flatMap { UIImage(data: $0) }
+                    ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
+                if let image = img {
                     GeometryReader { geo in
                         Image(uiImage: image)
                             .resizable()
