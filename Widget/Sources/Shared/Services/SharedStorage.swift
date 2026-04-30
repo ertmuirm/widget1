@@ -280,12 +280,19 @@ final class SharedStorage {
             appendExtensionLog("LOAD: no data found in any store")
             return []
         }
-        let configs = try decoder.decode([WidgetConfig].self, from: data)
-        // Migrate existing configs to keychain on first load after upgrade.
-        // Whoever runs first (app or extension) promotes the data so both can read it.
+        var configs = try decoder.decode([WidgetConfig].self, from: data)
+        // Populate imageData for every slide from the image store (imageData is not serialized
+        // to keep JSON small; SharedStorage holds the authoritative copy).
+        for i in configs.indices {
+            guard configs[i].slides != nil else { continue }
+            for j in configs[i].slides!.indices {
+                let fn = configs[i].slides![j].filename
+                configs[i].slides![j].imageData = loadWidgetImageData(filename: fn)
+            }
+        }
         if !configs.isEmpty && keychainRead(forKey: Self.configKey) == nil {
             let st = keychainWrite(data, forKey: Self.configKey)
-            appendExtensionLog("LOAD: migrated \(configs.count) configs → keychain kc=\(st==errSecSuccess ? "ok" : "fail(\(st))")")
+            appendExtensionLog("LOAD: migrated \(configs.count) configs → kc=\(st==errSecSuccess ? "ok" : "fail(\(st))")")
         } else {
             appendExtensionLog("LOAD: \(configs.count) configs")
         }
@@ -392,13 +399,10 @@ final class SharedStorage {
     }
 
     func saveWidgetImage(_ data: Data, filename: String) {
-        // 0. Keychain — ONLY reliable cross-process channel on SideStore.
-        //    keychainWrite silently no-ops when the group is unavailable.
-        keychainWrite(data, forKey: "wi_\(filename)")
-
-        // Scatter-write to every accessible app-group container AND Documents so
-        // both the main app and the widget extension can load the file regardless
-        // of which shared container each process resolves.
+        let udKey = "wi_\(filename)"
+        // 0. Keychain (cross-process on devices where entitlement works)
+        keychainWrite(data, forKey: udKey)
+        // 1. App-group containers
         for id in Self.appGroupCandidates {
             if let container = FileManager.default.containerURL(
                 forSecurityApplicationGroupIdentifier: id) {
@@ -407,48 +411,44 @@ final class SharedStorage {
                 try? data.write(to: dir.appendingPathComponent(filename), options: .atomicWrite)
             }
         }
-        // Always write to Documents as a last-resort fallback
+        // 2. Documents directory (always accessible in the main app process)
         let docDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("widget_images")
         try? FileManager.default.createDirectory(at: docDir, withIntermediateDirectories: true)
         try? data.write(to: docDir.appendingPathComponent(filename), options: .atomicWrite)
-
-        // Also persist in app-group UserDefaults as additional fallback
-        let udKey = "wi_\(filename)"
+        // 3. App-group UserDefaults
         for id in Self.appGroupCandidates {
-            if let ud = UserDefaults(suiteName: id) {
-                ud.set(data, forKey: udKey)
-                ud.synchronize()
+            if let ud = UserDefaults(suiteName: id) { ud.set(data, forKey: udKey); ud.synchronize() }
+        }
+        // 4. Standard UserDefaults — always works within the same process (main app preview)
+        UserDefaults.standard.set(data, forKey: udKey)
+        UserDefaults.standard.synchronize()
+    }
+
+    /// Load raw JPEG bytes for a slide image (used to populate imageData after deserialization).
+    func loadWidgetImageData(filename: String) -> Data? {
+        let udKey = "wi_\(filename)"
+        if let d = keychainRead(forKey: udKey), !d.isEmpty { return d }
+        for id in Self.appGroupCandidates {
+            if let c = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                let url = c.appendingPathComponent("widget_images").appendingPathComponent(filename)
+                if let d = try? Data(contentsOf: url), !d.isEmpty { return d }
             }
         }
+        let docURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("widget_images").appendingPathComponent(filename)
+        if let d = try? Data(contentsOf: docURL), !d.isEmpty { return d }
+        for id in Self.appGroupCandidates {
+            if let d = UserDefaults(suiteName: id)?.data(forKey: udKey), !d.isEmpty { return d }
+        }
+        // Standard UserDefaults — always readable in same process
+        if let d = UserDefaults.standard.data(forKey: udKey), !d.isEmpty { return d }
+        return nil
     }
 
     #if canImport(UIKit)
     func loadWidgetImage(filename: String) -> UIImage? {
-        // 0. Keychain — ONLY reliable cross-process channel on SideStore
-        if let data = keychainRead(forKey: "wi_\(filename)"),
-           let image = UIImage(data: data) { return image }
-        // 1. App-group container files (fastest path when container resolves)
-        for id in Self.appGroupCandidates {
-            if let container = FileManager.default.containerURL(
-                forSecurityApplicationGroupIdentifier: id) {
-                let url = container.appendingPathComponent("widget_images")
-                    .appendingPathComponent(filename)
-                if let image = UIImage(contentsOfFile: url.path) { return image }
-            }
-        }
-        // 2. Documents directory (main-app process only)
-        let docURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("widget_images")
-            .appendingPathComponent(filename)
-        if let image = UIImage(contentsOfFile: docURL.path) { return image }
-        // 3. App-group UserDefaults
-        let udKey = "wi_\(filename)"
-        for id in Self.appGroupCandidates {
-            if let data = UserDefaults(suiteName: id)?.data(forKey: udKey),
-               let image = UIImage(data: data) { return image }
-        }
-        return nil
+        loadWidgetImageData(filename: filename).flatMap { UIImage(data: $0) }
     }
     #endif
 

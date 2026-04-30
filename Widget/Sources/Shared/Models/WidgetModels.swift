@@ -12,6 +12,7 @@ struct WidgetItem: Codable, Identifiable, Equatable {
     var sfSymbolName: String?
     var customText: String?
     var customImageFilename: String?  // used when displayType == .image
+    var qrCodeContent: String?        // used when displayType == .qrCode
     var fontSize: CGFloat
     var foregroundColor: CodableColor
     var backgroundColor: CodableColor
@@ -24,6 +25,7 @@ struct WidgetItem: Codable, Identifiable, Equatable {
         sfSymbolName: String? = "star.fill",
         customText: String? = nil,
         customImageFilename: String? = nil,
+        qrCodeContent: String? = nil,
         fontSize: CGFloat = 14,
         foregroundColor: CodableColor = CodableColor(.white),
         backgroundColor: CodableColor = CodableColor(.clear),
@@ -35,6 +37,7 @@ struct WidgetItem: Codable, Identifiable, Equatable {
         self.sfSymbolName = sfSymbolName
         self.customText = customText
         self.customImageFilename = customImageFilename
+        self.qrCodeContent = qrCodeContent
         self.fontSize = fontSize
         self.foregroundColor = foregroundColor
         self.backgroundColor = backgroundColor
@@ -49,12 +52,14 @@ enum DisplayType: String, Codable, CaseIterable {
     case icon
     case text
     case image
+    case qrCode
 
     var displayName: String {
         switch self {
-        case .icon:  return "Icon"
-        case .text:  return "Text"
-        case .image: return "Image"
+        case .icon:   return "Icon"
+        case .text:   return "Text"
+        case .image:  return "Image"
+        case .qrCode: return "QR Code"
         }
     }
 }
@@ -85,7 +90,11 @@ struct ImageSlide: Codable, Identifiable, Equatable {
     var offsetY: Double    // -0.5 … 0.5 (fraction of widget height)
     var scale: Double      // 1.0 = fit, >1 = zoomed in
     var action: WidgetAction?
-    var imageData: Data?           // ← inline JPEG; travels with config via keychain
+    /// In-memory JPEG data. Never serialized — populated at load time from SharedStorage.
+    var imageData: Data?
+
+    // imageData is intentionally excluded from JSON to keep config sizes small.
+    enum CodingKeys: CodingKey { case id, filename, offsetX, offsetY, scale, action }
 
     init(id: UUID = UUID(), filename: String,
          offsetX: Double = 0, offsetY: Double = 0, scale: Double = 1.0,

@@ -170,12 +170,12 @@ struct WidgetPreviewView: View {
                         .font(.title2)
                         .foregroundStyle(.secondary)
                 } else {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: configuration.size.columns), spacing: 2) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 1), count: configuration.size.columns), spacing: 1) {
                         ForEach(Array(configuration.truncatedItems.enumerated()), id: \.element.id) { _, item in
                             ItemPreviewView(item: item, size: itemSize)
+                                .aspectRatio(1, contentMode: .fit)
                         }
                     }
-                    .padding(4)
                 }
             }
         }
@@ -199,13 +199,19 @@ struct ItemPreviewView: View {
         ZStack {
             item.backgroundColor.swiftUIColor.opacity(item.backgroundOpacity)
 
-            if item.displayType == .icon {
+            if item.displayType == .qrCode, let content = item.qrCodeContent, !content.isEmpty,
+               let qr = UIImage.qrCode(from: content, size: max(size.width, 60) * 2) {
+                Image(uiImage: qr).interpolation(.none).resizable().scaledToFit()
+                    .padding(2)
+            } else if item.displayType == .image, let fn = item.customImageFilename,
+                      let img = SharedStorage.shared.loadWidgetImage(filename: fn) {
+                Image(uiImage: img).resizable().scaledToFill()
+                    .frame(width: size.width, height: size.height).clipped()
+            } else if item.displayType == .icon {
                 if let symbolName = item.sfSymbolName {
                     if symbolName.hasPrefix("wi_") {
                         Image(symbolName)
-                            .resizable()
-                            .renderingMode(.template)
-                            .scaledToFit()
+                            .resizable().renderingMode(.template).scaledToFit()
                             .frame(width: size.width * 0.55, height: size.width * 0.55)
                             .foregroundStyle(item.foregroundColor.swiftUIColor)
                     } else {

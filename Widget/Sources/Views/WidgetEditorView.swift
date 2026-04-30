@@ -682,20 +682,22 @@ struct ItemRowView: View {
                     .fill(item.backgroundColor.swiftUIColor.opacity(item.backgroundOpacity))
                     .frame(width: 44, height: 44)
 
-                if item.displayType == .image, let filename = item.customImageFilename,
+                if item.displayType == .qrCode, let content = item.qrCodeContent, !content.isEmpty,
+                   let qr = UIImage.qrCode(from: content, size: 88) {
+                    Image(uiImage: qr).interpolation(.none).resizable().scaledToFit()
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else if item.displayType == .image, let filename = item.customImageFilename,
                    let image = SharedStorage.shared.loadWidgetImage(filename: filename) {
                     Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
+                        .resizable().scaledToFill()
                         .frame(width: 44, height: 44)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 } else if item.displayType == .icon {
                     if let symbolName = item.sfSymbolName {
                         if symbolName.hasPrefix("wi_") {
                             Image(symbolName)
-                                .resizable()
-                                .renderingMode(.template)
-                                .scaledToFit()
+                                .resizable().renderingMode(.template).scaledToFit()
                                 .frame(width: 24, height: 24)
                                 .foregroundStyle(item.foregroundColor.swiftUIColor)
                         } else {
@@ -738,9 +740,10 @@ struct ItemRowView: View {
 
     private var itemTitle: String {
         switch item.displayType {
-        case .icon:  return item.sfSymbolName ?? "Icon"
-        case .text:  return item.customText ?? "Text"
-        case .image: return item.customImageFilename != nil ? "Image" : "No image"
+        case .icon:   return item.sfSymbolName ?? "Icon"
+        case .text:   return item.customText ?? "Text"
+        case .image:  return item.customImageFilename != nil ? "Image" : "No image"
+        case .qrCode: return item.qrCodeContent.map { $0.prefix(20) + ($0.count > 20 ? "…" : "") } ?? "QR Code"
         }
     }
 }

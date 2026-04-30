@@ -65,33 +65,33 @@ struct WidgetEntryView: View {
     // MARK: - Grid layouts
 
     private var smallGrid: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
-        return LazyVGrid(columns: columns, spacing: 2) {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 1), count: 3)
+        return LazyVGrid(columns: columns, spacing: 1) {
             ForEach(Array(entry.configuration.items.prefix(9).enumerated()), id: \.element.id) { _, item in
                 itemCell(item, size: .systemSmall)
+                    .aspectRatio(1, contentMode: .fit)
             }
         }
-        .padding(4)
     }
 
     private var mediumGrid: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 6)
-        return LazyVGrid(columns: columns, spacing: 2) {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 1), count: 6)
+        return LazyVGrid(columns: columns, spacing: 1) {
             ForEach(Array(entry.configuration.items.prefix(18).enumerated()), id: \.element.id) { _, item in
                 itemCell(item, size: .systemMedium)
+                    .aspectRatio(1, contentMode: .fit)
             }
         }
-        .padding(4)
     }
 
     private var largeGrid: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 6)
-        return LazyVGrid(columns: columns, spacing: 2) {
+        let columns = Array(repeating: GridItem(.flexible(), spacing: 1), count: 6)
+        return LazyVGrid(columns: columns, spacing: 1) {
             ForEach(Array(entry.configuration.items.prefix(36).enumerated()), id: \.element.id) { _, item in
                 itemCell(item, size: .systemLarge)
+                    .aspectRatio(1, contentMode: .fit)
             }
         }
-        .padding(4)
     }
 
     private var extraLargeGrid: some View { largeGrid }
@@ -236,9 +236,16 @@ struct WidgetEntryView: View {
                     .resizable()
                     .renderingMode(.original)
                     .scaledToFit()
+            } else if item.displayType == .qrCode, let content = item.qrCodeContent,
+                      let qr = UIImage.qrCode(from: content, size: 60) {
+                Image(uiImage: qr).resizable().scaledToFit()
             } else if item.displayType == .icon, let symbol = item.sfSymbolName {
-                Image(systemName: symbol)
-                    .font(.system(size: 20))
+                if symbol.hasPrefix("wi_") {
+                    Image(symbol).resizable().renderingMode(.template).scaledToFit()
+                        .frame(width: 24, height: 24)
+                } else {
+                    Image(systemName: symbol).font(.system(size: 20))
+                }
             } else {
                 Text(item.customText?.prefix(2) ?? "")
                     .font(.system(size: 14, weight: .medium))
@@ -253,10 +260,13 @@ struct WidgetEntryView: View {
         if let item = entry.configuration.items.first {
             if item.displayType == .icon, let symbol = item.sfSymbolName {
                 HStack(spacing: 2) {
-                    Image(systemName: symbol)
-                    if let text = item.customText, !text.isEmpty {
-                        Text(text)
+                    if symbol.hasPrefix("wi_") {
+                        Image(symbol).resizable().renderingMode(.template).scaledToFit()
+                            .frame(width: 16, height: 16)
+                    } else {
+                        Image(systemName: symbol)
                     }
+                    if let text = item.customText, !text.isEmpty { Text(text) }
                 }
             } else {
                 Text(item.customText ?? "")
@@ -297,7 +307,14 @@ struct ItemView: View {
             item.backgroundColor.swiftUIColor
                 .opacity(item.backgroundOpacity)
 
-            if item.displayType == .image, let filename = item.customImageFilename,
+            if item.displayType == .qrCode, let content = item.qrCodeContent, !content.isEmpty,
+               let qr = UIImage.qrCode(from: content) {
+                Image(uiImage: qr)
+                    .interpolation(.none)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(2)
+            } else if item.displayType == .image, let filename = item.customImageFilename,
                let image = SharedStorage.shared.loadWidgetImage(filename: filename) {
                 Image(uiImage: image)
                     .resizable()
@@ -351,18 +368,20 @@ struct LockScreenItemView: View {
             if item.displayType == .image, let filename = item.customImageFilename,
                let image = SharedStorage.shared.loadWidgetImage(filename: filename) {
                 Image(uiImage: image)
-                    .resizable()
-                    .renderingMode(.original)
-                    .scaledToFit()
+                    .resizable().renderingMode(.original).scaledToFit()
                     .frame(width: 16, height: 16)
-            } else if item.displayType == .icon {
-                if let symbol = item.sfSymbolName {
-                    Image(systemName: symbol)
-                        .font(.system(size: 12))
+            } else if item.displayType == .qrCode, let content = item.qrCodeContent,
+                      let qr = UIImage.qrCode(from: content, size: 32) {
+                Image(uiImage: qr).resizable().scaledToFit().frame(width: 16, height: 16)
+            } else if item.displayType == .icon, let symbol = item.sfSymbolName {
+                if symbol.hasPrefix("wi_") {
+                    Image(symbol).resizable().renderingMode(.template).scaledToFit()
+                        .frame(width: 14, height: 14)
+                } else {
+                    Image(systemName: symbol).font(.system(size: 12))
                 }
             } else {
-                Text(item.customText?.prefix(1) ?? "")
-                    .font(.system(size: 10))
+                Text(item.customText?.prefix(1) ?? "").font(.system(size: 10))
             }
         }
     }

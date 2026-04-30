@@ -70,5 +70,54 @@
 	</array>
 	<key>UIApplicationShortcutItems</key>
 	<array/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>googlegeminiai</string>
+		<string>grok</string>
+		<string>perplexity</string>
+		<string>chatgpt</string>
+		<string>doubao</string>
+		<string>replika</string>
+		<string>whatsapp</string>
+		<string>tg</string>
+		<string>weixin</string>
+		<string>msteams</string>
+		<string>zoomus</string>
+		<string>facetime</string>
+		<string>facetime-audio</string>
+		<string>sms</string>
+		<string>tel</string>
+		<string>comgooglemaps</string>
+		<string>uber</string>
+		<string>grab</string>
+		<string>spotify</string>
+		<string>vnd.youtube</string>
+		<string>taobao</string>
+		<string>alipay</string>
+		<string>alipayqr</string>
+		<string>alipays</string>
+		<string>shopee</string>
+		<string>dbsnow</string>
+		<string>chase</string>
+		<string>citi</string>
+		<string>wallet</string>
+		<string>sg.gov.singpass.app</string>
+		<string>libby</string>
+		<string>shortcuts</string>
+		<string>googletranslate</string>
+		<string>itms-apps</string>
+		<string>shareddocuments</string>
+		<string>googlephotos</string>
+		<string>widgetsmith</string>
+		<string>hiltonhhonors</string>
+		<string>marriott</string>
+		<string>singaporeair</string>
+		<string>concurmobile</string>
+		<string>ms-onedrive</string>
+		<string>ms-officemobile</string>
+		<string>googlehome</string>
+		<string>mihome</string>
+		<string>duolingo</string>
+	</array>
 </dict>
 </plist>

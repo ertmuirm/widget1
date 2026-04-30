@@ -30,17 +30,16 @@ func bundleIDURL(_ bundleID: String, fallback: String? = nil) -> String {
 
 let predefinedGroups: [(category: String, apps: [AppActionGroup])] = [
     ("AI Assistants", [
-        AppActionGroup(category: "AI Assistants", name: "ChatGPT",    openURL: "chatgpt://",        deepLinks: []),
-        AppActionGroup(category: "AI Assistants", name: "Gemini", openURL: bundleIDURL("com.google.GeminiApp", fallback: "googlegeminiai://"), deepLinks: [
+        AppActionGroup(category: "AI Assistants", name: "ChatGPT",    openURL: "chatgpt://",           deepLinks: []),
+        AppActionGroup(category: "AI Assistants", name: "Gemini",     openURL: "googlegeminiai://",    deepLinks: [
             DeepLink(name: "Open Microphone",        urlString: "googlegeminiai://open-mic"),
-            DeepLink(name: "Open in Google App",     urlString: "googleapp://robin"),
         ]),
-        AppActionGroup(category: "AI Assistants", name: "Perplexity", openURL: bundleIDURL("com.perplexity.labs.Perplexity"), deepLinks: [
-            DeepLink(name: "Open App (URL scheme)", urlString: "perplexity://"),
-        ]),
-        AppActionGroup(category: "AI Assistants", name: "Grok", openURL: bundleIDURL("com.xai.grok", fallback: "grok://"), deepLinks: []),
-        AppActionGroup(category: "AI Assistants", name: "Doubao 豆包", openURL: "doubao://",        deepLinks: []),
-        AppActionGroup(category: "AI Assistants", name: "Replika",    openURL: "replika://",       deepLinks: []),
+        AppActionGroup(category: "AI Assistants", name: "Perplexity", openURL: "perplexity://",        deepLinks: []),
+        AppActionGroup(category: "AI Assistants", name: "Grok",       openURL: "grok://",              deepLinks: []),
+        AppActionGroup(category: "AI Assistants", name: "Claude",     openURL: bundleIDURL("com.anthropic.claudeios"), deepLinks: []),
+        AppActionGroup(category: "AI Assistants", name: "Copilot",    openURL: "ms-officemobile://",   deepLinks: []),
+        AppActionGroup(category: "AI Assistants", name: "Doubao 豆包", openURL: "doubao://",            deepLinks: []),
+        AppActionGroup(category: "AI Assistants", name: "Replika",    openURL: "replika://",           deepLinks: []),
     ]),
     ("Communication", [
         AppActionGroup(category: "Communication", name: "WhatsApp", openURL: "whatsapp://", deepLinks: [
@@ -129,13 +128,17 @@ let predefinedGroups: [(category: String, apps: [AppActionGroup])] = [
         AppActionGroup(category: "Shopping & Food", name: "McDonald's", openURL: "mcdonalds://", deepLinks: []),
     ]),
     ("Banking & Finance", [
-        AppActionGroup(category: "Banking & Finance", name: "Chase",             openURL: "chase://",                                       deepLinks: []),
-        AppActionGroup(category: "Banking & Finance", name: "Citibank",          openURL: "citi://",                                        deepLinks: []),
-        AppActionGroup(category: "Banking & Finance", name: "DBS Bank",          openURL: "dbsnow://",                                      deepLinks: []),
-        AppActionGroup(category: "Banking & Finance", name: "Wallet",            openURL: "wallet://",                                      deepLinks: []),
-        AppActionGroup(category: "Banking & Finance", name: "Bank of Singapore", openURL: bundleIDURL("com.bankofsingapore.digital.iphone"), deepLinks: []),
-        AppActionGroup(category: "Banking & Finance", name: "Maribank",          openURL: bundleIDURL("sg.com.maribankmobile.digitalbank"),  deepLinks: []),
-        AppActionGroup(category: "Banking & Finance", name: "Trust Bank",        openURL: bundleIDURL("sg.trust"),                          deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "Chase",             openURL: "chase://",                                           deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "Citibank",          openURL: "citi://",                                            deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "DBS / POSB",        openURL: "dbsnow://",                                          deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "OCBC",              openURL: bundleIDURL("com.ocbcgroup.mobile.apple"),             deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "UOB TMRW",          openURL: bundleIDURL("com.uob.ios.tmrw"),                       deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "Standard Chartered", openURL: bundleIDURL("com.standardchartered.mobile.sg"),       deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "Wallet",            openURL: "wallet://",                                          deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "Bank of Singapore", openURL: bundleIDURL("com.bankofsingapore.digital.iphone"),     deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "Maribank",          openURL: bundleIDURL("sg.com.maribankmobile.digitalbank"),      deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "Trust Bank",        openURL: bundleIDURL("sg.trust"),                              deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "GXS Bank",          openURL: bundleIDURL("sg.gxs.bank"),                           deepLinks: []),
     ]),
     ("Business", [
         AppActionGroup(category: "Business", name: "SAP Concur", openURL: "concurmobile://", deepLinks: [
@@ -191,7 +194,13 @@ let predefinedGroups: [(category: String, apps: [AppActionGroup])] = [
         AppActionGroup(category: "Apple System", name: "Widgetsmith",   openURL: "widgetsmith://",                         deepLinks: []),
     ]),
     ("Government & Identity", [
-        AppActionGroup(category: "Government & Identity", name: "Singpass", openURL: "https://app.singpass.gov.sg", deepLinks: []),
+        AppActionGroup(category: "Government & Identity", name: "Singpass",    openURL: "sg.gov.singpass.app://", deepLinks: [
+            DeepLink(name: "Open (web fallback)", urlString: "https://app.singpass.gov.sg"),
+        ]),
+        AppActionGroup(category: "Government & Identity", name: "SingHealth",  openURL: bundleIDURL("sg.gov.singhealth.myinfo"),    deepLinks: []),
+        AppActionGroup(category: "Government & Identity", name: "HealthHub",   openURL: bundleIDURL("sg.gov.ihis.HealthHub"),       deepLinks: []),
+        AppActionGroup(category: "Government & Identity", name: "CPF Mobile",  openURL: bundleIDURL("sg.gov.cpf.cpfdigitalmobile"), deepLinks: []),
+        AppActionGroup(category: "Government & Identity", name: "MyInfo",      openURL: bundleIDURL("sg.gov.ndi.myinfo"),           deepLinks: []),
     ]),
     ("Utilities", [
         AppActionGroup(category: "Utilities", name: "Safemate",    openURL: bundleIDURL("com.safemate2.yet"),         deepLinks: []),

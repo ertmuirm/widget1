@@ -101,6 +101,27 @@ struct ItemEditorView: View {
                         .foregroundStyle(.red)
                     }
                 }
+            } else if item.displayType == .qrCode {
+                Section("QR Code Content") {
+                    TextField("URL or text to encode", text: Binding(
+                        get: { item.qrCodeContent ?? "" },
+                        set: { item.qrCodeContent = $0.isEmpty ? nil : $0 }
+                    ))
+                    .foregroundStyle(.white)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+
+                    if let content = item.qrCodeContent, !content.isEmpty,
+                       let qr = UIImage.qrCode(from: content, size: 160) {
+                        Image(uiImage: qr)
+                            .interpolation(.none)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 160)
+                            .frame(maxWidth: .infinity)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                    }
+                }
             } else {
                 // Text section
                 Section("Text") {
@@ -118,8 +139,8 @@ struct ItemEditorView: View {
                 }
             }
 
-            // Colors section (not shown for image type)
-            if item.displayType != .image {
+            // Colors section (not shown for image or QR code type)
+            if item.displayType != .image && item.displayType != .qrCode {
                 Section("Colors") {
                     HStack {
                         Text("Foreground")
