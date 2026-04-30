@@ -4,11 +4,11 @@
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.iosmirror</string>
+		<string>group.com.ioswidget</string>
 	</array>
 	<key>keychain-access-groups</key>
 	<array>
-		<string>J3D2F4SMVD.com.iosmirror.shared</string>
+		<string>J3D2F4SMVD.com.ioswidget.shared</string>
 	</array>
 </dict>
 </plist>

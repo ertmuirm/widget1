@@ -72,6 +72,7 @@ struct WidgetEntryView: View {
                     .aspectRatio(1, contentMode: .fit)
             }
         }
+        .padding(-16)
     }
 
     private var mediumGrid: some View {
@@ -82,6 +83,7 @@ struct WidgetEntryView: View {
                     .aspectRatio(1, contentMode: .fit)
             }
         }
+        .padding(-16)
     }
 
     private var largeGrid: some View {
@@ -92,6 +94,7 @@ struct WidgetEntryView: View {
                     .aspectRatio(1, contentMode: .fit)
             }
         }
+        .padding(-16)
     }
 
     private var extraLargeGrid: some View { largeGrid }
@@ -242,9 +245,9 @@ struct WidgetEntryView: View {
             } else if item.displayType == .icon, let symbol = item.sfSymbolName {
                 if symbol.hasPrefix("wi_") {
                     Image(symbol).resizable().renderingMode(.template).scaledToFit()
-                        .frame(width: 24, height: 24)
+                        .frame(width: 36, height: 36)
                 } else {
-                    Image(systemName: symbol).font(.system(size: 20))
+                    Image(systemName: symbol).font(.system(size: 30))
                 }
             } else {
                 Text(item.customText?.prefix(2) ?? "")
@@ -293,14 +296,7 @@ struct ItemView: View {
     let widgetSize: WidgetSize
     let showLabel: Bool
 
-    private var symbolSize: CGFloat {
-        switch widgetSize {
-        case .systemSmall:      return 14
-        case .systemMedium:     return 10
-        case .systemLarge:      return 10
-        case .systemExtraLarge: return 10
-        }
-    }
+    private var symbolSize: CGFloat { 14 }
 
     var body: some View {
         ZStack {
@@ -388,9 +384,9 @@ struct LockScreenItemView: View {
             } else if item.displayType == .icon, let symbol = item.sfSymbolName {
                 if symbol.hasPrefix("wi_") {
                     Image(symbol).resizable().renderingMode(.template).scaledToFit()
-                        .frame(width: 14, height: 14)
+                        .frame(width: 21, height: 21)
                 } else {
-                    Image(systemName: symbol).font(.system(size: 12))
+                    Image(systemName: symbol).font(.system(size: 18))
                 }
             } else {
                 Text(item.customText?.prefix(1) ?? "").font(.system(size: 10))

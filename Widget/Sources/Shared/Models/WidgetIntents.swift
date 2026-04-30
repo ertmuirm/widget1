@@ -34,13 +34,8 @@ func resolveURL(for action: WidgetAction) -> URL? {
     let raw = action.payload.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !raw.isEmpty else { return nil }
     switch action.type {
-    case .urlScheme, .appIntent, .call:
-        var normalized = raw
-        // Migrate old WhatsApp payloads that stored + in phone= param
-        // WhatsApp URL parser treats + as space, causing "invalid call link"
-        if normalized.hasPrefix("whatsapp://") {
-            normalized = normalized.replacingOccurrences(of: "phone=+", with: "phone=")
-        }
+    case .urlScheme, .appIntent:
+        let normalized = raw
         return URL(string: normalized)
             ?? URL(string: normalized.addingPercentEncoding(
                 withAllowedCharacters: .urlFragmentAllowed) ?? normalized)

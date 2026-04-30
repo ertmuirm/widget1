@@ -8,6 +8,8 @@ struct ItemEditorView: View {
     @Environment(\.dismiss) private var dismiss
 
     @Binding var item: WidgetItem
+    /// Pass the widget kind so QR code is only offered for image-widget items.
+    var widgetKind: WidgetKind? = nil
 
     @State private var showSymbolPicker = false
     @State private var showActionPicker = false
@@ -15,14 +17,22 @@ struct ItemEditorView: View {
     @State private var photoPickerItems: [PhotosPickerItem] = []
     @State private var qrScanPickerItems: [PhotosPickerItem] = []
     @State private var showFileImporter = false
+    @State private var showQRFileImporter = false
     @State private var scanError: String?
+
+    private var allowedDisplayTypes: [DisplayType] {
+        if widgetKind == .imageSlideshow {
+            return DisplayType.allCases
+        }
+        return DisplayType.allCases.filter { $0 != .qrCode }
+    }
 
     var body: some View {
         List {
             // Display type section
             Section("Display Type") {
                 Picker("Type", selection: $item.displayType) {
-                    ForEach(DisplayType.allCases, id: \.self) { type in
+                    ForEach(allowedDisplayTypes, id: \.self) { type in
                         Text(type.displayName).tag(type)
                     }
                 }
@@ -114,15 +124,23 @@ struct ItemEditorView: View {
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
 
-                    // Scan QR / barcode from a photo
+                    // Scan QR / barcode from Photos
                     PhotosPicker(selection: $qrScanPickerItems, maxSelectionCount: 1, matching: .images) {
-                        Label("Scan from Image", systemImage: "qrcode.viewfinder")
+                        Label("Scan from Photos", systemImage: "qrcode.viewfinder")
                     }
                     .foregroundStyle(.white)
                     .onChange(of: qrScanPickerItems) { items in
                         if let first = items.first { scanQRFromPhoto(first) }
                         qrScanPickerItems = []
                     }
+
+                    // Scan QR / barcode from Files
+                    Button {
+                        showQRFileImporter = true
+                    } label: {
+                        Label("Scan from Files", systemImage: "folder.badge.questionmark")
+                    }
+                    .foregroundStyle(.white)
 
                     if let err = scanError {
                         Text(err).font(.caption).foregroundStyle(.orange)
@@ -279,53 +297,6 @@ struct ItemEditorView: View {
                         .foregroundStyle(.white)
                         .autocorrectionDisabled()
 
-                    case .call:
-                        // 0 = Phone, 1 = WhatsApp Audio, 2 = WhatsApp Video
-                        let callMethod: Int = {
-                            if action.payload.hasPrefix("whatsapp://videocall") { return 2 }
-                            if action.payload.hasPrefix("whatsapp://call")      { return 1 }
-                            return 0
-                        }()
-                        let rawNumber: String = {
-                            if action.payload.hasPrefix("tel:") {
-                                return String(action.payload.dropFirst(4))
-                            }
-                            // WhatsApp payloads store digits-only; prefix + for display
-                            if action.payload.hasPrefix("whatsapp://call?phone=") {
-                                let d = String(action.payload.dropFirst("whatsapp://call?phone=".count))
-                                    .filter { $0.isNumber }
-                                return d.isEmpty ? "" : "+\(d)"
-                            }
-                            if action.payload.hasPrefix("whatsapp://videocall?phone=") {
-                                let d = String(action.payload.dropFirst("whatsapp://videocall?phone=".count))
-                                    .filter { $0.isNumber }
-                                return d.isEmpty ? "" : "+\(d)"
-                            }
-                            return ""
-                        }()
-
-                        TextField("Phone number (+15551234567)", text: Binding(
-                            get: { rawNumber },
-                            set: { val in
-                                let cleaned = val.filter { $0.isNumber || $0 == "+" }
-                                item.action?.payload = makeCallPayload(number: cleaned, method: callMethod)
-                            }
-                        ))
-                        .foregroundStyle(.white)
-                        .keyboardType(.phonePad)
-
-                        Picker("Call via", selection: Binding(
-                            get: { callMethod },
-                            set: { newMethod in
-                                let cleaned = rawNumber.filter { $0.isNumber || $0 == "+" }
-                                item.action?.payload = makeCallPayload(number: cleaned, method: newMethod)
-                            }
-                        )) {
-                            Text("Phone App").tag(0)
-                            Text("WhatsApp Audio").tag(1)
-                            Text("WhatsApp Video").tag(2)
-                        }
-                        .pickerStyle(.segmented)
                     }
 
                     Button {
@@ -369,25 +340,14 @@ struct ItemEditorView: View {
                 loadImageFile(url)
             }
         }
-    }
-
-    // MARK: - Call payload builder
-
-    /// Builds the stored payload for a .call action.
-    /// Phone: `tel:+NUMBER`
-    /// WhatsApp audio: `whatsapp://call?phone=DIGITS`
-    /// WhatsApp video: `whatsapp://videocall?phone=DIGITS`
-    /// WhatsApp uses digits-only (no + prefix); + in URL query strings is decoded
-    /// as a space by WhatsApp's URL parser, causing "invalid call link".
-    private func makeCallPayload(number: String, method: Int) -> String {
-        let cleaned = number.filter { $0.isNumber || $0 == "+" }
-        let digits = cleaned.filter { $0.isNumber }
-        switch method {
-        case 1:  return "whatsapp://call?phone=\(digits)"
-        case 2:  return "whatsapp://videocall?phone=\(digits)"
-        default:
-            let e164 = cleaned.isEmpty ? "" : (cleaned.hasPrefix("+") ? cleaned : "+\(cleaned)")
-            return "tel:\(e164)"
+        .fileImporter(
+            isPresented: $showQRFileImporter,
+            allowedContentTypes: [.image],
+            allowsMultipleSelection: false
+        ) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                scanQRFromFile(url)
+            }
         }
     }
 
@@ -431,7 +391,7 @@ struct ItemEditorView: View {
         item.customImageFilename = filename
     }
 
-    // MARK: - QR/barcode scan from photo
+    // MARK: - QR/barcode scan
 
     private func scanQRFromPhoto(_ photoItem: PhotosPickerItem) {
         scanError = nil
@@ -441,17 +401,36 @@ struct ItemEditorView: View {
                 DispatchQueue.main.async { self.scanError = "Could not load image." }
                 return
             }
-            let request = VNDetectBarcodesRequest()
-            let handler = VNImageRequestHandler(ciImage: ciImage, options: [:])
-            DispatchQueue.global(qos: .userInitiated).async {
-                try? handler.perform([request])
-                DispatchQueue.main.async {
-                    if let payload = request.results?.first?.payloadStringValue {
-                        self.item.qrCodeContent = payload
-                        self.scanError = nil
-                    } else {
-                        self.scanError = "No QR code or barcode detected in the image."
-                    }
+            performQRScan(on: ciImage)
+        }
+    }
+
+    private func scanQRFromFile(_ url: URL) {
+        scanError = nil
+        guard url.startAccessingSecurityScopedResource() else {
+            scanError = "Could not access file."
+            return
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+        guard let data = try? Data(contentsOf: url),
+              let ciImage = CIImage(data: data) else {
+            scanError = "Could not load image."
+            return
+        }
+        performQRScan(on: ciImage)
+    }
+
+    private func performQRScan(on ciImage: CIImage) {
+        let request = VNDetectBarcodesRequest()
+        let handler = VNImageRequestHandler(ciImage: ciImage, options: [:])
+        DispatchQueue.global(qos: .userInitiated).async {
+            try? handler.perform([request])
+            DispatchQueue.main.async {
+                if let payload = request.results?.first?.payloadStringValue {
+                    self.item.qrCodeContent = payload
+                    self.scanError = nil
+                } else {
+                    self.scanError = "No QR code or barcode detected in the image."
                 }
             }
         }

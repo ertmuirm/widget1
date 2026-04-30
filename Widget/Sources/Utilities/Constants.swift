@@ -4,12 +4,12 @@ import Foundation
 enum Constants {
     // MARK: - App Group
     
-    static let appGroupIdentifier = "group.com.iosmirror"
-    
+    static let appGroupIdentifier = "group.com.ioswidget"
+
     // MARK: - Bundle IDs
-    
-    static let mainBundleID = "com.iosmirror"
-    static let extensionBundleID = "com.iosmirror.broadcast"
+
+    static let mainBundleID = "com.ioswidget"
+    static let extensionBundleID = "com.ioswidget.extension"
     
     // MARK: - Storage Keys
     
@@ -24,13 +24,13 @@ enum Constants {
     }
 
     enum AppGroup {
-        static let rawId = "group.com.iosmirror"
+        static let rawId = "group.com.ioswidget"
         static let teamId = "J3D2F4SMVD"
-        
+
         // Try all possible IDs
         static let allIDs = [
-            "group.com.iosmirror.\(teamId)",
-            "group.\(teamId).com.iosmirror",
+            "group.com.ioswidget.\(teamId)",
+            "group.\(teamId).com.ioswidget",
             rawId
         ]
         

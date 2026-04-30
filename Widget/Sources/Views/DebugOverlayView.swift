@@ -2,13 +2,13 @@ import SwiftUI
 import WidgetKit
 
 enum AppGroup {
-    static let rawId = "group.com.iosmirror"
+    static let rawId = "group.com.ioswidget"
     static let teamId = "J3D2F4SMVD"
     
     static var suiteName: String {
-        let sideStoreId1 = "group.com.iosmirror.\(teamId)"
-        let sideStoreId2 = "group.\(teamId).com.iosmirror"
-        let rawId = "group.com.iosmirror"
+        let sideStoreId1 = "group.com.ioswidget.\(teamId)"
+        let sideStoreId2 = "group.\(teamId).com.ioswidget"
+        let rawId = "group.com.ioswidget"
         
         if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: sideStoreId1) {
             print("✅ Active App Group (SideStore1): \(sideStoreId1)")
@@ -152,9 +152,9 @@ struct DebugOverlayView: View {
     
     private func detectAppGroup() {
         let teamId = "J3D2F4SMVD"
-        let rawId = "group.com.iosmirror"
-        let sideStoreId1 = "group.com.iosmirror.\(teamId)"
-        let sideStoreId2 = "group.\(teamId).com.iosmirror"
+        let rawId = "group.com.ioswidget"
+        let sideStoreId1 = "group.com.ioswidget.\(teamId)"
+        let sideStoreId2 = "group.\(teamId).com.ioswidget"
         
         statusText = "---App Group Detection (UD)---\n"
         

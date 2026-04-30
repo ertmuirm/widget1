@@ -77,7 +77,7 @@ struct WidgetEditorView: View {
         // Grid item editor sheet
         .sheet(item: $editingItemIndex) { sel in
             NavigationStack {
-                ItemEditorView(item: $configuration.items[sel.id])
+                ItemEditorView(item: $configuration.items[sel.id], widgetKind: configuration.widgetKind)
             }
         }
         // Slide position/scale editor sheet
@@ -577,51 +577,6 @@ struct SlideEditorView: View {
                         .foregroundStyle(.white)
                         .autocorrectionDisabled()
 
-                    case .call:
-                        let callMethod: Int = {
-                            if action.payload.hasPrefix("whatsapp://videocall") { return 2 }
-                            if action.payload.hasPrefix("whatsapp://call")      { return 1 }
-                            return 0
-                        }()
-                        let rawNumber: String = {
-                            if action.payload.hasPrefix("tel:") {
-                                return String(action.payload.dropFirst(4))
-                            }
-                            if action.payload.hasPrefix("whatsapp://call?phone=") {
-                                let d = String(action.payload.dropFirst("whatsapp://call?phone=".count))
-                                    .filter { $0.isNumber }
-                                return d.isEmpty ? "" : "+\(d)"
-                            }
-                            if action.payload.hasPrefix("whatsapp://videocall?phone=") {
-                                let d = String(action.payload.dropFirst("whatsapp://videocall?phone=".count))
-                                    .filter { $0.isNumber }
-                                return d.isEmpty ? "" : "+\(d)"
-                            }
-                            return ""
-                        }()
-
-                        TextField("Phone number (+15551234567)", text: Binding(
-                            get: { rawNumber },
-                            set: { val in
-                                let cleaned = val.filter { $0.isNumber || $0 == "+" }
-                                slide.action?.payload = makeSlideCallPayload(number: cleaned, method: callMethod)
-                            }
-                        ))
-                        .foregroundStyle(.white)
-                        .keyboardType(.phonePad)
-
-                        Picker("Call via", selection: Binding(
-                            get: { callMethod },
-                            set: { newMethod in
-                                let cleaned = rawNumber.filter { $0.isNumber || $0 == "+" }
-                                slide.action?.payload = makeSlideCallPayload(number: cleaned, method: newMethod)
-                            }
-                        )) {
-                            Text("Phone App").tag(0)
-                            Text("WhatsApp Audio").tag(1)
-                            Text("WhatsApp Video").tag(2)
-                        }
-                        .pickerStyle(.segmented)
                     }
 
                     Button(role: .destructive) {
@@ -657,17 +612,6 @@ struct SlideEditorView: View {
         }
     }
 
-    private func makeSlideCallPayload(number: String, method: Int) -> String {
-        let cleaned = number.filter { $0.isNumber || $0 == "+" }
-        let digits = cleaned.filter { $0.isNumber }
-        switch method {
-        case 1:  return "whatsapp://call?phone=\(digits)"
-        case 2:  return "whatsapp://videocall?phone=\(digits)"
-        default:
-            let e164 = cleaned.isEmpty ? "" : (cleaned.hasPrefix("+") ? cleaned : "+\(cleaned)")
-            return "tel:\(e164)"
-        }
-    }
 }
 
 // MARK: - Item Row View

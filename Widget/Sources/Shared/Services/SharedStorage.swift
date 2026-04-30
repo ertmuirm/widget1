@@ -9,9 +9,9 @@ import UIKit
 /// Storage priority (write ALL, read in order):
 ///   1. Shared Keychain access group — the ONLY mechanism that genuinely crosses
 ///      the process boundary on SideStore/AltStore free accounts. Both targets
-///      declare `$(AppIdentifierPrefix)com.iosmirror.shared`; SideStore transforms
+///      declare `$(AppIdentifierPrefix)com.ioswidget.shared`; SideStore transforms
 ///      `$(AppIdentifierPrefix)` → `J3D2F4SMVD.` for both, giving both processes
-///      the same `J3D2F4SMVD.com.iosmirror.shared` group.
+///      the same `J3D2F4SMVD.com.ioswidget.shared` group.
 ///   2. App-group UserDefaults (scatter-gather across all three candidate IDs).
 ///   3. App-group container files.
 ///   4. Standard UserDefaults (process-local last resort).
@@ -29,18 +29,18 @@ final class SharedStorage {
 
     /// All app-group candidates, in priority order.
     static let appGroupCandidates: [String] = [
-        "group.com.iosmirror.J3D2F4SMVD",   // SideStore: team ID appended
-        "group.J3D2F4SMVD.com.iosmirror",   // SideStore: team ID prepended
-        "group.com.iosmirror"                // canonical / unsigned
+        "group.com.ioswidget.J3D2F4SMVD",   // SideStore: team ID appended
+        "group.J3D2F4SMVD.com.ioswidget",   // SideStore: team ID prepended
+        "group.com.ioswidget"                // canonical / unsigned
     ]
 
     // MARK: - Keychain shared access group
 
     /// The keychain access group shared between the main app and widget extension.
     ///
-    /// The entitlement hardcodes `J3D2F4SMVD.com.iosmirror.shared` (no variable
+    /// The entitlement hardcodes `J3D2F4SMVD.com.ioswidget.shared` (no variable
     /// expansion needed). SideStore leaves already-prefixed team-ID groups alone.
-    /// We probe at runtime so the fallback (`com.iosmirror.shared`) covers the
+    /// We probe at runtime so the fallback (`com.ioswidget.shared`) covers the
     /// simulator / unsigned builds. `SecTaskCreateFromSelf` is macOS-only, so we
     /// use a harmless SecItemCopyMatching probe instead.
     /// Non-nil only when a test write to the group actually succeeds (errSecSuccess).
@@ -48,13 +48,13 @@ final class SharedStorage {
     /// some iOS versions, so we must probe with a write to get a reliable answer.
     static let sharedKeychainGroup: String? = {
         let candidates = [
-            "J3D2F4SMVD.com.iosmirror.shared",
-            "com.iosmirror.shared"
+            "J3D2F4SMVD.com.ioswidget.shared",
+            "com.ioswidget.shared"
         ]
         for group in candidates {
             var q: [String: Any] = [
                 kSecClass as String:           kSecClassGenericPassword,
-                kSecAttrService as String:     "com.iosmirror.widgetdata",
+                kSecAttrService as String:     "com.ioswidget.widgetdata",
                 kSecAttrAccount as String:     "__writeprobe__",
                 kSecAttrAccessGroup as String: group
             ]
@@ -70,7 +70,7 @@ final class SharedStorage {
         return nil  // nil = keychain sharing unavailable (e.g. SideStore strips the entitlement)
     }()
 
-    private static let keychainService = "com.iosmirror.widgetdata"
+    private static let keychainService = "com.ioswidget.widgetdata"
 
     // MARK: - Init
 

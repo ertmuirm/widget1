@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>com.iosmirror</string>
+	<string>com.ioswidget</string>
 	<key>CFBundleName</key>
 	<string>Widget</string>
 	<key>CFBundleDisplayName</key>
