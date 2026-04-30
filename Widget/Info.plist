@@ -57,6 +57,17 @@
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.iosmirror.openapp</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>openapp</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIApplicationShortcutItems</key>
 	<array/>
 	<key>UIBackgroundModes</key>

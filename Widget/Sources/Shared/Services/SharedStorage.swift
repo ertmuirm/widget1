@@ -392,6 +392,10 @@ final class SharedStorage {
     }
 
     func saveWidgetImage(_ data: Data, filename: String) {
+        // 0. Keychain — ONLY reliable cross-process channel on SideStore.
+        //    keychainWrite silently no-ops when the group is unavailable.
+        keychainWrite(data, forKey: "wi_\(filename)")
+
         // Scatter-write to every accessible app-group container AND Documents so
         // both the main app and the widget extension can load the file regardless
         // of which shared container each process resolves.
@@ -409,8 +413,7 @@ final class SharedStorage {
         try? FileManager.default.createDirectory(at: docDir, withIntermediateDirectories: true)
         try? data.write(to: docDir.appendingPathComponent(filename), options: .atomicWrite)
 
-        // Also persist in app-group UserDefaults — same channel that reliably
-        // crosses the process boundary on SideStore (same mechanism as configs).
+        // Also persist in app-group UserDefaults as additional fallback
         let udKey = "wi_\(filename)"
         for id in Self.appGroupCandidates {
             if let ud = UserDefaults(suiteName: id) {
@@ -422,6 +425,9 @@ final class SharedStorage {
 
     #if canImport(UIKit)
     func loadWidgetImage(filename: String) -> UIImage? {
+        // 0. Keychain — ONLY reliable cross-process channel on SideStore
+        if let data = keychainRead(forKey: "wi_\(filename)"),
+           let image = UIImage(data: data) { return image }
         // 1. App-group container files (fastest path when container resolves)
         for id in Self.appGroupCandidates {
             if let container = FileManager.default.containerURL(
@@ -436,7 +442,7 @@ final class SharedStorage {
             .appendingPathComponent("widget_images")
             .appendingPathComponent(filename)
         if let image = UIImage(contentsOfFile: docURL.path) { return image }
-        // 3. App-group UserDefaults — guaranteed cross-process on SideStore
+        // 3. App-group UserDefaults
         let udKey = "wi_\(filename)"
         for id in Self.appGroupCandidates {
             if let data = UserDefaults(suiteName: id)?.data(forKey: udKey),
@@ -447,6 +453,7 @@ final class SharedStorage {
     #endif
 
     func deleteWidgetImage(filename: String) {
+        keychainDelete(forKey: "wi_\(filename)")
         for id in Self.appGroupCandidates {
             if let container = FileManager.default.containerURL(
                 forSecurityApplicationGroupIdentifier: id) {

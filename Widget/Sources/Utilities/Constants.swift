@@ -134,3 +134,19 @@ extension UserDefaults {
         set { set(newValue, forKey: key) }
     }
 }
+
+// MARK: - UIImage downscaling for widget storage
+
+extension UIImage {
+    /// Returns a copy scaled so the longest edge is at most 1024 px.
+    /// This keeps keychain items well under the ~4 MB limit while
+    /// preserving more than enough resolution for any widget display size.
+    func downsizedForWidget(maxDimension: CGFloat = 1024) -> UIImage {
+        let longest = max(size.width, size.height)
+        guard longest > maxDimension else { return self }
+        let scale = maxDimension / longest
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        return renderer.image { _ in self.draw(in: CGRect(origin: .zero, size: newSize)) }
+    }
+}

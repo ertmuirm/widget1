@@ -372,8 +372,9 @@ struct WidgetEditorView: View {
     }
 
     private func addSlide(imageData: Data) {
-        guard let image = UIImage(data: imageData),
-              let jpeg = image.jpegData(compressionQuality: 0.8) else { return }
+        guard let image = UIImage(data: imageData) else { return }
+        let downsized = image.downsizedForWidget()
+        guard let jpeg = downsized.jpegData(compressionQuality: 0.75) else { return }
         let filename = "\(UUID().uuidString).jpg"
         SharedStorage.shared.saveWidgetImage(jpeg, filename: filename)
         let slide = ImageSlide(filename: filename)
@@ -580,10 +581,14 @@ struct SlideEditorView: View {
                                 return String(action.payload.dropFirst(4))
                             }
                             if action.payload.hasPrefix("whatsapp://call?phone=") {
-                                return String(action.payload.dropFirst("whatsapp://call?phone=".count))
+                                let d = String(action.payload.dropFirst("whatsapp://call?phone=".count))
+                                    .filter { $0.isNumber }
+                                return d.isEmpty ? "" : "+\(d)"
                             }
                             if action.payload.hasPrefix("whatsapp://videocall?phone=") {
-                                return String(action.payload.dropFirst("whatsapp://videocall?phone=".count))
+                                let d = String(action.payload.dropFirst("whatsapp://videocall?phone=".count))
+                                    .filter { $0.isNumber }
+                                return d.isEmpty ? "" : "+\(d)"
                             }
                             return ""
                         }()
@@ -647,11 +652,13 @@ struct SlideEditorView: View {
 
     private func makeSlideCallPayload(number: String, method: Int) -> String {
         let cleaned = number.filter { $0.isNumber || $0 == "+" }
-        let e164 = cleaned.isEmpty ? "" : (cleaned.hasPrefix("+") ? cleaned : "+\(cleaned)")
+        let digits = cleaned.filter { $0.isNumber }
         switch method {
-        case 1:  return "whatsapp://call?phone=\(e164)"
-        case 2:  return "whatsapp://videocall?phone=\(e164)"
-        default: return "tel:\(cleaned)"
+        case 1:  return "whatsapp://call?phone=\(digits)"
+        case 2:  return "whatsapp://videocall?phone=\(digits)"
+        default:
+            let e164 = cleaned.isEmpty ? "" : (cleaned.hasPrefix("+") ? cleaned : "+\(cleaned)")
+            return "tel:\(e164)"
         }
     }
 }

@@ -207,12 +207,16 @@ struct ItemEditorView: View {
                             if action.payload.hasPrefix("tel:") {
                                 return String(action.payload.dropFirst(4))
                             }
-                            // Payloads now stored with leading + (E.164)
+                            // WhatsApp payloads store digits-only; prefix + for display
                             if action.payload.hasPrefix("whatsapp://call?phone=") {
-                                return String(action.payload.dropFirst("whatsapp://call?phone=".count))
+                                let d = String(action.payload.dropFirst("whatsapp://call?phone=".count))
+                                    .filter { $0.isNumber }
+                                return d.isEmpty ? "" : "+\(d)"
                             }
                             if action.payload.hasPrefix("whatsapp://videocall?phone=") {
-                                return String(action.payload.dropFirst("whatsapp://videocall?phone=".count))
+                                let d = String(action.payload.dropFirst("whatsapp://videocall?phone=".count))
+                                    .filter { $0.isNumber }
+                                return d.isEmpty ? "" : "+\(d)"
                             }
                             return ""
                         }()
@@ -287,17 +291,20 @@ struct ItemEditorView: View {
     // MARK: - Call payload builder
 
     /// Builds the stored payload for a .call action.
-    /// Phone: `tel:+NUMBER`  |  WhatsApp audio: `whatsapp://call?phone=NUMBER`
-    ///                          WhatsApp video: `whatsapp://videocall?phone=NUMBER`
-    /// method: 0 = Phone, 1 = WhatsApp Audio, 2 = WhatsApp Video
+    /// Phone: `tel:+NUMBER`
+    /// WhatsApp audio: `whatsapp://call?phone=DIGITS`
+    /// WhatsApp video: `whatsapp://videocall?phone=DIGITS`
+    /// WhatsApp uses digits-only (no + prefix); + in URL query strings is decoded
+    /// as a space by WhatsApp's URL parser, causing "invalid call link".
     private func makeCallPayload(number: String, method: Int) -> String {
         let cleaned = number.filter { $0.isNumber || $0 == "+" }
-        // WhatsApp requires E.164 format with leading +
-        let e164 = cleaned.isEmpty ? "" : (cleaned.hasPrefix("+") ? cleaned : "+\(cleaned)")
+        let digits = cleaned.filter { $0.isNumber }
         switch method {
-        case 1:  return "whatsapp://call?phone=\(e164)"
-        case 2:  return "whatsapp://videocall?phone=\(e164)"
-        default: return "tel:\(cleaned)"
+        case 1:  return "whatsapp://call?phone=\(digits)"
+        case 2:  return "whatsapp://videocall?phone=\(digits)"
+        default:
+            let e164 = cleaned.isEmpty ? "" : (cleaned.hasPrefix("+") ? cleaned : "+\(cleaned)")
+            return "tel:\(e164)"
         }
     }
 
@@ -321,14 +328,15 @@ struct ItemEditorView: View {
 
     private func saveImageData(_ data: Data) {
         guard let image = UIImage(data: data) else { return }
-        // Use PNG for .image display type to preserve alpha transparency
+        let downsized = image.downsizedForWidget()
+        // PNG preserves alpha for .image display type; JPEG for others
         let saveData: Data?
         let ext: String
         if item.displayType == .image {
-            saveData = image.pngData()
+            saveData = downsized.pngData()
             ext = "png"
         } else {
-            saveData = image.jpegData(compressionQuality: 0.8)
+            saveData = downsized.jpegData(compressionQuality: 0.75)
             ext = "jpg"
         }
         guard let saveData else { return }
