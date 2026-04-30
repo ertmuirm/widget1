@@ -7,6 +7,7 @@ struct WidgetListView: View {
     @AppStorage("defaultWidgetSize") private var defaultWidgetSize = WidgetSize.systemMedium.rawValue
     @State private var showAddSheet = false
     @State private var showAddImageSheet = false
+    @State private var showAddLockScreenSheet = false
     @State private var showSettingsSheet = false
 
     var body: some View {
@@ -51,6 +52,11 @@ struct WidgetListView: View {
                     } label: {
                         Label("Image Widget", systemImage: "photo.on.rectangle.angled")
                     }
+                    Button {
+                        showAddLockScreenSheet = true
+                    } label: {
+                        Label("Lock Screen Widget", systemImage: "lock.display")
+                    }
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.title3)
@@ -70,6 +76,17 @@ struct WidgetListView: View {
                 size: .systemSmall,
                 widgetKind: .imageSlideshow,
                 slides: []
+            )
+            NavigationStack {
+                WidgetEditorView(configuration: newConfig, isNew: true)
+            }
+        }
+        .sheet(isPresented: $showAddLockScreenSheet) {
+            let newConfig = WidgetConfig(
+                name: "Lock Screen Widget",
+                size: .systemSmall,
+                items: [WidgetItem()],
+                widgetKind: .lockScreen
             )
             NavigationStack {
                 WidgetEditorView(configuration: newConfig, isNew: true)
@@ -119,7 +136,7 @@ struct WidgetRowView: View {
                     .font(.headline)
                     .foregroundStyle(.white)
 
-                Text(configuration.size.displayName)
+                Text(configuration.widgetKind?.displayName ?? configuration.size.displayName)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 

@@ -36,8 +36,8 @@ func resolveItemURL(_ item: WidgetItem) -> URL? {
     let raw = action.payload.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !raw.isEmpty else { return nil }
     switch action.type {
-    case .urlScheme, .appIntent:
-        // .appIntent stores a URL scheme selected from the predefined list
+    case .urlScheme, .appIntent, .call:
+        // .appIntent and .call both store a fully-formed URL in payload
         return URL(string: raw)
             ?? URL(string: raw.addingPercentEncoding(
                 withAllowedCharacters: .urlFragmentAllowed) ?? raw)
@@ -313,12 +313,16 @@ struct LockWidgetQuery: EntityQuery {
         }
     }
     func suggestedEntities() async throws -> [LockWidgetEntity] {
-        let list = allConfigs()
+        // Prefer dedicated lock-screen configs; fall back to all configs
+        var list = allConfigs().filter { $0.widgetKind == .lockScreen }
+        if list.isEmpty { list = allConfigs() }
         if list.isEmpty { return [LockWidgetEntity(id: "none", name: "No Widgets")] }
         return list.map { LockWidgetEntity(id: encodeEntityID($0), name: $0.name) }
     }
     func defaultResult() async -> LockWidgetEntity? {
-        allConfigs().first.map { LockWidgetEntity(id: encodeEntityID($0), name: $0.name) }
+        let ls = allConfigs().filter { $0.widgetKind == .lockScreen }
+        let pick = ls.first ?? allConfigs().first
+        return pick.map { LockWidgetEntity(id: encodeEntityID($0), name: $0.name) }
     }
 }
 

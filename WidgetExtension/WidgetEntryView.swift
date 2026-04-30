@@ -188,8 +188,8 @@ struct WidgetEntryView: View {
                let image = SharedStorage.shared.loadWidgetImage(filename: filename) {
                 Image(uiImage: image)
                     .resizable()
-                    .scaledToFill()
-                    .clipShape(Circle())
+                    .renderingMode(.original)
+                    .scaledToFit()
             } else if item.displayType == .icon, let symbol = item.sfSymbolName {
                 Image(systemName: symbol)
                     .font(.system(size: 20))

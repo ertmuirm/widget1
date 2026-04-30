@@ -17,7 +17,7 @@ struct WidgetApp: App {
                 showingBlackScreen = true
                 // Yield to let the black screen render before activating the target app
                 Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(80))
+                    try? await Task.sleep(for: .milliseconds(30))
                     if url.scheme == "openapp" {
                         // Bundle-ID launch: openapp://launch?bundle=com.example.app
                         if let bundleID = URLComponents(url: url, resolvingAgainstBaseURL: false)?

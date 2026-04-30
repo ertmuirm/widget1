@@ -28,10 +28,14 @@ func bundleIDURL(_ bundleID: String) -> String {
 
 let predefinedGroups: [(category: String, apps: [AppActionGroup])] = [
     ("AI Assistants", [
-        AppActionGroup(category: "AI Assistants", name: "Doubao 豆包", openURL: "doubao://",          deepLinks: []),
-        AppActionGroup(category: "AI Assistants", name: "Gemini",      openURL: "googlegeminiai://", deepLinks: []),
-        AppActionGroup(category: "AI Assistants", name: "Grok",        openURL: "grok://",           deepLinks: []),
-        AppActionGroup(category: "AI Assistants", name: "Replika",     openURL: "replika://",        deepLinks: []),
+        AppActionGroup(category: "AI Assistants", name: "Doubao 豆包",  openURL: "doubao://",           deepLinks: []),
+        AppActionGroup(category: "AI Assistants", name: "Gemini",       openURL: "googlegeminiai://",   deepLinks: [
+            DeepLink(name: "Open Microphone", urlString: "googlegeminiai://open-mic"),
+        ]),
+        AppActionGroup(category: "AI Assistants", name: "Grok",         openURL: "grok://",             deepLinks: []),
+        AppActionGroup(category: "AI Assistants", name: "ChatGPT",      openURL: "chatgpt://",          deepLinks: []),
+        AppActionGroup(category: "AI Assistants", name: "Perplexity",   openURL: "perplexity://",       deepLinks: []),
+        AppActionGroup(category: "AI Assistants", name: "Replika",      openURL: "replika://",          deepLinks: []),
     ]),
     ("Communication", [
         AppActionGroup(category: "Communication", name: "WeChat",          openURL: "weixin://",                        deepLinks: [
@@ -43,13 +47,14 @@ let predefinedGroups: [(category: String, apps: [AppActionGroup])] = [
         AppActionGroup(category: "Communication", name: "Microsoft Teams", openURL: "msteams://",                       deepLinks: []),
         AppActionGroup(category: "Communication", name: "Zoom",            openURL: "zoomus://",                        deepLinks: []),
         AppActionGroup(category: "Communication", name: "Google Voice",    openURL: "googlevoice://",                   deepLinks: []),
-        AppActionGroup(category: "Communication", name: "Messages",        openURL: "sms:",                             deepLinks: []),
+        AppActionGroup(category: "Communication", name: "Messages",        openURL: bundleIDURL("com.apple.MobileSMS"), deepLinks: []),
     ]),
     ("Phone & Contacts", [
         AppActionGroup(category: "Phone & Contacts", name: "Phone",    openURL: "mobilephone-keypad://", deepLinks: [
             DeepLink(name: "Recents", urlString: "mobilephone-recents://"),
         ]),
-        AppActionGroup(category: "Phone & Contacts", name: "Contacts", openURL: "contacts://", deepLinks: []),
+        AppActionGroup(category: "Phone & Contacts", name: "Contacts", openURL: bundleIDURL("com.apple.MobileAddressBook"), deepLinks: []),
+        AppActionGroup(category: "Phone & Contacts", name: "FaceTime", openURL: "facetime://",           deepLinks: []),
     ]),
     ("Navigation & Transport", [
         AppActionGroup(category: "Navigation & Transport", name: "Google Maps",        openURL: "comgooglemaps://",   deepLinks: [
@@ -76,14 +81,14 @@ let predefinedGroups: [(category: String, apps: [AppActionGroup])] = [
         AppActionGroup(category: "Shopping & Food", name: "McDonald's",  openURL: "mcdonalds://", deepLinks: []),
     ]),
     ("Banking & Finance", [
-        AppActionGroup(category: "Banking & Finance", name: "Chase",            openURL: "chase://",                                                   deepLinks: []),
-        AppActionGroup(category: "Banking & Finance", name: "Citibank",         openURL: "citi://",                                                    deepLinks: []),
-        AppActionGroup(category: "Banking & Finance", name: "DBS Bank",         openURL: "dbsnow://",                                                  deepLinks: []),
-        AppActionGroup(category: "Banking & Finance", name: "Alipay",           openURL: "alipay://",                                                  deepLinks: []),
-        AppActionGroup(category: "Banking & Finance", name: "Wallet",           openURL: "wallet://",                                                  deepLinks: []),
-        AppActionGroup(category: "Banking & Finance", name: "Bank of Singapore",openURL: bundleIDURL("com.bankofsingapore.digital.iphone"),             deepLinks: []),
-        AppActionGroup(category: "Banking & Finance", name: "Maribank",         openURL: bundleIDURL("sg.com.maribankmobile.digitalbank"),              deepLinks: []),
-        AppActionGroup(category: "Banking & Finance", name: "Trust Bank",       openURL: bundleIDURL("sg.trust"),                                      deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "Chase",             openURL: "chase://",                                                   deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "Citibank",          openURL: "citi://",                                                    deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "DBS Bank",          openURL: "dbsnow://",                                                  deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "Alipay",            openURL: "alipay://",                                                  deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "Wallet",            openURL: "wallet://",                                                  deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "Bank of Singapore", openURL: bundleIDURL("com.bankofsingapore.digital.iphone"),             deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "Maribank",          openURL: bundleIDURL("sg.com.maribankmobile.digitalbank"),              deepLinks: []),
+        AppActionGroup(category: "Banking & Finance", name: "Trust Bank",        openURL: bundleIDURL("sg.trust"),                                      deepLinks: []),
     ]),
     ("Business", [
         AppActionGroup(category: "Business", name: "SAP Concur",     openURL: "concurmobile://",                                      deepLinks: [
@@ -93,9 +98,9 @@ let predefinedGroups: [(category: String, apps: [AppActionGroup])] = [
         AppActionGroup(category: "Business", name: "OneDrive",        openURL: "ms-onedrive://",                                      deepLinks: []),
     ]),
     ("Travel & Hotels", [
-        AppActionGroup(category: "Travel & Hotels", name: "Singapore Airlines", openURL: "singaporeair://",    deepLinks: []),
-        AppActionGroup(category: "Travel & Hotels", name: "Hilton Honors",      openURL: "hiltonhhonors://",   deepLinks: []),
-        AppActionGroup(category: "Travel & Hotels", name: "Marriott Bonvoy",    openURL: "marriott://",        deepLinks: []),
+        AppActionGroup(category: "Travel & Hotels", name: "Singapore Airlines", openURL: "singaporeair://",  deepLinks: []),
+        AppActionGroup(category: "Travel & Hotels", name: "Hilton Honors",      openURL: "hiltonhhonors://", deepLinks: []),
+        AppActionGroup(category: "Travel & Hotels", name: "Marriott Bonvoy",    openURL: "marriott://",      deepLinks: []),
     ]),
     ("Productivity & Learning", [
         AppActionGroup(category: "Productivity & Learning", name: "Google Translate", openURL: "googletranslate://", deepLinks: []),
@@ -113,26 +118,26 @@ let predefinedGroups: [(category: String, apps: [AppActionGroup])] = [
         AppActionGroup(category: "Smart Home", name: "MiHome",      openURL: "mihome://",     deepLinks: []),
     ]),
     ("Apple System", [
-        AppActionGroup(category: "Apple System", name: "App Store",     openURL: "itms-apps://",      deepLinks: [
+        AppActionGroup(category: "Apple System", name: "App Store",     openURL: "itms-apps://",                            deepLinks: [
             DeepLink(name: "Today Tab", urlString: "itms-apps://?action=today"),
             DeepLink(name: "Search",    urlString: "itms-apps://?action=search&term="),
         ]),
-        AppActionGroup(category: "Apple System", name: "Photos",        openURL: "photos://",         deepLinks: []),
-        AppActionGroup(category: "Apple System", name: "Calculator",    openURL: "calc://",           deepLinks: []),
-        AppActionGroup(category: "Apple System", name: "Files",         openURL: "shareddocuments://",deepLinks: []),
-        AppActionGroup(category: "Apple System", name: "Stocks",        openURL: "stocks://",         deepLinks: []),
-        AppActionGroup(category: "Apple System", name: "Google Photos", openURL: "googlephotos://",   deepLinks: []),
-        AppActionGroup(category: "Apple System", name: "Widgetsmith",   openURL: "widgetsmith://",    deepLinks: []),
+        AppActionGroup(category: "Apple System", name: "Photos",        openURL: bundleIDURL("com.apple.mobileslideshow"),  deepLinks: []),
+        AppActionGroup(category: "Apple System", name: "Calculator",    openURL: bundleIDURL("com.apple.calculator"),       deepLinks: []),
+        AppActionGroup(category: "Apple System", name: "Files",         openURL: "shareddocuments://",                      deepLinks: []),
+        AppActionGroup(category: "Apple System", name: "Stocks",        openURL: bundleIDURL("com.apple.stocks"),           deepLinks: []),
+        AppActionGroup(category: "Apple System", name: "Google Photos", openURL: "googlephotos://",                         deepLinks: []),
+        AppActionGroup(category: "Apple System", name: "Widgetsmith",   openURL: "widgetsmith://",                          deepLinks: []),
     ]),
     ("Government & Identity", [
         AppActionGroup(category: "Government & Identity", name: "Singpass", openURL: "https://app.singpass.gov.sg", deepLinks: []),
     ]),
     ("Utilities", [
-        AppActionGroup(category: "Utilities", name: "Safemate",    openURL: bundleIDURL("com.safemate2.yet"),                  deepLinks: []),
-        AppActionGroup(category: "Utilities", name: "HeyCyan",     openURL: bundleIDURL("com.heycyan.app"),                    deepLinks: []),
-        AppActionGroup(category: "Utilities", name: "iCondo",      openURL: bundleIDURL("com.project.icondo"),                 deepLinks: []),
-        AppActionGroup(category: "Utilities", name: "M1 (My M1+)", openURL: bundleIDURL("sg.com.m1.sunshine"),                 deepLinks: []),
-        AppActionGroup(category: "Utilities", name: "HDFlix",      openURL: bundleIDURL("com.box.hd.flix.drama.hub"),          deepLinks: []),
+        AppActionGroup(category: "Utilities", name: "Safemate",    openURL: bundleIDURL("com.safemate2.yet"),         deepLinks: []),
+        AppActionGroup(category: "Utilities", name: "HeyCyan",     openURL: bundleIDURL("com.heycyan.app"),           deepLinks: []),
+        AppActionGroup(category: "Utilities", name: "iCondo",      openURL: bundleIDURL("com.project.icondo"),        deepLinks: []),
+        AppActionGroup(category: "Utilities", name: "M1 (My M1+)", openURL: bundleIDURL("sg.com.m1.sunshine"),        deepLinks: []),
+        AppActionGroup(category: "Utilities", name: "HDFlix",      openURL: bundleIDURL("com.box.hd.flix.drama.hub"), deepLinks: []),
     ]),
 ]
 
@@ -143,6 +148,9 @@ class InstalledAppsManager: ObservableObject {
 
     @Published var scannedApps: [AppActionGroup] = []
     @Published var isScanning = false
+    @Published var hasCompletedScan = false
+    @Published var installedBundleIDs: Set<String> = []
+    @Published var installedURLSchemes: Set<String> = []
 
     private let predefinedBundleIDs: Set<String> = {
         var ids = Set<String>()
@@ -162,27 +170,67 @@ class InstalledAppsManager: ObservableObject {
         guard !isScanning else { return }
         isScanning = true
         DispatchQueue.global(qos: .userInitiated).async {
-            let apps = self.fetchUserApps()
+            let (apps, bundleIDs, urlSchemes) = self.fetchUserApps()
             DispatchQueue.main.async {
                 self.scannedApps = apps
+                self.installedBundleIDs = bundleIDs
+                self.installedURLSchemes = urlSchemes
+                self.hasCompletedScan = true
                 self.isScanning = false
             }
         }
     }
 
-    private func fetchUserApps() -> [AppActionGroup] {
+    /// Returns true if the predefined app appears to be installed on the device.
+    /// When the scan hasn't completed, defaults to true (show all).
+    func isInstalled(_ app: AppActionGroup) -> Bool {
+        guard hasCompletedScan else { return true }
+
+        let url = app.openURL
+
+        // Bundle-ID based launch
+        if url.hasPrefix("openapp://launch?bundle="),
+           let comps = URLComponents(string: url),
+           let bundleID = comps.queryItems?.first(where: { $0.name == "bundle" })?.value {
+            return installedBundleIDs.contains(bundleID)
+        }
+
+        // HTTP/HTTPS deep links — assume installed (can't reliably check)
+        if url.hasPrefix("http://") || url.hasPrefix("https://") { return true }
+
+        // URL-scheme based check
+        if let scheme = URL(string: url)?.scheme {
+            return installedURLSchemes.contains(scheme)
+        }
+        return true
+    }
+
+    private func fetchUserApps() -> ([AppActionGroup], Set<String>, Set<String>) {
         guard
             let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
             let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject,
             let raw = ws.perform(NSSelectorFromString("allApplications"))?.takeUnretainedValue(),
             let nsArray = raw as? NSArray
-        else { return [] }
+        else { return ([], [], []) }
 
         var result: [AppActionGroup] = []
+        var bundleIDs = Set<String>()
+        var urlSchemes = Set<String>()
+
         for proxy in nsArray {
             let p = proxy as AnyObject
+            guard let bundleID = p.value(forKey: "applicationIdentifier") as? String else { continue }
+
+            // Collect ALL bundle IDs (system + user) for the installed filter
+            bundleIDs.insert(bundleID)
+
+            // Collect registered URL schemes for the installed filter
+            if let schemes = p.value(forKey: "registeredURLSchemes") as? [String] {
+                for scheme in schemes { urlSchemes.insert(scheme.lowercased()) }
+            }
+
+            // Only add user-installed apps to the scanned list
             guard
-                let bundleID = p.value(forKey: "applicationIdentifier") as? String,
                 let name = p.value(forKey: "localizedName") as? String,
                 (p.value(forKey: "applicationType") as? String) == "User",
                 !name.isEmpty,
@@ -196,7 +244,8 @@ class InstalledAppsManager: ObservableObject {
                 deepLinks: []
             ))
         }
-        return result.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        let sorted = result.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        return (sorted, bundleIDs, urlSchemes)
     }
 }
 
@@ -209,9 +258,14 @@ struct AppActionPickerView: View {
     @State private var searchText = ""
 
     private var filteredPredefined: [(category: String, apps: [AppActionGroup])] {
-        guard !searchText.isEmpty else { return predefinedGroups }
+        // Filter out uninstalled apps (no-op until scan completes)
+        let installed = predefinedGroups.compactMap { cat -> (category: String, apps: [AppActionGroup])? in
+            let apps = cat.apps.filter { appsManager.isInstalled($0) }
+            return apps.isEmpty ? nil : (cat.category, apps)
+        }
+        guard !searchText.isEmpty else { return installed }
         let q = searchText.lowercased()
-        return predefinedGroups.compactMap { cat in
+        return installed.compactMap { cat in
             let filtered = cat.apps.filter {
                 $0.name.lowercased().contains(q) ||
                 $0.deepLinks.contains { $0.name.lowercased().contains(q) }
@@ -307,13 +361,14 @@ struct AppActionRow: View {
                         Image(systemName: expanded ? "chevron.down" : "chevron.right")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
-                            .frame(width: 32, height: 32)
+                            .frame(width: 32, alignment: .center)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.vertical, 4)
+            // Consistent row height: same padding regardless of whether chevron is present
+            .frame(minHeight: 44)
 
             if expanded {
                 VStack(alignment: .leading, spacing: 0) {

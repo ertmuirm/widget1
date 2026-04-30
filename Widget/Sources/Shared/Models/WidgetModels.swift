@@ -64,11 +64,13 @@ enum DisplayType: String, Codable, CaseIterable {
 enum WidgetKind: String, Codable {
     case grid
     case imageSlideshow
+    case lockScreen
 
     var displayName: String {
         switch self {
         case .grid:            return "Grid"
         case .imageSlideshow:  return "Image Slideshow"
+        case .lockScreen:      return "Lock Screen"
         }
     }
 }
@@ -243,12 +245,14 @@ enum ActionType: String, Codable, CaseIterable {
     case urlScheme
     case appIntent
     case shortcut
+    case call
 
     var displayName: String {
         switch self {
         case .urlScheme:  return "URL Scheme"
         case .appIntent:  return "App Action"
         case .shortcut:   return "Shortcut"
+        case .call:       return "Phone / WhatsApp Call"
         }
     }
 
@@ -257,6 +261,7 @@ enum ActionType: String, Codable, CaseIterable {
         case .urlScheme:  return "Enter a custom URL or deep link"
         case .appIntent:  return "Pick from a list of supported apps"
         case .shortcut:   return "Run a named Shortcut"
+        case .call:       return "Call a phone number via Phone app or WhatsApp"
         }
     }
 }

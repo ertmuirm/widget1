@@ -19,6 +19,7 @@ struct WidgetEditorView: View {
     @State private var showFileImporter = false
 
     private var isImageWidget: Bool { configuration.widgetKind == .imageSlideshow }
+    private var isLockScreenWidget: Bool { configuration.widgetKind == .lockScreen }
 
     var body: some View {
         List {
@@ -27,7 +28,7 @@ struct WidgetEditorView: View {
                     .foregroundStyle(.white)
             }
 
-            if !isImageWidget {
+            if !isImageWidget && !isLockScreenWidget {
                 Section("Widget Size") {
                     Picker("Size", selection: $configuration.size) {
                         ForEach(WidgetSize.homeScreenCases, id: \.self) { size in
@@ -40,19 +41,23 @@ struct WidgetEditorView: View {
 
             if isImageWidget {
                 slidesSection
+            } else if isLockScreenWidget {
+                lockScreenItemSection
             } else {
                 gridItemsSection
                 backgroundSection
             }
 
-            Section("Preview") {
-                if isImageWidget {
-                    imageSlideshowPreview
-                } else {
-                    WidgetPreviewView(configuration: configuration, size: CGSize(width: 300, height: 300))
-                        .frame(height: 300)
-                        .frame(maxWidth: .infinity)
-                        .listRowInsets(EdgeInsets())
+            if !isLockScreenWidget {
+                Section("Preview") {
+                    if isImageWidget {
+                        imageSlideshowPreview
+                    } else {
+                        WidgetPreviewView(configuration: configuration, size: CGSize(width: 300, height: 300))
+                            .frame(height: 300)
+                            .frame(maxWidth: .infinity)
+                            .listRowInsets(EdgeInsets())
+                    }
                 }
             }
         }
@@ -142,6 +147,38 @@ struct WidgetEditorView: View {
     // MARK: - Grid items section
 
     @ViewBuilder
+    // MARK: - Lock screen single-item section
+
+    @ViewBuilder
+    private var lockScreenItemSection: some View {
+        Section {
+            Text("Lock screen widgets show one icon or image in the circular slot. Tap the item below to configure it.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+
+        if let item = configuration.items.first {
+            Section("Icon / Image") {
+                Button {
+                    if configuration.items.isEmpty { configuration.items.append(WidgetItem()) }
+                    editingItemIndex = EditingItemIndex(id: 0)
+                } label: {
+                    ItemRowView(item: item)
+                }
+            }
+        } else {
+            Section {
+                Button {
+                    configuration.items.append(WidgetItem())
+                    editingItemIndex = EditingItemIndex(id: 0)
+                } label: {
+                    Label("Configure Icon", systemImage: "plus")
+                }
+                .foregroundStyle(.gray)
+            }
+        }
+    }
+
     private var gridItemsSection: some View {
         Section("Items (\(configuration.items.count)/\(configuration.maxItems))") {
             if configuration.items.isEmpty {

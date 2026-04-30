@@ -195,6 +195,50 @@ struct ItemEditorView: View {
                         ))
                         .foregroundStyle(.white)
                         .autocorrectionDisabled()
+
+                    case .call:
+                        let isWA = action.payload.hasPrefix("https://wa.me/")
+                        let rawNumber: String = {
+                            if action.payload.hasPrefix("tel:") {
+                                return String(action.payload.dropFirst(4))
+                            } else if action.payload.hasPrefix("https://wa.me/") {
+                                let n = String(action.payload.dropFirst("https://wa.me/".count))
+                                return n.isEmpty ? "" : "+\(n)"
+                            }
+                            return ""
+                        }()
+
+                        TextField("Phone number (e.g. +15551234567)", text: Binding(
+                            get: { rawNumber },
+                            set: { val in
+                                let cleaned = val.filter { $0.isNumber || $0 == "+" }
+                                if isWA {
+                                    let digits = cleaned.hasPrefix("+") ? String(cleaned.dropFirst()) : cleaned
+                                    item.action?.payload = "https://wa.me/\(digits)"
+                                } else {
+                                    item.action?.payload = "tel:\(cleaned)"
+                                }
+                            }
+                        ))
+                        .foregroundStyle(.white)
+                        .keyboardType(.phonePad)
+
+                        Picker("Call via", selection: Binding(
+                            get: { isWA },
+                            set: { useWA in
+                                let cleaned = rawNumber.filter { $0.isNumber || $0 == "+" }
+                                if useWA {
+                                    let digits = cleaned.hasPrefix("+") ? String(cleaned.dropFirst()) : cleaned
+                                    item.action?.payload = "https://wa.me/\(digits)"
+                                } else {
+                                    item.action?.payload = "tel:\(cleaned)"
+                                }
+                            }
+                        )) {
+                            Text("Phone App").tag(false)
+                            Text("WhatsApp").tag(true)
+                        }
+                        .pickerStyle(.segmented)
                     }
 
                     Button {
@@ -259,14 +303,23 @@ struct ItemEditorView: View {
     }
 
     private func saveImageData(_ data: Data) {
-        guard let image = UIImage(data: data),
-              let jpeg = image.jpegData(compressionQuality: 0.8) else { return }
-        // Delete old image if replacing
+        guard let image = UIImage(data: data) else { return }
+        // Use PNG for .image display type to preserve alpha transparency
+        let saveData: Data?
+        let ext: String
+        if item.displayType == .image {
+            saveData = image.pngData()
+            ext = "png"
+        } else {
+            saveData = image.jpegData(compressionQuality: 0.8)
+            ext = "jpg"
+        }
+        guard let saveData else { return }
         if let old = item.customImageFilename {
             SharedStorage.shared.deleteWidgetImage(filename: old)
         }
-        let filename = "\(UUID().uuidString).jpg"
-        SharedStorage.shared.saveWidgetImage(jpeg, filename: filename)
+        let filename = "\(UUID().uuidString).\(ext)"
+        SharedStorage.shared.saveWidgetImage(saveData, filename: filename)
         item.customImageFilename = filename
     }
 }
