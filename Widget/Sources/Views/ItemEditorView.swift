@@ -16,9 +16,10 @@ struct ItemEditorView: View {
     @State private var showAppActionPicker = false
     @State private var photoPickerItems: [PhotosPickerItem] = []
     @State private var qrScanPickerItems: [PhotosPickerItem] = []
-    @State private var showFileImporter = false
-    @State private var showQRFileImporter = false
+    @State private var fileImporterPurpose: FileImporterPurpose? = nil
     @State private var scanError: String?
+
+    private enum FileImporterPurpose { case loadImage, scanQR }
 
     private var allowedDisplayTypes: [DisplayType] {
         if widgetKind == .imageSlideshow {
@@ -95,7 +96,7 @@ struct ItemEditorView: View {
                     }
 
                     Button {
-                        showFileImporter = true
+                        fileImporterPurpose = .loadImage
                     } label: {
                         Label(item.customImageFilename == nil ? "Import from Files" : "Replace from Files",
                               systemImage: "folder")
@@ -136,7 +137,7 @@ struct ItemEditorView: View {
 
                     // Scan QR / barcode from Files
                     Button {
-                        showQRFileImporter = true
+                        fileImporterPurpose = .scanQR
                     } label: {
                         Label("Scan from Files", systemImage: "folder.badge.questionmark")
                     }
@@ -332,21 +333,18 @@ struct ItemEditorView: View {
             }
         }
         .fileImporter(
-            isPresented: $showFileImporter,
+            isPresented: Binding(
+                get: { fileImporterPurpose != nil },
+                set: { if !$0 { fileImporterPurpose = nil } }
+            ),
             allowedContentTypes: [.image],
             allowsMultipleSelection: false
         ) { result in
+            let purpose = fileImporterPurpose
+            fileImporterPurpose = nil
             if case .success(let urls) = result, let url = urls.first {
-                loadImageFile(url)
-            }
-        }
-        .fileImporter(
-            isPresented: $showQRFileImporter,
-            allowedContentTypes: [.image],
-            allowsMultipleSelection: false
-        ) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                scanQRFromFile(url)
+                if purpose == .loadImage { loadImageFile(url) }
+                else if purpose == .scanQR { scanQRFromFile(url) }
             }
         }
     }
