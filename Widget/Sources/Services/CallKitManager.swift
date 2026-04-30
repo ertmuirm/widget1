@@ -18,8 +18,7 @@ final class CallKitManager: NSObject {
     private let provider: CXProvider
 
     private override init() {
-        let config = CXProviderConfiguration()
-        config.localizedName = "Widget"
+        let config = CXProviderConfiguration(localizedName: "Widget")
         config.supportsVideo = false
         config.maximumCallsPerCallGroup = 1
         config.supportedHandleTypes = [.phoneNumber]
