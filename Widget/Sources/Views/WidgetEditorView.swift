@@ -146,7 +146,6 @@ struct WidgetEditorView: View {
 
     // MARK: - Grid items section
 
-    @ViewBuilder
     // MARK: - Lock screen single-item section
 
     @ViewBuilder

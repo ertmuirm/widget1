@@ -25,7 +25,7 @@ struct WidgetApp: App {
                             openAppByBundleID(bundleID)
                         }
                     } else {
-                        UIApplication.shared.open(url)
+                        await UIApplication.shared.open(url)
                     }
                 }
             }

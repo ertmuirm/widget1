@@ -15,7 +15,7 @@ final class ActionExecutionService {
     @MainActor
     func execute(action: WidgetAction) async throws -> ActionResult {
         switch action.type {
-        case .urlScheme:
+        case .urlScheme, .call:
             return await executeURLScheme(action.payload)
         case .appIntent:
             return await executeAppIntent(action.payload)
