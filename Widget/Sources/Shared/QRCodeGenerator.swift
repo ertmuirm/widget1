@@ -13,19 +13,29 @@ extension UIImage {
         let scale = size / raw.extent.width
         let scaled = raw.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
 
-        // CIQRCodeGenerator emits a grayscale CIImage. All downstream paths that
-        // produce a CGImage in the native grayscale color space result in an
-        // all-white square when WidgetKit composites the image — it silently drops
-        // the dark modules. Requesting RGBA8 + DeviceRGB from createCGImage forces
-        // the color-space conversion inside CIContext so the output CGImage is
-        // unambiguously RGBA and renders correctly in the widget extension.
-        let rgbSpace = CGColorSpaceCreateDeviceRGB()
-        let ctx = CIContext(options: [.workingColorSpace: rgbSpace as Any,
-                                      .outputColorSpace: rgbSpace as Any])
+        // CIQRCodeGenerator emits a single-channel linearGray CIImage.
+        //
+        // Two separate bugs cause all-white output in WidgetKit:
+        //
+        // Bug 1 — grayscale→white conversion: every standard UIImage/CGImage path
+        // preserves the grayscale color space, which WidgetKit's renderer discards.
+        // Fix: pass NSNull() for BOTH kCIContextWorkingColorSpace and
+        // kCIContextOutputColorSpace so Core Image skips color management entirely
+        // and treats pixels as raw values. Then explicitly request RGBA8 output in
+        // DeviceRGB from createCGImage — the result is an unambiguous 4-channel image.
+        //
+        // Bug 2 — iOS 18 Tinted Widget Mode: the Image view must carry
+        // .widgetAccentedRenderingMode(.fullColor) (added at the call sites in
+        // WidgetEntryView) so the system doesn't replace the image with a solid tint.
+        let ctx = CIContext(options: [
+            .workingColorSpace: NSNull(),
+            .outputColorSpace:  NSNull()
+        ])
         guard let cg = ctx.createCGImage(scaled,
                                          from: scaled.extent,
                                          format: .RGBA8,
-                                         colorSpace: rgbSpace) else { return nil }
+                                         colorSpace: CGColorSpaceCreateDeviceRGB()
+        ) else { return nil }
         return UIImage(cgImage: cg)
     }
 }

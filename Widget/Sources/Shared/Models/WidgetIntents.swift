@@ -162,6 +162,25 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     }
     if let v = slideOverride { finalConfig.currentSlideIndex = v }
 
+    // Only keep imageData for the ACTIVE slide. loadConfigurations() eagerly loads
+    // every slide's image; holding them all decoded simultaneously easily blows the
+    // 30 MB WidgetKit process memory limit and causes a silent blank-widget kill.
+    if var slides = finalConfig.slides, !slides.isEmpty {
+        let activeIdx = min(finalConfig.currentSlideIndex ?? 0, slides.count - 1)
+        for j in slides.indices {
+            if j == activeIdx {
+                // Ensure the active slide has data (may be nil when config was loaded
+                // from the stripped JSON path where saveConfigurations omits imageData).
+                if slides[j].imageData == nil, !slides[j].filename.isEmpty {
+                    slides[j].imageData = storage.loadWidgetImageData(filename: slides[j].filename)
+                }
+            } else {
+                slides[j].imageData = nil
+            }
+        }
+        finalConfig.slides = slides
+    }
+
     let showLabels = finalConfig.showItemLabels ?? storage.showItemLabels
     return WidgetEntry(date: Date(), configuration: finalConfig, showItemLabels: showLabels)
 }

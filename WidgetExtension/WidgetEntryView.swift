@@ -154,10 +154,7 @@ struct WidgetEntryView: View {
                        let qr = UIImage.qrCode(from: content) {
                         GeometryReader { geo in
                             ZStack {
-                                Image(uiImage: qr)
-                                    .interpolation(.none)
-                                    .resizable()
-                                    .scaledToFit()
+                                qrImageView(qr)
                                     .frame(width: geo.size.width, height: geo.size.height)
                                 if let label = slide.qrCodeLabel, !label.isEmpty {
                                     Text(label)
@@ -204,11 +201,9 @@ struct WidgetEntryView: View {
                     }
                 } else {
                     let image = slide.imageData.flatMap { UIImage(data: $0) }
-                        ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
                     if let image {
                         GeometryReader { geo in
-                            Image(uiImage: image)
-                                .resizable()
+                            widgetImageView(image)
                                 .scaledToFill()
                                 .scaleEffect(CGFloat(slide.scale))
                                 .offset(
@@ -288,6 +283,34 @@ struct WidgetEntryView: View {
         }
     }
 
+    // MARK: - Rendering helpers (iOS 18 tinted-widget fix)
+
+    /// Returns an Image view that survives iOS 18 "Tinted" widget mode.
+    /// In Tinted mode WidgetKit replaces any UIImage with a solid accent colour
+    /// unless .widgetAccentedRenderingMode(.fullColor) is present.
+    @ViewBuilder
+    private func qrImageView(_ uiImage: UIImage) -> some View {
+        let base = Image(uiImage: uiImage)
+            .interpolation(.none)
+            .resizable()
+            .scaledToFit()
+        if #available(iOS 18.0, *) {
+            base.widgetAccentedRenderingMode(.fullColor)
+        } else {
+            base
+        }
+    }
+
+    @ViewBuilder
+    private func widgetImageView(_ uiImage: UIImage) -> some View {
+        let base = Image(uiImage: uiImage).resizable()
+        if #available(iOS 18.0, *) {
+            base.widgetAccentedRenderingMode(.fullColor)
+        } else {
+            base
+        }
+    }
+
     @ViewBuilder
     private func slideDebugOverlay(slide: ImageSlide, index: Int, total: Int) -> some View {
         VStack(alignment: .leading, spacing: 1) {
@@ -329,7 +352,7 @@ struct WidgetEntryView: View {
         if let item = entry.configuration.items.first {
             if item.displayType == .qrCode, let content = item.qrCodeContent,
                       let qr = UIImage.qrCode(from: content, size: 60) {
-                Image(uiImage: qr).resizable().scaledToFit()
+                lockQRImageView(qr)
             } else if item.displayType == .icon, let symbol = item.sfSymbolName {
                 if symbol.hasPrefix("wi_") {
                     Image(symbol).resizable().renderingMode(.template).scaledToFit()
@@ -394,10 +417,7 @@ struct ItemView: View {
             if item.displayType == .qrCode, let content = item.qrCodeContent, !content.isEmpty,
                let qr = UIImage.qrCode(from: content) {
                 ZStack {
-                    Image(uiImage: qr)
-                        .interpolation(.none)
-                        .resizable()
-                        .scaledToFit()
+                    itemQRImageView(qr)
                         .padding(2)
                     if let label = item.qrCodeLabel, !label.isEmpty {
                         Text(label)
@@ -446,6 +466,16 @@ struct ItemView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    @ViewBuilder
+    private func itemQRImageView(_ uiImage: UIImage) -> some View {
+        let base = Image(uiImage: uiImage).interpolation(.none).resizable().scaledToFit()
+        if #available(iOS 18.0, *) {
+            base.widgetAccentedRenderingMode(.fullColor)
+        } else {
+            base
+        }
+    }
 }
 
 // MARK: - Lock Screen Item View
@@ -457,7 +487,7 @@ struct LockScreenItemView: View {
         ZStack {
             if item.displayType == .qrCode, let content = item.qrCodeContent,
                       let qr = UIImage.qrCode(from: content, size: 32) {
-                Image(uiImage: qr).resizable().scaledToFit().frame(width: 16, height: 16)
+                lockQRImageView(qr).frame(width: 16, height: 16)
             } else if item.displayType == .icon, let symbol = item.sfSymbolName {
                 if symbol.hasPrefix("wi_") {
                     Image(symbol).resizable().renderingMode(.template).scaledToFit()
@@ -468,6 +498,16 @@ struct LockScreenItemView: View {
             } else {
                 Text(item.customText?.prefix(1) ?? "").font(.system(size: 10))
             }
+        }
+    }
+
+    @ViewBuilder
+    private func lockQRImageView(_ uiImage: UIImage) -> some View {
+        let base = Image(uiImage: uiImage).resizable().scaledToFit()
+        if #available(iOS 18.0, *) {
+            base.widgetAccentedRenderingMode(.fullColor)
+        } else {
+            base
         }
     }
 }

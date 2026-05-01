@@ -264,15 +264,35 @@ final class SharedStorage {
     // MARK: - Configuration CRUD
 
     func saveConfigurations(_ configurations: [WidgetConfig]) throws {
-        let data = try encoder.encode(configurations)
+        // Strip embedded imageData before encoding. Images are accessed by filename
+        // at render time, so inlining them here just inflates the JSON and silently
+        // blows past UserDefaults / Keychain size limits (causing the widget to load
+        // nothing). encodeEntityID() provides 80-px thumbnails for the cross-process
+        // fallback path; full-resolution access goes through loadWidgetImageData().
+        var compact = configurations
+        for i in compact.indices {
+            for j in (compact[i].slides ?? []).indices {
+                compact[i].slides![j].imageData = nil
+            }
+            for j in compact[i].items.indices {
+                compact[i].items[j].imageData = nil
+            }
+        }
+        let data = try encoder.encode(compact)
         let kcWriteStatus = keychainWrite(data, forKey: Self.configKey)
-        // Also scatter to UserDefaults/files as fallback
+        // Scatter to UserDefaults and app-group container files
         for id in Self.appGroupCandidates {
             if let ud = UserDefaults(suiteName: id) { ud.set(data, forKey: Self.configKey); ud.synchronize() }
         }
+        for id in Self.appGroupCandidates {
+            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                let url = container.appendingPathComponent("widgetConfigs.json")
+                try? data.write(to: url, options: .atomicWrite)
+            }
+        }
         UserDefaults.standard.set(data, forKey: Self.configKey)
         UserDefaults.standard.synchronize()
-        appendExtensionLog("SAVE: \(configurations.count) configs kc=\(kcWriteStatus==errSecSuccess ? "ok" : "fail(\(kcWriteStatus))")")
+        appendExtensionLog("SAVE: \(configurations.count) configs size=\(data.count) kc=\(kcWriteStatus==errSecSuccess ? "ok" : "fail(\(kcWriteStatus))")")
     }
 
     func loadConfigurations() throws -> [WidgetConfig] {
@@ -413,10 +433,9 @@ final class SharedStorage {
     }
 
     func saveWidgetImage(_ data: Data, filename: String) {
-        let udKey = "wi_\(filename)"
-        // 0. Keychain (cross-process on devices where entitlement works)
-        keychainWrite(data, forKey: udKey)
-        // 1. App-group containers
+        // Write to app-group container files (primary cross-process channel for images).
+        // UserDefaults is intentionally omitted — individual image blobs push it over
+        // its ~1 MB limit and prevent synchronisation across processes.
         for id in Self.appGroupCandidates {
             if let container = FileManager.default.containerURL(
                 forSecurityApplicationGroupIdentifier: id) {
@@ -425,18 +444,11 @@ final class SharedStorage {
                 try? data.write(to: dir.appendingPathComponent(filename), options: .atomicWrite)
             }
         }
-        // 2. Documents directory (always accessible in the main app process)
+        // Documents fallback (readable by main app only, but useful for editor preview)
         let docDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("widget_images")
         try? FileManager.default.createDirectory(at: docDir, withIntermediateDirectories: true)
         try? data.write(to: docDir.appendingPathComponent(filename), options: .atomicWrite)
-        // 3. App-group UserDefaults
-        for id in Self.appGroupCandidates {
-            if let ud = UserDefaults(suiteName: id) { ud.set(data, forKey: udKey); ud.synchronize() }
-        }
-        // 4. Standard UserDefaults — always works within the same process (main app preview)
-        UserDefaults.standard.set(data, forKey: udKey)
-        UserDefaults.standard.synchronize()
     }
 
     /// Load raw JPEG bytes for a slide image (used to populate imageData after deserialization).

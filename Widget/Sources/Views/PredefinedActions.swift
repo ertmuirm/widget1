@@ -381,38 +381,9 @@ struct AppActionPickerView: View {
         return appsManager.scannedApps.filter { $0.name.lowercased().contains(q) }
     }
 
-    /// Sample three predefined apps to show their resolved isInstalled state in the
-    /// debug header. If the apps below all show "inst=YES" but the user has none of
-    /// them, the bulk-enumeration path is over-reporting; if they all show "inst=NO",
-    /// the bundle-ID extraction or workspace check is broken.
-    private var debugSampleResults: [(String, Bool)] {
-        let names = ["Trust Bank", "Safemate", "Granola"]
-        return names.compactMap { name in
-            predefinedApps.first(where: { $0.name == name }).map { ($0.name, appsManager.isInstalled($0)) }
-        }
-    }
-
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("hasEnumerated: \(appsManager.hasSuccessfullyEnumerated ? "YES" : "NO")")
-                        Text("installedBundleIDs: \(appsManager.installedBundleIDs.count)")
-                        Text("installedURLSchemes: \(appsManager.installedURLSchemes.count)")
-                        Text("workspaceAccessible: \(appsManager.isWorkspaceAccessible ? "YES" : "NO")")
-                        Text("scanComplete: \(appsManager.hasCompletedScan ? "YES" : "NO")")
-                        Text("isScanning: \(appsManager.isScanning ? "YES" : "NO")")
-                        ForEach(debugSampleResults, id: \.0) { name, installed in
-                            Text("  \(name): inst=\(installed ? "YES" : "NO")")
-                        }
-                    }
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.yellow)
-                } header: {
-                    Text("Debug")
-                }
-
                 Section {
                     ForEach(filteredPredefined) { app in
                         AppActionRow(

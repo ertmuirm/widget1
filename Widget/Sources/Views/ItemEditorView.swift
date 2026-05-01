@@ -447,26 +447,160 @@ struct ItemEditorView: View {
 
 // MARK: - Symbol Picker View
 
+private struct SymbolEntry: Identifiable {
+    let name: String
+    let label: String
+    var id: String { name }
+}
+
 struct SymbolPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var selectedSymbol: String
 
     @State private var searchText = ""
 
-    private let sfSymbols = [
-        "star.fill", "house.fill", "gear", "heart.fill", "bolt.fill", "flame.fill",
-        "sun.max.fill", "moon.fill", "cloud.fill", "snow", "wind", "drop.fill",
-        "leaf.fill", "camera.fill", "mic.fill", "music.note", "phone.fill", "envelope.fill",
-        "message.fill", "bell.fill", "tag.fill", "cart.fill", "creditcard.fill", "gift.fill",
-        "airplane", "car.fill", "bus.fill", "tram.fill", "bicycle", "figure.walk",
-        "figure.run", "sportscourt.fill", "gamecontroller.fill", "paintbrush.fill", "pencil",
-        "scissors", "doc.fill", "folder.fill", "trash.fill", "archivebox.fill",
-        "clock.fill", "timer", "calendar", "map.fill", "location.fill",
-        "wifi", "lock.fill", "eye.fill", "sparkle", "wand.and.stars"
+    // ~100 modern flat SF Symbols organised by searchable label.
+    // Grid shows icons only; labels power the search.
+    private let sfSymbolEntries: [SymbolEntry] = [
+        // Communication
+        SymbolEntry(name: "phone.fill",             label: "phone call"),
+        SymbolEntry(name: "message.fill",            label: "message sms"),
+        SymbolEntry(name: "envelope.fill",           label: "email mail"),
+        SymbolEntry(name: "bubble.left.fill",        label: "chat bubble"),
+        SymbolEntry(name: "bell.fill",               label: "notification bell alert"),
+        SymbolEntry(name: "mic.fill",                label: "microphone mic"),
+        SymbolEntry(name: "video.fill",              label: "video call facetime"),
+        SymbolEntry(name: "antenna.radiowaves.left.and.right", label: "radio signal broadcast"),
+        // Media & Entertainment
+        SymbolEntry(name: "play.fill",               label: "play media"),
+        SymbolEntry(name: "music.note",              label: "music song"),
+        SymbolEntry(name: "headphones",              label: "headphones audio"),
+        SymbolEntry(name: "camera.fill",             label: "camera photo"),
+        SymbolEntry(name: "photo.fill",              label: "photo image picture"),
+        SymbolEntry(name: "film.fill",               label: "film movie video"),
+        SymbolEntry(name: "tv.fill",                 label: "television tv screen"),
+        SymbolEntry(name: "gamecontroller.fill",     label: "game controller"),
+        SymbolEntry(name: "airpods.gen3",            label: "airpods earbuds"),
+        SymbolEntry(name: "speaker.wave.2.fill",     label: "speaker volume sound"),
+        // Productivity & Documents
+        SymbolEntry(name: "doc.fill",                label: "document file"),
+        SymbolEntry(name: "doc.text.fill",           label: "text document notes"),
+        SymbolEntry(name: "folder.fill",             label: "folder directory"),
+        SymbolEntry(name: "calendar",                label: "calendar date schedule"),
+        SymbolEntry(name: "clock.fill",              label: "clock time"),
+        SymbolEntry(name: "timer",                   label: "timer stopwatch"),
+        SymbolEntry(name: "pencil",                  label: "pencil edit write"),
+        SymbolEntry(name: "bookmark.fill",           label: "bookmark save"),
+        SymbolEntry(name: "tag.fill",                label: "tag label"),
+        SymbolEntry(name: "checkmark.circle.fill",   label: "done check complete"),
+        SymbolEntry(name: "list.bullet",             label: "list tasks"),
+        SymbolEntry(name: "note.text",               label: "note memo"),
+        SymbolEntry(name: "archivebox.fill",         label: "archive box"),
+        SymbolEntry(name: "tray.fill",               label: "inbox tray"),
+        // Finance & Shopping
+        SymbolEntry(name: "creditcard.fill",         label: "credit card payment"),
+        SymbolEntry(name: "dollarsign.circle.fill",  label: "dollar money finance"),
+        SymbolEntry(name: "banknote.fill",           label: "banknote cash money"),
+        SymbolEntry(name: "chart.line.uptrend.xyaxis", label: "chart trend stocks"),
+        SymbolEntry(name: "chart.bar.fill",          label: "bar chart analytics"),
+        SymbolEntry(name: "building.columns.fill",   label: "bank building finance"),
+        SymbolEntry(name: "cart.fill",               label: "shopping cart"),
+        SymbolEntry(name: "bag.fill",                label: "shopping bag"),
+        SymbolEntry(name: "gift.fill",               label: "gift present"),
+        SymbolEntry(name: "qrcode",                  label: "qr code scan"),
+        // Health & Fitness
+        SymbolEntry(name: "heart.fill",              label: "heart health love"),
+        SymbolEntry(name: "figure.walk",             label: "walk steps"),
+        SymbolEntry(name: "figure.run",              label: "run jog"),
+        SymbolEntry(name: "figure.yoga",             label: "yoga stretch"),
+        SymbolEntry(name: "dumbbell.fill",           label: "gym workout dumbbell"),
+        SymbolEntry(name: "lungs.fill",              label: "lungs breathing"),
+        SymbolEntry(name: "pills.fill",              label: "pills medicine"),
+        SymbolEntry(name: "stethoscope",             label: "stethoscope doctor"),
+        SymbolEntry(name: "bandage.fill",            label: "bandage first aid"),
+        SymbolEntry(name: "fork.knife",              label: "food restaurant meal"),
+        SymbolEntry(name: "cup.and.saucer.fill",     label: "coffee cup drink"),
+        SymbolEntry(name: "wineglass",               label: "wine glass drink"),
+        // Transportation & Travel
+        SymbolEntry(name: "car.front.fill",          label: "car vehicle drive"),
+        SymbolEntry(name: "airplane",                label: "airplane flight travel"),
+        SymbolEntry(name: "ferry.fill",              label: "ferry boat ship"),
+        SymbolEntry(name: "bicycle",                 label: "bicycle bike cycle"),
+        SymbolEntry(name: "scooter",                 label: "scooter moped"),
+        SymbolEntry(name: "bus.fill",                label: "bus public transport"),
+        SymbolEntry(name: "tram.fill",               label: "tram train metro"),
+        SymbolEntry(name: "suitcase.fill",           label: "suitcase luggage travel"),
+        SymbolEntry(name: "fuelpump.fill",           label: "fuel petrol gas station"),
+        SymbolEntry(name: "parkingsign.circle.fill", label: "parking"),
+        // Home & Smart Home
+        SymbolEntry(name: "house.fill",              label: "home house"),
+        SymbolEntry(name: "lightbulb.fill",          label: "light bulb idea"),
+        SymbolEntry(name: "fan.fill",                label: "fan air"),
+        SymbolEntry(name: "lock.fill",               label: "lock security"),
+        SymbolEntry(name: "key.fill",                label: "key"),
+        SymbolEntry(name: "door.left.hand.closed",   label: "door entry"),
+        SymbolEntry(name: "washer.fill",             label: "washer laundry"),
+        SymbolEntry(name: "bed.double.fill",         label: "bed bedroom sleep"),
+        SymbolEntry(name: "sofa.fill",               label: "sofa couch living room"),
+        SymbolEntry(name: "trash.fill",              label: "trash delete remove"),
+        // Devices & Tech
+        SymbolEntry(name: "iphone",                  label: "iphone mobile phone"),
+        SymbolEntry(name: "laptopcomputer",          label: "laptop macbook computer"),
+        SymbolEntry(name: "desktopcomputer",         label: "desktop mac computer"),
+        SymbolEntry(name: "wifi",                    label: "wifi internet wireless"),
+        SymbolEntry(name: "bolt.fill",               label: "bolt power energy"),
+        SymbolEntry(name: "gear",                    label: "settings gear configure"),
+        SymbolEntry(name: "cpu.fill",                label: "cpu processor chip"),
+        SymbolEntry(name: "externaldrive.fill",      label: "drive storage"),
+        SymbolEntry(name: "printer.fill",            label: "printer print"),
+        SymbolEntry(name: "paperclip",               label: "attachment paperclip"),
+        // Nature & Weather
+        SymbolEntry(name: "sun.max.fill",            label: "sun sunny"),
+        SymbolEntry(name: "moon.fill",               label: "moon night"),
+        SymbolEntry(name: "cloud.fill",              label: "cloud cloudy"),
+        SymbolEntry(name: "cloud.rain.fill",         label: "rain shower"),
+        SymbolEntry(name: "snowflake",               label: "snow cold winter"),
+        SymbolEntry(name: "wind",                    label: "wind breeze"),
+        SymbolEntry(name: "flame.fill",              label: "fire flame"),
+        SymbolEntry(name: "leaf.fill",               label: "leaf nature eco"),
+        SymbolEntry(name: "tree.fill",               label: "tree park nature"),
+        SymbolEntry(name: "drop.fill",               label: "water drop rain"),
+        SymbolEntry(name: "mountain.2.fill",         label: "mountain hiking"),
+        // Security & Privacy
+        SymbolEntry(name: "shield.fill",             label: "shield protection secure"),
+        SymbolEntry(name: "eye.fill",                label: "eye view"),
+        SymbolEntry(name: "faceid",                  label: "face id biometric"),
+        SymbolEntry(name: "hand.raised.fill",        label: "privacy stop"),
+        // People & Social
+        SymbolEntry(name: "person.fill",             label: "person user"),
+        SymbolEntry(name: "person.2.fill",           label: "group team people"),
+        SymbolEntry(name: "person.crop.circle.fill", label: "profile avatar account"),
+        SymbolEntry(name: "star.fill",               label: "star favourite"),
+        SymbolEntry(name: "hand.thumbsup.fill",      label: "thumbs up like"),
+        SymbolEntry(name: "globe",                   label: "globe world internet"),
+        SymbolEntry(name: "safari.fill",             label: "safari browser compass"),
+        SymbolEntry(name: "map.fill",                label: "map navigate"),
+        SymbolEntry(name: "location.fill",           label: "location gps pin"),
+        // Misc
+        SymbolEntry(name: "wand.and.stars",          label: "magic wand effects"),
+        SymbolEntry(name: "sparkle",                 label: "sparkle shine"),
+        SymbolEntry(name: "paintbrush.fill",         label: "paint brush design"),
+        SymbolEntry(name: "scissors",                label: "scissors cut"),
+        SymbolEntry(name: "magnifyingglass",         label: "search magnify"),
+        SymbolEntry(name: "square.grid.2x2.fill",    label: "grid apps"),
+        SymbolEntry(name: "ellipsis.circle.fill",    label: "more options"),
+        SymbolEntry(name: "waveform",                label: "waveform audio signal"),
     ]
 
-    private var filteredSFSymbols: [String] {
-        searchText.isEmpty ? sfSymbols : sfSymbols.filter { $0.localizedCaseInsensitiveContains(searchText) }
+    private let gridColumns = [GridItem(.adaptive(minimum: 56, maximum: 72))]
+
+    private var filteredSFEntries: [SymbolEntry] {
+        guard !searchText.isEmpty else { return sfSymbolEntries }
+        let q = searchText.lowercased()
+        return sfSymbolEntries.filter {
+            $0.label.localizedCaseInsensitiveContains(q) ||
+            $0.name.localizedCaseInsensitiveContains(q)
+        }
     }
 
     private var filteredCustomIcons: [(name: String, label: String)] {
@@ -479,24 +613,28 @@ struct SymbolPickerView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                if !filteredCustomIcons.isEmpty {
-                    Section("Custom Icons") {
-                        ForEach(filteredCustomIcons, id: \.name) { icon in
-                            symbolRow(name: icon.name, label: icon.label, isCustom: true)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    if !filteredCustomIcons.isEmpty {
+                        iconSection(title: "Custom Icons") {
+                            ForEach(filteredCustomIcons, id: \.name) { icon in
+                                iconCell(name: icon.name, isCustom: true)
+                            }
+                        }
+                    }
+                    if !filteredSFEntries.isEmpty {
+                        iconSection(title: "Icons") {
+                            ForEach(filteredSFEntries) { entry in
+                                iconCell(name: entry.name, isCustom: false)
+                            }
                         }
                     }
                 }
-                if !filteredSFSymbols.isEmpty {
-                    Section("SF Symbols") {
-                        ForEach(filteredSFSymbols, id: \.self) { symbol in
-                            symbolRow(name: symbol, label: symbol, isCustom: false)
-                        }
-                    }
-                }
+                .padding()
             }
-            .listStyle(.insetGrouped)
+            .background(Color(.systemGroupedBackground))
             .navigationTitle("Choose Icon")
+            .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Search icons")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -504,43 +642,55 @@ struct SymbolPickerView: View {
                 }
             }
         }
+        .preferredColorScheme(.dark)
     }
 
     @ViewBuilder
-    private func symbolRow(name: String, label: String, isCustom: Bool) -> some View {
+    private func iconSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
+            LazyVGrid(columns: gridColumns, spacing: 10) {
+                content()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func iconCell(name: String, isCustom: Bool) -> some View {
         Button {
             selectedSymbol = name
             dismiss()
         } label: {
-            HStack {
-                Group {
-                    if isCustom {
-                        Image(name)
-                            .resizable()
-                            .renderingMode(.template)
-                            .scaledToFit()
-                            .frame(width: 24, height: 24)
-                    } else {
-                        Image(systemName: name)
-                            .font(.title2)
-                    }
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(name == selectedSymbol
+                          ? Color.white.opacity(0.25)
+                          : Color.white.opacity(0.08))
+                if isCustom {
+                    Image(name)
+                        .resizable()
+                        .renderingMode(.template)
+                        .scaledToFit()
+                        .padding(12)
+                        .foregroundStyle(.white)
+                } else {
+                    Image(systemName: name)
+                        .font(.system(size: 22))
+                        .foregroundStyle(.white)
                 }
-                .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .background(Color.white.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                Text(label)
-                    .foregroundStyle(.white)
-
-                Spacer()
-
+            }
+            .frame(width: 56, height: 56)
+            .overlay {
                 if name == selectedSymbol {
-                    Image(systemName: "checkmark")
-                        .foregroundStyle(.gray)
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(Color.white.opacity(0.7), lineWidth: 1.5)
                 }
             }
         }
+        .buttonStyle(.plain)
     }
 }
 

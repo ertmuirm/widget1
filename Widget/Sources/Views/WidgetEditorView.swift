@@ -411,11 +411,14 @@ struct WidgetEditorView: View {
 
     private func addSlide(imageData: Data) {
         guard let image = UIImage(data: imageData) else { return }
-        let downsized = image.downsizedForWidget()
-        guard let jpeg = downsized.jpegData(compressionQuality: 0.75) else { return }
+        // 500 px max keeps decoded bitmap memory ~1 MB — well within WidgetKit's 30 MB limit.
+        let downsized = image.downsizedForWidget(maxDimension: 500)
+        guard let jpeg = downsized.jpegData(compressionQuality: 0.8) else { return }
         let filename = "\(UUID().uuidString).jpg"
         SharedStorage.shared.saveWidgetImage(jpeg, filename: filename)
-        let slide = ImageSlide(filename: filename, imageData: jpeg)
+        // Do not embed jpeg in the slide struct — saveConfigurations strips it anyway
+        // and the inline blob would bloat the config JSON past UserDefaults limits.
+        let slide = ImageSlide(filename: filename)
         if configuration.slides == nil { configuration.slides = [] }
         configuration.slides?.append(slide)
     }
