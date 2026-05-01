@@ -256,51 +256,8 @@ struct WidgetEntryView: View {
                 }
             }
 
-            debugOverlay
         }
         .widgetURL(actionURL)
-    }
-
-    private var debugOverlay: some View {
-        let slides = entry.configuration.slides ?? []
-        let idx = entry.configuration.currentSlideIndex ?? 0
-        let entityID = entry.entityUUID
-        let configID = entry.configuration.id.uuidString
-        let shortEntity = String(entityID.suffix(8))
-        let idxKey = "slideIdx_\(entityID)"
-        var storedIdx: Int? = nil
-        for gid in SharedStorage.appGroupCandidates {
-            if let v = UserDefaults(suiteName: gid)?.object(forKey: idxKey) as? Int {
-                storedIdx = v; break
-            }
-        }
-        if storedIdx == nil {
-            storedIdx = UserDefaults.standard.object(forKey: idxKey) as? Int
-        }
-        let uuidMatch = entityID == configID
-
-        return VStack {
-            HStack {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("eid:\(shortEntity)")
-                        .font(.system(size: 5.5, weight: .bold, design: .monospaced))
-                        .foregroundStyle(uuidMatch ? .green : .red)
-                    Text("cfg:\(String(configID.suffix(8)))")
-                        .font(.system(size: 5.5, weight: .bold, design: .monospaced))
-                        .foregroundStyle(uuidMatch ? .green : .orange)
-                    Text("s:\(idx)/\(max(slides.count-1,0)) ud:\(storedIdx.map{"\($0)"}  ?? "nil")")
-                        .font(.system(size: 5.5, weight: .bold, design: .monospaced))
-                        .foregroundStyle(storedIdx != nil ? .green : .red)
-                }
-                .padding(2)
-                .background(Color.black.opacity(0.75))
-                .clipShape(RoundedRectangle(cornerRadius: 3))
-                Spacer()
-            }
-            Spacer()
-        }
-        .padding(3)
-        .allowsHitTesting(false)
     }
 
     // MARK: - Lock Screen

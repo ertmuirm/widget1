@@ -1,1 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M5.5 17.5l5.5-10 2 3.5h5"/><path d="M11 7.5l2 3.5"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Wheels -->
+  <circle cx="5.5" cy="17.5" r="3.5"/>
+  <circle cx="18.5" cy="17.5" r="3.5"/>
+  <!-- Frame: rear hub → seat post top → bottom bracket → front dropout -->
+  <path d="M5.5 17.5 L11 7.5 L13 11 H18.5"/>
+  <!-- Seat tube: bottom bracket up to seat -->
+  <path d="M11 7.5 L13 11"/>
+  <!-- Front fork: front wheel hub up to handlebar stem -->
+  <path d="M18.5 17.5 L17.5 9.5"/>
+  <!-- Handlebar stem (short vertical) -->
+  <line x1="17.5" y1="9.5" x2="17.5" y2="7.5"/>
+  <!-- Handlebars: horizontal bar with downward grips at each end -->
+  <line x1="14" y1="7.5" x2="21" y2="7.5"/>
+  <path d="M14 7.5 C13 7.5 13 9 14 9"/>
+  <path d="M21 7.5 C22 7.5 22 9 21 9"/>
+</svg>

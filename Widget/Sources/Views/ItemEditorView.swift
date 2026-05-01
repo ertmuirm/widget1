@@ -522,7 +522,7 @@ struct SymbolPickerView: View {
         SymbolEntry(name: "cup.and.saucer.fill",     label: "coffee cup drink"),
         SymbolEntry(name: "wineglass",               label: "wine glass drink"),
         // Transportation & Travel
-        SymbolEntry(name: "car.front.fill",          label: "car vehicle drive"),
+        SymbolEntry(name: "car.fill",                 label: "car vehicle drive"),
         SymbolEntry(name: "airplane",                label: "airplane flight travel"),
         SymbolEntry(name: "ferry.fill",              label: "ferry boat ship"),
         SymbolEntry(name: "bicycle",                 label: "bicycle bike cycle"),

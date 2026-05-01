@@ -20,8 +20,11 @@ struct WidgetEditorView: View {
 
     // QR / barcode slide editing
     @State private var editingSlideIndex: EditingItemIndex?
-    @State private var showBarcodeFileImporter = false
-    @State private var showQRFileImporter = false
+    // Single fileImporter state — SwiftUI only supports one .fileImporter per view;
+    // multiple modifiers cause all but the last to be silently ignored.
+    @State private var showFileImporter = false
+    private enum FileImportMode { case barcode, qr }
+    @State private var fileImportMode: FileImportMode = .barcode
     @State private var barcodeScanError: String?
 
     private var isImageWidget: Bool { configuration.widgetKind == .imageSlideshow }
@@ -91,20 +94,15 @@ struct WidgetEditorView: View {
                 SlideEditorView(slide: bindingForSlide(sel.id))
             }
         }
-        // Barcode scan from Files
-        .fileImporter(isPresented: $showBarcodeFileImporter,
+        // Single fileImporter handles both barcode and QR scan from Files.
+        .fileImporter(isPresented: $showFileImporter,
                       allowedContentTypes: [.image],
                       allowsMultipleSelection: false) { result in
             if case .success(let urls) = result, let url = urls.first {
-                scanBarcodeFromFile(url)
-            }
-        }
-        // QR scan from Files
-        .fileImporter(isPresented: $showQRFileImporter,
-                      allowedContentTypes: [.image],
-                      allowsMultipleSelection: false) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                scanQRFromFile(url)
+                switch fileImportMode {
+                case .barcode: scanBarcodeFromFile(url)
+                case .qr:      scanQRFromFile(url)
+                }
             }
         }
     }
@@ -144,12 +142,12 @@ struct WidgetEditorView: View {
             }
             .foregroundStyle(.white)
 
-            Button { showBarcodeFileImporter = true } label: {
+            Button { fileImportMode = .barcode; showFileImporter = true } label: {
                 Label("Add Barcode from Files", systemImage: "barcode")
             }
             .foregroundStyle(.white)
 
-            Button { showQRFileImporter = true } label: {
+            Button { fileImportMode = .qr; showFileImporter = true } label: {
                 Label("Add QR Code from Files", systemImage: "qrcode.viewfinder")
             }
             .foregroundStyle(.white)
