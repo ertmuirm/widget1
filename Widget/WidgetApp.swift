@@ -45,32 +45,20 @@ private func openAppByBundleID(_ bundleID: String, fallbackURLString: String? = 
     guard let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
           let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject
     else {
-        // Workspace not accessible — go straight to URL fallback
         openFallbackURL(fallbackURLString)
         return
     }
 
-    // Check if the app is actually installed before trying to launch
-    let isInstalledSel = NSSelectorFromString("applicationIsInstalled:")
-    let appInstalled: Bool
-    if ws.responds(to: isInstalledSel) {
-        appInstalled = ws.perform(isInstalledSel, with: bundleID)?.takeUnretainedValue() as? Bool ?? false
-    } else {
-        appInstalled = true  // can't check — assume installed and try
-    }
-
-    guard appInstalled else {
-        // App not installed by this bundle ID — try URL fallback (might be a different scheme)
-        openFallbackURL(fallbackURLString)
-        return
-    }
-
+    // Skip applicationIsInstalled: — its BOOL return value cannot be reliably cast
+    // through NSInvocation's perform path, causing it to always appear false.
+    // Just attempt openApplicationWithBundleID: directly; it silently fails if the
+    // app is not installed, and the fallback URL covers that case where available.
     let openSel = NSSelectorFromString("openApplicationWithBundleID:")
-    if ws.responds(to: openSel) {
-        ws.perform(openSel, with: bundleID)
-    } else {
+    guard ws.responds(to: openSel) else {
         openFallbackURL(fallbackURLString)
+        return
     }
+    ws.perform(openSel, with: bundleID)
 }
 
 private func openFallbackURL(_ urlString: String?) {

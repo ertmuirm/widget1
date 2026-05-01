@@ -108,11 +108,10 @@ struct WidgetEntryView: View {
                 ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
             }
         } else {
-            // No action configured: NoOpIntent prevents the tap from opening the app
-            Button(intent: NoOpIntent()) {
-                ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
-            }
-            .buttonStyle(.plain)
+            // No action — plain view. The background NoOpIntent button (in homeScreenWidget)
+            // handles dead-area taps. Wrapping every no-action item in Button(intent:) would
+            // exceed WidgetKit's interactive-element budget and break rendering for multi-row grids.
+            ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
         }
     }
 
