@@ -283,31 +283,38 @@ struct WidgetEntryView: View {
         }
     }
 
-    // MARK: - Rendering helpers (iOS 18 tinted-widget fix)
+    // MARK: - Rendering helpers (iOS 16+ tinted-widget fix)
+    //
+    // widgetAccentedRenderingMode(_:) is an extension on Image, not View.
+    // It MUST be called directly on Image before any modifiers that change the
+    // type to some View (resizable / scaledToFit). In iOS 16+ Tinted widget mode
+    // WidgetKit replaces any UIImage with a solid accent colour unless .fullColor
+    // is set here.
 
-    /// Returns an Image view that survives iOS 18 "Tinted" widget mode.
-    /// In Tinted mode WidgetKit replaces any UIImage with a solid accent colour
-    /// unless .widgetAccentedRenderingMode(.fullColor) is present.
     @ViewBuilder
     private func qrImageView(_ uiImage: UIImage) -> some View {
-        let base = Image(uiImage: uiImage)
-            .interpolation(.none)
-            .resizable()
-            .scaledToFit()
-        if #available(iOS 18.0, *) {
-            base.widgetAccentedRenderingMode(.fullColor)
+        if #available(iOS 16.0, *) {
+            Image(uiImage: uiImage)
+                .widgetAccentedRenderingMode(.fullColor)
+                .interpolation(.none)
+                .resizable()
+                .scaledToFit()
         } else {
-            base
+            Image(uiImage: uiImage)
+                .interpolation(.none)
+                .resizable()
+                .scaledToFit()
         }
     }
 
     @ViewBuilder
     private func widgetImageView(_ uiImage: UIImage) -> some View {
-        let base = Image(uiImage: uiImage).resizable()
-        if #available(iOS 18.0, *) {
-            base.widgetAccentedRenderingMode(.fullColor)
+        if #available(iOS 16.0, *) {
+            Image(uiImage: uiImage)
+                .widgetAccentedRenderingMode(.fullColor)
+                .resizable()
         } else {
-            base
+            Image(uiImage: uiImage).resizable()
         }
     }
 
@@ -352,7 +359,7 @@ struct WidgetEntryView: View {
         if let item = entry.configuration.items.first {
             if item.displayType == .qrCode, let content = item.qrCodeContent,
                       let qr = UIImage.qrCode(from: content, size: 60) {
-                lockQRImageView(qr)
+                qrImageView(qr)
             } else if item.displayType == .icon, let symbol = item.sfSymbolName {
                 if symbol.hasPrefix("wi_") {
                     Image(symbol).resizable().renderingMode(.template).scaledToFit()
@@ -469,11 +476,14 @@ struct ItemView: View {
 
     @ViewBuilder
     private func itemQRImageView(_ uiImage: UIImage) -> some View {
-        let base = Image(uiImage: uiImage).interpolation(.none).resizable().scaledToFit()
-        if #available(iOS 18.0, *) {
-            base.widgetAccentedRenderingMode(.fullColor)
+        if #available(iOS 16.0, *) {
+            Image(uiImage: uiImage)
+                .widgetAccentedRenderingMode(.fullColor)
+                .interpolation(.none)
+                .resizable()
+                .scaledToFit()
         } else {
-            base
+            Image(uiImage: uiImage).interpolation(.none).resizable().scaledToFit()
         }
     }
 }
@@ -503,11 +513,13 @@ struct LockScreenItemView: View {
 
     @ViewBuilder
     private func lockQRImageView(_ uiImage: UIImage) -> some View {
-        let base = Image(uiImage: uiImage).resizable().scaledToFit()
-        if #available(iOS 18.0, *) {
-            base.widgetAccentedRenderingMode(.fullColor)
+        if #available(iOS 16.0, *) {
+            Image(uiImage: uiImage)
+                .widgetAccentedRenderingMode(.fullColor)
+                .resizable()
+                .scaledToFit()
         } else {
-            base
+            Image(uiImage: uiImage).resizable().scaledToFit()
         }
     }
 }
