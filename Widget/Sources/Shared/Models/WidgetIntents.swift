@@ -552,6 +552,7 @@ struct AdvanceImageIntent: AppIntent {
             ? (current + 1) % count
             : (current - 1 + count) % count
         try? SharedStorage.shared.saveConfigurations(configs)
+        WidgetCenter.shared.reloadAllTimelines()
         return .result()
     }
 }

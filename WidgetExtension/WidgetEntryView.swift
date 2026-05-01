@@ -65,39 +65,47 @@ struct WidgetEntryView: View {
     // MARK: - Grid layouts
 
     private var smallGrid: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 1), count: 3)
-        return LazyVGrid(columns: columns, spacing: 1) {
-            ForEach(Array(entry.configuration.items.prefix(9).enumerated()), id: \.element.id) { _, item in
-                itemCell(item, size: .systemSmall)
-                    .aspectRatio(1, contentMode: .fit)
-            }
-        }
-        .padding(-10)
+        itemGrid(items: Array(entry.configuration.items.prefix(9)),
+                 cols: 3, rows: 3, size: .systemSmall)
     }
 
     private var mediumGrid: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 1), count: 6)
-        return LazyVGrid(columns: columns, spacing: 1) {
-            ForEach(Array(entry.configuration.items.prefix(18).enumerated()), id: \.element.id) { _, item in
-                itemCell(item, size: .systemMedium)
-                    .aspectRatio(1, contentMode: .fit)
-            }
-        }
-        .padding(-10)
+        itemGrid(items: Array(entry.configuration.items.prefix(18)),
+                 cols: 6, rows: 3, size: .systemMedium)
     }
 
     private var largeGrid: some View {
-        let columns = Array(repeating: GridItem(.flexible(), spacing: 1), count: 6)
-        return LazyVGrid(columns: columns, spacing: 1) {
-            ForEach(Array(entry.configuration.items.prefix(36).enumerated()), id: \.element.id) { _, item in
-                itemCell(item, size: .systemLarge)
-                    .aspectRatio(1, contentMode: .fit)
+        itemGrid(items: Array(entry.configuration.items.prefix(36)),
+                 cols: 6, rows: 6, size: .systemLarge)
+    }
+
+    private var extraLargeGrid: some View { largeGrid }
+
+    private func itemGrid(items: [WidgetItem], cols: Int, rows: Int, size: WidgetSize) -> some View {
+        GeometryReader { geo in
+            let spacing: CGFloat = 1
+            let cellW = (geo.size.width - spacing * CGFloat(cols - 1)) / CGFloat(cols)
+            let cellH = (geo.size.height - spacing * CGFloat(rows - 1)) / CGFloat(rows)
+            VStack(spacing: spacing) {
+                ForEach(0..<rows, id: \.self) { row in
+                    HStack(spacing: spacing) {
+                        ForEach(0..<cols, id: \.self) { col in
+                            let idx = row * cols + col
+                            Group {
+                                if idx < items.count {
+                                    itemCell(items[idx], size: size)
+                                } else {
+                                    Color.clear
+                                }
+                            }
+                            .frame(width: cellW, height: cellH)
+                        }
+                    }
+                }
             }
         }
         .padding(-10)
     }
-
-    private var extraLargeGrid: some View { largeGrid }
 
     // MARK: - Cell with optional URL link
 
@@ -141,29 +149,59 @@ struct WidgetEntryView: View {
                 }
             } else {
                 let slide = slides[index]
-                if slide.isQRCode, let content = slide.qrCodeContent, !content.isEmpty,
-                   let qr = UIImage.qrCode(from: content) {
-                    GeometryReader { geo in
-                        ZStack {
-                            Image(uiImage: qr)
-                                .interpolation(.none)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: geo.size.width, height: geo.size.height)
-                            if let label = slide.qrCodeLabel, !label.isEmpty {
-                                Text(label)
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.5)
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 3)
-                                    .background(Color.black)
-                                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                if slide.isQRCode {
+                    if let content = slide.qrCodeContent, !content.isEmpty,
+                       let qr = UIImage.qrCode(from: content) {
+                        GeometryReader { geo in
+                            ZStack {
+                                Image(uiImage: qr)
+                                    .interpolation(.none)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: geo.size.width, height: geo.size.height)
+                                if let label = slide.qrCodeLabel, !label.isEmpty {
+                                    Text(label)
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.5)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 3)
+                                        .background(Color.black)
+                                        .clipShape(RoundedRectangle(cornerRadius: 3))
+                                }
                             }
                         }
+                        .padding(-10)
+                    } else {
+                        Color.black
+                        VStack(spacing: 3) {
+                            Text("QR Debug")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.green)
+                            if let content = slide.qrCodeContent {
+                                if content.isEmpty {
+                                    Text("content: empty")
+                                        .font(.system(size: 8))
+                                        .foregroundStyle(.green)
+                                } else {
+                                    Text("gen failed")
+                                        .font(.system(size: 8))
+                                        .foregroundStyle(.green)
+                                    Text("\"\(content.prefix(24))\"")
+                                        .font(.system(size: 7))
+                                        .foregroundStyle(.green)
+                                        .lineLimit(2)
+                                }
+                            } else {
+                                Text("content: nil")
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(.green)
+                            }
+                        }
+                        .multilineTextAlignment(.center)
+                        .padding(4)
                     }
-                    .padding(-10)
                 } else {
                     let image = slide.imageData.flatMap { UIImage(data: $0) }
                         ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
@@ -182,10 +220,23 @@ struct WidgetEntryView: View {
                         }
                         .padding(-10)
                     } else {
-                        Color.gray.opacity(0.3)
-                        Image(systemName: "photo")
-                            .font(.title)
-                            .foregroundStyle(.secondary)
+                        Color.black.opacity(0.7)
+                        VStack(spacing: 3) {
+                            Image(systemName: "photo")
+                                .font(.title2)
+                                .foregroundStyle(.green)
+                            Text(slide.imageData != nil
+                                 ? "data: \(slide.imageData!.count)B"
+                                 : "data: nil")
+                                .font(.system(size: 8))
+                                .foregroundStyle(.green)
+                            Text("file: \(slide.filename.isEmpty ? "empty" : slide.filename)")
+                                .font(.system(size: 7))
+                                .foregroundStyle(.green)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(4)
                     }
                 }
 
@@ -193,45 +244,39 @@ struct WidgetEntryView: View {
                 if hasNavigation || hasAction {
                     HStack(spacing: 0) {
                         // Left third — previous slide
-                        Group {
-                            if hasNavigation {
-                                Button(intent: AdvanceImageIntent(
-                                    widgetID: entry.configuration.id.uuidString, forward: false)) {
-                                    Color.clear
-                                }
-                                .buttonStyle(.plain)
-                            } else {
+                        if hasNavigation {
+                            Button(intent: AdvanceImageIntent(
+                                widgetID: entry.configuration.id.uuidString, forward: false)) {
                                 Color.clear
                             }
+                            .buttonStyle(.plain)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .contentShape(Rectangle())
+                        } else {
+                            Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .contentShape(Rectangle())
 
                         // Center third — configured action
-                        Group {
-                            if let url = actionURL {
-                                Link(destination: url) { Color.clear }
-                            } else {
-                                Color.clear
-                            }
+                        if let url = actionURL {
+                            Link(destination: url) { Color.clear }
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .contentShape(Rectangle())
+                        } else {
+                            Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .contentShape(Rectangle())
 
                         // Right third — next slide
-                        Group {
-                            if hasNavigation {
-                                Button(intent: AdvanceImageIntent(
-                                    widgetID: entry.configuration.id.uuidString, forward: true)) {
-                                    Color.clear
-                                }
-                                .buttonStyle(.plain)
-                            } else {
+                        if hasNavigation {
+                            Button(intent: AdvanceImageIntent(
+                                widgetID: entry.configuration.id.uuidString, forward: true)) {
                                 Color.clear
                             }
+                            .buttonStyle(.plain)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .contentShape(Rectangle())
+                        } else {
+                            Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .contentShape(Rectangle())
                     }
                 }
             }

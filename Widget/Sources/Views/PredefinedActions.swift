@@ -37,19 +37,11 @@ func bundleIDURL(_ bundleID: String, fallback: String? = nil) -> String {
 // MARK: - Predefined list (flat, alphabetical)
 
 let predefinedApps: [AppActionGroup] = [
-    AppActionGroup(category: "", name: "1Password",          openURL: bundleIDURL("com.agilebits.onepassword-ios", fallback: "onepassword://"), deepLinks: [
-        DeepLink(name: "New Login",              urlString: "onepassword://new-login"),
-        DeepLink(name: "Search",                 urlString: "onepassword://search/"),
-    ]),
-    AppActionGroup(category: "", name: "Airbnb",             openURL: bundleIDURL("com.airbnb.app", fallback: "airbnb://"), deepLinks: []),
     AppActionGroup(category: "", name: "Alipay",             openURL: bundleIDURL("com.alipay.iphoneclient", fallback: "alipay://"), deepLinks: [
         DeepLink(name: "Scan QR Code",   urlString: "alipayqr://platformapi/startapp?saId=10000007"),
         DeepLink(name: "Payment QR",     urlString: "alipayqr://platformapi/startapp?appId=20000056"),
         DeepLink(name: "Transfer Money", urlString: "alipays://platformapi/startapp?appId=20000116"),
         DeepLink(name: "Phone Top-Up",   urlString: "alipayqr://platformapi/startapp?appId=10000003"),
-    ]),
-    AppActionGroup(category: "", name: "Amazon",             openURL: bundleIDURL("com.amazon.Amazon", fallback: "amazon://"), deepLinks: [
-        DeepLink(name: "Search",                 urlString: "amazon://search?query="),
     ]),
     AppActionGroup(category: "", name: "App Store",          openURL: bundleIDURL("com.apple.AppStore", fallback: "itms-apps://"), deepLinks: [
         DeepLink(name: "Today Tab",              urlString: "itms-apps://?action=today"),
@@ -58,11 +50,6 @@ let predefinedApps: [AppActionGroup] = [
     ]),
     AppActionGroup(category: "", name: "Authy",              openURL: bundleIDURL("com.authy", fallback: "authy://"), deepLinks: []),
     AppActionGroup(category: "", name: "Bank of Singapore",  openURL: bundleIDURL("com.bankofsingapore.digital.iphone"), deepLinks: []),
-    AppActionGroup(category: "", name: "Bear",               openURL: bundleIDURL("net.shinyfrog.bear", fallback: "bear://"), deepLinks: [
-        DeepLink(name: "New Note",               urlString: "bear://x-callback-url/create"),
-        DeepLink(name: "Search",                 urlString: "bear://x-callback-url/search"),
-    ]),
-    AppActionGroup(category: "", name: "Booking.com",        openURL: bundleIDURL("com.booking.BookingApp", fallback: "booking://"), deepLinks: []),
     AppActionGroup(category: "", name: "Calculator",         openURL: bundleIDURL("com.apple.calculator"), deepLinks: []),
     AppActionGroup(category: "", name: "Chase",              openURL: bundleIDURL("com.chase", fallback: "chase://"), deepLinks: []),
     AppActionGroup(category: "", name: "ChatGPT",            openURL: bundleIDURL("com.openai.chat", fallback: "chatgpt://"), deepLinks: []),
@@ -75,10 +62,6 @@ let predefinedApps: [AppActionGroup] = [
     AppActionGroup(category: "", name: "Doubao 豆包",         openURL: bundleIDURL("com.bot.doubao", fallback: "doubao://"), deepLinks: []),
     AppActionGroup(category: "", name: "Dropbox",            openURL: bundleIDURL("com.getdropbox.Dropbox", fallback: "dbinbox://"), deepLinks: []),
     AppActionGroup(category: "", name: "Duolingo",           openURL: bundleIDURL("com.duolingo.DuolingoMobile", fallback: "duolingo://"), deepLinks: []),
-    AppActionGroup(category: "", name: "Evernote",           openURL: bundleIDURL("com.evernote.iPhone.Evernote", fallback: "evernote://"), deepLinks: [
-        DeepLink(name: "New Note",               urlString: "evernote://x-callback-url/new-note"),
-        DeepLink(name: "Search",                 urlString: "evernote://x-callback-url/search?query="),
-    ]),
     AppActionGroup(category: "", name: "Facebook",           openURL: bundleIDURL("com.facebook.Facebook", fallback: "fb://"), deepLinks: [
         DeepLink(name: "Events",                 urlString: "fb://events"),
         DeepLink(name: "Notifications",          urlString: "fb://notifications"),
@@ -127,9 +110,7 @@ let predefinedApps: [AppActionGroup] = [
         DeepLink(name: "Direct Messages",        urlString: "instagram://direct-inbox"),
     ]),
     AppActionGroup(category: "", name: "iSH Shell",          openURL: bundleIDURL("app.ish.iSH"), deepLinks: []),
-    AppActionGroup(category: "", name: "Klook",              openURL: bundleIDURL("com.klook.klook", fallback: "klook://"), deepLinks: []),
     AppActionGroup(category: "", name: "Lark",               openURL: bundleIDURL("com.larksuite.lark", fallback: "https://applink.larksuite.com/"), deepLinks: []),
-    AppActionGroup(category: "", name: "Lazada",             openURL: bundleIDURL("com.LazadaSEA.Lazada", fallback: "lazada://"), deepLinks: []),
     AppActionGroup(category: "", name: "Libby",              openURL: bundleIDURL("com.overdrive.dewey", fallback: "dewey-oauth://"), deepLinks: []),
     AppActionGroup(category: "", name: "Line",               openURL: bundleIDURL("jp.naver.line", fallback: "line://"), deepLinks: [
         DeepLink(name: "New Message",            urlString: "line://msg/"),
@@ -165,32 +146,19 @@ let predefinedApps: [AppActionGroup] = [
     ]),
     AppActionGroup(category: "", name: "MiHome",             openURL: bundleIDURL("com.xiaomi.mihome", fallback: "mihome://"), deepLinks: []),
     AppActionGroup(category: "", name: "Netflix",            openURL: bundleIDURL("com.netflix.Netflix", fallback: "nflx://"), deepLinks: []),
-    AppActionGroup(category: "", name: "NordVPN",            openURL: bundleIDURL("com.nordvpn.NordVPN", fallback: "nordvpn://"), deepLinks: []),
-    AppActionGroup(category: "", name: "Notion",             openURL: bundleIDURL("notion.id", fallback: "notion://"), deepLinks: [
-        DeepLink(name: "New Page",               urlString: "notion://new-page"),
-    ]),
-    AppActionGroup(category: "", name: "Obsidian",           openURL: bundleIDURL("md.obsidian", fallback: "obsidian://"), deepLinks: [
-        DeepLink(name: "New Note",               urlString: "obsidian://new"),
-        DeepLink(name: "Open Vault",             urlString: "obsidian://open"),
-    ]),
     AppActionGroup(category: "", name: "OneDrive",           openURL: bundleIDURL("com.microsoft.skydrive", fallback: "ms-onedrive://"), deepLinks: [
         DeepLink(name: "My Files",               urlString: "ms-onedrive://files"),
         DeepLink(name: "Recent Files",           urlString: "ms-onedrive://recent"),
         DeepLink(name: "Shared with Me",         urlString: "ms-onedrive://shared"),
-    ]),
-    AppActionGroup(category: "", name: "PayPal",             openURL: bundleIDURL("com.yourcompany.PPClient", fallback: "paypalapp://"), deepLinks: [
-        DeepLink(name: "Send Money",             urlString: "paypalapp://pay"),
     ]),
     AppActionGroup(category: "", name: "Phone",              openURL: bundleIDURL("com.apple.mobilephone", fallback: "mobilephone-keypad://"), deepLinks: [
         DeepLink(name: "Recents",                urlString: "mobilephone-recents://"),
         DeepLink(name: "Voicemail",              urlString: "mobilephone-voicemail://"),
     ]),
     AppActionGroup(category: "", name: "Photos",             openURL: bundleIDURL("com.apple.mobileslideshow", fallback: "photos-redirect://"), deepLinks: []),
-    AppActionGroup(category: "", name: "Prime Video",        openURL: bundleIDURL("com.amazon.aiv.AIVApp", fallback: "aiv://"), deepLinks: []),
     AppActionGroup(category: "", name: "Reddit",             openURL: bundleIDURL("com.reddit.Reddit", fallback: "reddit://"), deepLinks: [
         DeepLink(name: "Search",                 urlString: "reddit://search?q="),
     ]),
-    AppActionGroup(category: "", name: "Revolut",            openURL: bundleIDURL("com.revolut.revolut", fallback: "revolut://"), deepLinks: []),
     AppActionGroup(category: "", name: "S&P Capital IQ",     openURL: bundleIDURL("com.capitaliq.mobile.MarketIntelligence"), deepLinks: []),
     AppActionGroup(category: "", name: "Safemate",           openURL: bundleIDURL("com.yaoertai.safemate2"), deepLinks: []),
     AppActionGroup(category: "", name: "SAP Concur",         openURL: bundleIDURL("com.concur.concurmobile", fallback: "concurmobile://"), deepLinks: [
@@ -205,16 +173,9 @@ let predefinedApps: [AppActionGroup] = [
         DeepLink(name: "Create Shortcut",        urlString: "shortcuts://create-shortcut"),
         DeepLink(name: "Open Gallery",           urlString: "shortcuts://gallery"),
     ]),
-    AppActionGroup(category: "", name: "Signal",             openURL: bundleIDURL("org.whispersystems.signal", fallback: "sgnl://"), deepLinks: [
-        DeepLink(name: "New Message",            urlString: "sgnl://"),
-    ]),
     AppActionGroup(category: "", name: "Singapore Airlines", openURL: bundleIDURL("com.amadeus.sqmobile", fallback: "https://www.singaporeair.com/"), deepLinks: []),
     AppActionGroup(category: "", name: "Singpass",           openURL: bundleIDURL("sg.ndi.sp", fallback: "singpass://"), deepLinks: [
         DeepLink(name: "Open (web fallback)",    urlString: "https://app.singpass.gov.sg"),
-    ]),
-    AppActionGroup(category: "", name: "Skype",              openURL: bundleIDURL("com.skype.skype", fallback: "skype://"), deepLinks: [
-        DeepLink(name: "Call",                   urlString: "skype://call"),
-        DeepLink(name: "New Chat",               urlString: "skype://chat"),
     ]),
     AppActionGroup(category: "", name: "Snapchat",           openURL: bundleIDURL("com.toyopagroup.picaboo", fallback: "snapchat://"), deepLinks: []),
     AppActionGroup(category: "", name: "Spotify",            openURL: bundleIDURL("com.spotify.client", fallback: "spotify:"), deepLinks: [
@@ -239,13 +200,9 @@ let predefinedApps: [AppActionGroup] = [
     ]),
     AppActionGroup(category: "", name: "TikTok",             openURL: bundleIDURL("com.zhiliaoapp.musically", fallback: "snssdk1233://"), deepLinks: []),
     AppActionGroup(category: "", name: "Trust Bank",         openURL: bundleIDURL("sg.com.trustbank.trustbankmobile"), deepLinks: []),
-    AppActionGroup(category: "", name: "Twitch",             openURL: bundleIDURL("tv.twitch", fallback: "twitch://"), deepLinks: []),
     AppActionGroup(category: "", name: "Uber",               openURL: bundleIDURL("com.ubercab.UberClient", fallback: "uber://"), deepLinks: [
         DeepLink(name: "Request Ride (from here)", urlString: "uber://?action=setPickup&pickup=my_location"),
         DeepLink(name: "Set Pickup & Dropoff",   urlString: "uber://?action=setPickup&pickup[latitude]=&pickup[longitude]=&dropoff[latitude]=&dropoff[longitude]="),
-    ]),
-    AppActionGroup(category: "", name: "Viber",              openURL: bundleIDURL("com.viber", fallback: "viber://"), deepLinks: [
-        DeepLink(name: "New Message",            urlString: "viber://chat"),
     ]),
     AppActionGroup(category: "", name: "Wallet",             openURL: bundleIDURL("com.apple.Passbook", fallback: "wallet://"), deepLinks: []),
     AppActionGroup(category: "", name: "WeChat",             openURL: bundleIDURL("com.tencent.xin", fallback: "weixin://"), deepLinks: [
@@ -327,7 +284,8 @@ class InstalledAppsManager: ObservableObject {
             if hasSuccessfullyEnumerated {
                 return installedBundleIDs.contains(bundleID)
             }
-            return true
+            // Bulk enumeration unavailable — fall back to per-app workspace check
+            return InstalledAppsManager.workspaceIsInstalled(bundleID: bundleID)
         }
 
         guard hasCompletedScan else { return true }
@@ -342,7 +300,8 @@ class InstalledAppsManager: ObservableObject {
         else { return false }
         let sel = NSSelectorFromString("applicationIsInstalled:")
         guard ws.responds(to: sel) else { return false }
-        return ws.perform(sel, with: bundleID)?.takeUnretainedValue() as? Bool ?? false
+        // BOOL methods return 0/1 as raw pointer — use != nil rather than casting
+        return ws.perform(sel, with: bundleID) != nil
     }
 
     private func fetchUserApps() -> ([AppActionGroup], Set<String>, Set<String>, Bool) {
