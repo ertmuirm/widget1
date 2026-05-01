@@ -106,13 +106,72 @@ struct QRCodeCanvasView: View {
                 }
             }
         } else {
-            // Fallback: show a placeholder when the string cannot be encoded
-            Color.black
+            Color.white
                 .overlay(
-                    Text("QR\nError")
+                    Text("QR Error")
                         .font(.system(size: 8, design: .monospaced))
-                        .foregroundStyle(.green)
-                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+                )
+        }
+    }
+}
+
+// MARK: - Barcode strip (used by BarcodeCanvasView)
+
+/// Extracts a single-row boolean strip from a Code-128 barcode.
+/// true = dark bar, false = light bar (space).
+/// Returns nil if the string cannot be encoded.
+func barcodeStrip(from string: String) -> [Bool]? {
+    guard let data = string.data(using: .utf8),
+          let filter = CIFilter(name: "CICode128BarcodeGenerator") else { return nil }
+    filter.setValue(data, forKey: "inputMessage")
+    filter.setValue(0.0, forKey: "inputQuietSpace")
+    guard let raw = filter.outputImage else { return nil }
+
+    let w = Int(raw.extent.width)
+    guard w > 0 else { return nil }
+
+    let ctx = CIContext(options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull()])
+    // Render only the first row (height = 1) to extract bar pattern
+    let stripRect = CGRect(x: raw.extent.minX, y: raw.extent.minY, width: raw.extent.width, height: 1)
+    var pixels = [UInt8](repeating: 0, count: w * 4)
+    ctx.render(raw, toBitmap: &pixels, rowBytes: w * 4,
+               bounds: stripRect, format: .RGBA8,
+               colorSpace: CGColorSpaceCreateDeviceRGB())
+    return (0..<w).map { pixels[$0 * 4] < 128 }
+}
+
+// MARK: - BarcodeCanvasView
+
+/// Renders a Code-128 barcode via SwiftUI Canvas, stretched to full widget width.
+/// No UIImage — immune to WidgetKit colour-space and Tinted-mode issues.
+struct BarcodeCanvasView: View {
+    let content: String
+
+    var body: some View {
+        if let strip = barcodeStrip(from: content) {
+            Canvas { ctx, size in
+                // White background
+                ctx.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.white))
+
+                let barCount = CGFloat(strip.count)
+                guard barCount > 0 else { return }
+                let barW = size.width / barCount
+
+                // Draw each bar at full canvas height — maximum horizontal use
+                for (i, isDark) in strip.enumerated() where isDark {
+                    ctx.fill(
+                        Path(CGRect(x: CGFloat(i) * barW, y: 0, width: barW, height: size.height)),
+                        with: .color(.black)
+                    )
+                }
+            }
+        } else {
+            Color.white
+                .overlay(
+                    Text("Barcode Error")
+                        .font(.system(size: 8, design: .monospaced))
+                        .foregroundStyle(.secondary)
                 )
         }
     }

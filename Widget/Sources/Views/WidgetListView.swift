@@ -55,7 +55,7 @@ struct WidgetListView: View {
                     Button {
                         showAddImageSheet = true
                     } label: {
-                        Label("Image Widget", systemImage: "photo.on.rectangle.angled")
+                        Label("Code Widget", systemImage: "qrcode")
                     }
                     Button {
                         showAddLockScreenSheet = true

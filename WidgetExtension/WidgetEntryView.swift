@@ -172,6 +172,24 @@ struct WidgetEntryView: View {
                         }
                     }
                     .padding(-10)
+                } else if let content = slide.barcodeContent, !content.isEmpty {
+                    // Barcode: full-width, centred vertically with padding for readability
+                    GeometryReader { geo in
+                        ZStack {
+                            BarcodeCanvasView(content: content)
+                                .frame(width: geo.size.width, height: geo.size.height * 0.55)
+                                .frame(width: geo.size.width, height: geo.size.height)
+                            if let label = slide.qrCodeLabel, !label.isEmpty {
+                                Text(label)
+                                    .font(.system(size: 8, weight: .medium))
+                                    .foregroundStyle(.black)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.5)
+                                    .padding(.top, geo.size.height * 0.62)
+                            }
+                        }
+                    }
+                    .padding(-10)
                 } else {
                     VStack(spacing: 4) {
                         Image(systemName: "qrcode")
@@ -183,44 +201,44 @@ struct WidgetEntryView: View {
                     }
                 }
 
-                // Three-zone tap overlay: left third (prev), center (action), right third (next)
+                // Three-zone tap overlay: left third (prev), center (action), right third (next).
+                // Color.black.opacity(0.001) instead of Color.clear — clear has no hit area
+                // in WidgetKit even with contentShape; near-zero opacity is reliably tappable.
                 if hasNavigation || hasAction {
                     HStack(spacing: 0) {
-                        // Left third — previous slide
                         if hasNavigation {
                             Button(intent: AdvanceImageIntent(
                                 widgetID: entry.configuration.id.uuidString, forward: false)) {
-                                Color.clear
+                                Color.black.opacity(0.001)
                             }
                             .buttonStyle(.plain)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .contentShape(Rectangle())
                         } else {
-                            Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
+                            Color.black.opacity(0.001).frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
 
-                        // Center third — configured action
                         if let url = actionURL {
-                            Link(destination: url) { Color.clear }
+                            Link(destination: url) { Color.black.opacity(0.001) }
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 .contentShape(Rectangle())
                         } else {
-                            Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
+                            Color.black.opacity(0.001).frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
 
-                        // Right third — next slide
                         if hasNavigation {
                             Button(intent: AdvanceImageIntent(
                                 widgetID: entry.configuration.id.uuidString, forward: true)) {
-                                Color.clear
+                                Color.black.opacity(0.001)
                             }
                             .buttonStyle(.plain)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .contentShape(Rectangle())
                         } else {
-                            Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
+                            Color.black.opacity(0.001).frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }

@@ -102,30 +102,32 @@ enum WidgetKind: String, Codable {
 /// One image (or QR code) in an Image Slideshow widget
 struct ImageSlide: Codable, Identifiable, Equatable {
     let id: UUID
-    var filename: String   // file stored in shared images directory (empty for QR slides)
+    var filename: String   // file stored in shared images directory (empty for QR/barcode slides)
     var offsetX: Double    // -0.5 … 0.5 (fraction of widget width)
     var offsetY: Double    // -0.5 … 0.5 (fraction of widget height)
     var scale: Double      // 1.0 = fit, >1 = zoomed in
     var action: WidgetAction?
     /// QR code content — when non-nil this slide shows a QR code instead of a photo.
     var qrCodeContent: String?
-    /// Optional label shown below the QR code.
+    /// Optional label shown below the QR/barcode.
     var qrCodeLabel: String?
-    /// In-memory JPEG data. Serialized in config JSON so it crosses process boundaries
-    /// via the same keychain/UserDefaults channel configs use. Stripped from entity IDs
-    /// (see encodeEntityID in WidgetIntents) to keep those compact.
+    /// Barcode content — when non-nil this slide shows a Code-128 barcode.
+    var barcodeContent: String?
+    /// In-memory JPEG data.
     var imageData: Data?
 
     enum CodingKeys: CodingKey {
-        case id, filename, offsetX, offsetY, scale, action, qrCodeContent, qrCodeLabel, imageData
+        case id, filename, offsetX, offsetY, scale, action, qrCodeContent, qrCodeLabel, barcodeContent, imageData
     }
 
     var isQRCode: Bool { qrCodeContent != nil }
+    var isBarcode: Bool { barcodeContent != nil }
 
     init(id: UUID = UUID(), filename: String,
          offsetX: Double = 0, offsetY: Double = 0, scale: Double = 1.0,
          action: WidgetAction? = nil, qrCodeContent: String? = nil,
-         qrCodeLabel: String? = nil, imageData: Data? = nil) {
+         qrCodeLabel: String? = nil, barcodeContent: String? = nil,
+         imageData: Data? = nil) {
         self.id = id
         self.filename = filename
         self.offsetX = offsetX
@@ -134,6 +136,7 @@ struct ImageSlide: Codable, Identifiable, Equatable {
         self.action = action
         self.qrCodeContent = qrCodeContent
         self.qrCodeLabel = qrCodeLabel
+        self.barcodeContent = barcodeContent
         self.imageData = imageData
     }
 }

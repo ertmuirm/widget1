@@ -501,7 +501,7 @@ private func imageSlideshowConfigs() -> [WidgetConfig] {
 
 struct ImageWidgetEntity: AppEntity, Hashable {
     static var typeDisplayRepresentation: TypeDisplayRepresentation {
-        TypeDisplayRepresentation(name: "Image Widget")
+        TypeDisplayRepresentation(name: "Code Widget")
     }
     static var defaultQuery = ImageWidgetQuery()
     var id: String
@@ -521,12 +521,12 @@ struct ImageWidgetQuery: EntityQuery {
             if let c = decodeConfigFromID(storedID) {
                 return ImageWidgetEntity(id: storedID, name: c.name)
             }
-            return ImageWidgetEntity(id: storedID, name: "Image Widget")
+            return ImageWidgetEntity(id: storedID, name: "Code Widget")
         }
     }
     func suggestedEntities() async throws -> [ImageWidgetEntity] {
         let list = imageSlideshowConfigs()
-        if list.isEmpty { return [ImageWidgetEntity(id: "none", name: "No Image Widgets")] }
+        if list.isEmpty { return [ImageWidgetEntity(id: "none", name: "No Code Widgets")] }
         return list.map { ImageWidgetEntity(id: encodeEntityID($0), name: $0.name) }
     }
     func defaultResult() async -> ImageWidgetEntity? {
@@ -535,8 +535,8 @@ struct ImageWidgetQuery: EntityQuery {
 }
 
 struct SelectImageWidgetIntent: WidgetConfigurationIntent {
-    static var title: LocalizedStringResource = "Select Image Widget"
-    static var description = IntentDescription("Choose an image slideshow widget")
+    static var title: LocalizedStringResource = "Select Code Widget"
+    static var description = IntentDescription("Choose a code widget")
     @Parameter(title: "Widget") var selectedWidget: ImageWidgetEntity?
     init() {}
     init(selectedWidget: ImageWidgetEntity?) { self.selectedWidget = selectedWidget }

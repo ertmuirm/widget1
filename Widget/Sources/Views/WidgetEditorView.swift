@@ -18,8 +18,11 @@ struct WidgetEditorView: View {
     @State private var editingItemIndex: EditingItemIndex?
     @State private var isReordering = false
 
-    // QR slide editing
+    // QR / barcode slide editing
     @State private var editingSlideIndex: EditingItemIndex?
+    @State private var barcodePickerItems: [PhotosPickerItem] = []
+    @State private var showBarcodeFileImporter = false
+    @State private var barcodeScanError: String?
 
     private var isImageWidget: Bool { configuration.widgetKind == .imageSlideshow }
     private var isLockScreenWidget: Bool { configuration.widgetKind == .lockScreen }
@@ -88,6 +91,23 @@ struct WidgetEditorView: View {
                 SlideEditorView(slide: bindingForSlide(sel.id))
             }
         }
+        // Barcode scan from Photos
+        .photosPicker(isPresented: .constant(false),
+                      selection: $barcodePickerItems,
+                      maxSelectionCount: 1,
+                      matching: .images)
+        .onChange(of: barcodePickerItems) { items in
+            if let first = items.first { scanBarcodeFromPhoto(first) }
+            barcodePickerItems = []
+        }
+        // Barcode scan from Files
+        .fileImporter(isPresented: $showBarcodeFileImporter,
+                      allowedContentTypes: [.image],
+                      allowsMultipleSelection: false) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                scanBarcodeFromFile(url)
+            }
+        }
     }
 
     // MARK: - Slides section (image widget)
@@ -103,16 +123,28 @@ struct WidgetEditorView: View {
                 .onTapGesture { editingSlideIndex = EditingItemIndex(id: index) }
             }
         } header: {
-            Text("QR Codes (\(configuration.slides?.count ?? 0))")
+            Text("Slides (\(configuration.slides?.count ?? 0))")
         }
 
-        Section {
-            Button {
-                addQRSlide()
-            } label: {
+        Section("Add Slide") {
+            Button { addQRSlide() } label: {
                 Label("Add QR Code", systemImage: "qrcode")
             }
             .foregroundStyle(.white)
+
+            PhotosPicker(selection: $barcodePickerItems, maxSelectionCount: 1, matching: .images) {
+                Label("Scan Barcode from Photos", systemImage: "barcode.viewfinder")
+            }
+            .foregroundStyle(.white)
+
+            Button { showBarcodeFileImporter = true } label: {
+                Label("Scan Barcode from Files", systemImage: "barcode")
+            }
+            .foregroundStyle(.white)
+
+            if let err = barcodeScanError {
+                Text(err).font(.caption).foregroundStyle(.orange)
+            }
         }
     }
 
@@ -345,6 +377,61 @@ struct WidgetEditorView: View {
         editingSlideIndex = EditingItemIndex(id: newIndex)
     }
 
+    private func scanBarcodeFromPhoto(_ item: PhotosPickerItem) {
+        barcodeScanError = nil
+        item.loadTransferable(type: Data.self) { result in
+            guard case .success(let data?) = result,
+                  let ciImage = CIImage(data: data) else {
+                DispatchQueue.main.async { self.barcodeScanError = "Could not load image." }
+                return
+            }
+            performBarcodeScan(on: ciImage)
+        }
+    }
+
+    private func scanBarcodeFromFile(_ url: URL) {
+        barcodeScanError = nil
+        guard url.startAccessingSecurityScopedResource() else {
+            barcodeScanError = "Could not access file."
+            return
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+        guard let data = try? Data(contentsOf: url),
+              let ciImage = CIImage(data: data) else {
+            barcodeScanError = "Could not load image."
+            return
+        }
+        performBarcodeScan(on: ciImage)
+    }
+
+    private func performBarcodeScan(on ciImage: CIImage) {
+        let request = VNDetectBarcodesRequest()
+        let handler = VNImageRequestHandler(ciImage: ciImage, options: [:])
+        DispatchQueue.global(qos: .userInitiated).async {
+            try? handler.perform([request])
+            DispatchQueue.main.async {
+                guard let result = request.results?.first,
+                      let payload = result.payloadStringValue else {
+                    self.barcodeScanError = "No barcode detected in image."
+                    return
+                }
+                // QR codes go into qrCodeContent; all other symbologies into barcodeContent
+                let isQR = result.symbology == .qr || result.symbology == .microQR
+                var slide = ImageSlide(filename: "")
+                if isQR {
+                    slide.qrCodeContent = payload
+                } else {
+                    slide.barcodeContent = payload
+                }
+                if self.configuration.slides == nil { self.configuration.slides = [] }
+                self.configuration.slides?.append(slide)
+                let newIndex = (self.configuration.slides?.count ?? 1) - 1
+                self.editingSlideIndex = EditingItemIndex(id: newIndex)
+                self.barcodeScanError = nil
+            }
+        }
+    }
+
     private func saveConfiguration() {
         if isNew {
             viewModel.addConfiguration(configuration)
@@ -375,45 +462,34 @@ struct SlideRowView: View {
                 if slide.isQRCode {
                     if let content = slide.qrCodeContent, !content.isEmpty,
                        let qr = UIImage.qrCode(from: content, size: 88) {
-                        ZStack {
-                            Image(uiImage: qr)
-                                .interpolation(.none)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 44, height: 44)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                            if let label = slide.qrCodeLabel, !label.isEmpty {
-                                Text(label)
-                                    .font(.system(size: 6, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .lineLimit(1)
-                                    .padding(.horizontal, 2).padding(.vertical, 1)
-                                    .background(Color.black)
-                                    .clipShape(RoundedRectangle(cornerRadius: 2))
-                            }
-                        }
-                    } else {
-                        Image(systemName: "qrcode")
-                            .foregroundStyle(.secondary)
-                    }
-                } else {
-                    let img = slide.imageData.flatMap { UIImage(data: $0) }
-                        ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
-                    if let image = img {
-                        Image(uiImage: image)
+                        Image(uiImage: qr)
+                            .interpolation(.none)
                             .resizable()
                             .scaledToFill()
                             .frame(width: 44, height: 44)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     } else {
-                        Image(systemName: "photo")
+                        Image(systemName: "qrcode")
                             .foregroundStyle(.secondary)
                     }
+                } else if slide.isBarcode {
+                    if let content = slide.barcodeContent, !content.isEmpty {
+                        BarcodeCanvasView(content: content)
+                            .frame(width: 44, height: 22)
+                            .frame(width: 44, height: 44)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else {
+                        Image(systemName: "barcode")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Image(systemName: "photo")
+                        .foregroundStyle(.secondary)
                 }
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(slide.isQRCode ? "QR Code \(index + 1)" : "Image \(index + 1)")
+                Text(slide.isQRCode ? "QR Code \(index + 1)" : slide.isBarcode ? "Barcode \(index + 1)" : "Image \(index + 1)")
                     .font(.headline)
                     .foregroundStyle(.white)
                 // Subtitle: prefer action detail over QR content URL
@@ -549,6 +625,36 @@ struct SlideEditorView: View {
                     .foregroundStyle(.white)
                 }
 
+            } else if slide.isBarcode {
+                Section {
+                    TextField("Text or number to encode", text: Binding(
+                        get: { slide.barcodeContent ?? "" },
+                        set: { slide.barcodeContent = $0.isEmpty ? nil : $0 }
+                    ))
+                    .foregroundStyle(.white)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                } header: {
+                    Text("Barcode Content")
+                }
+
+                if let content = slide.barcodeContent, !content.isEmpty {
+                    Section("Preview") {
+                        BarcodeCanvasView(content: content)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 80)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                    }
+                }
+
+                Section("Label (optional)") {
+                    TextField("Label below barcode", text: Binding(
+                        get: { slide.qrCodeLabel ?? "" },
+                        set: { slide.qrCodeLabel = $0.isEmpty ? nil : $0 }
+                    ))
+                    .foregroundStyle(.white)
+                }
             } else {
                 Section("Preview") {
                     let img = slide.imageData.flatMap { UIImage(data: $0) }
@@ -573,7 +679,7 @@ struct SlideEditorView: View {
                 }
             }
 
-            if !slide.isQRCode {
+            if !slide.isQRCode && !slide.isBarcode {
                 Section("Position & Scale") {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Zoom: \(String(format: "%.1f", slide.scale))×")
