@@ -1,9 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Bow: open arc (not a full circle) — cut where it meets the shaft top and bottom.
-       Arc from shaft-top (12.5, 10) going counter-clockwise all the way around to shaft-bottom (12.5, 14). -->
-  <path d="M12.5 10 A5.5 5.5 0 1 0 12.5 14"/>
-  <!-- Inner hole (small) -->
-  <circle cx="7" cy="12" r="1.5"/>
-  <!-- Shaft + two stepped teeth -->
-  <path d="M12.5 10 H22.5 V14 H20.5 V16.5 H18.5 V14 H16 V17.5 H14 V14 H12.5 Z"/>
+  <!-- Bow: open arc. Centre (7,12) radius 6.5.
+       Arc endpoints (13,9.5) and (13,14.5) are exactly on the circle,
+       large arc counter-clockwise = sweeps around the left side only.
+       No arc on the right side where the shaft opens. -->
+  <path d="M13 9.5 A6.5 6.5 0 1 0 13 14.5"/>
+  <!-- Inner hole -->
+  <circle cx="7" cy="12" r="1.8"/>
+  <!-- Shaft + two teeth. Open path (no Z) so no line closes across the bow opening. -->
+  <path d="M13 9.5 H22.5 V14.5 H21 V17 H19 V14.5 H17 V18 H15 V14.5 H13"/>
 </svg>

@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Cabin/roof (wide, only slightly narrower than body) -->
-  <path d="M5.5 9 L6.5 4.5 L17.5 4.5 L18.5 9"/>
-  <!-- Body (full width, A-pillars curving out from cabin) -->
+  <!-- Body (full width) -->
   <path d="M2 19.5 L2.5 12 Q3 10 5.5 9 L18.5 9 Q21 10 21.5 12 L22 19.5 Z"/>
-  <!-- Windshield glass (inside cabin) -->
-  <path d="M6.5 9 L7.5 5 L16.5 5 L17.5 9"/>
+  <!-- Cabin/roof — wider span x=4 to x=20, thinner stroke -->
+  <path d="M4 9 L5 4.5 L19 4.5 L20 9" stroke-width="1"/>
+  <!-- Windshield glass — thinner stroke matching cabin -->
+  <path d="M5 9 L6 5 L18 5 L19 9" stroke-width="1"/>
   <!-- Left headlight -->
   <rect x="2.5" y="14.5" width="4.5" height="2.5" rx="1"/>
   <!-- Right headlight -->

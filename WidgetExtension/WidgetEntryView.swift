@@ -141,11 +141,9 @@ struct WidgetEntryView: View {
             // the QR code always has a white surface to render on.
             Color.white
 
-            // NoOpIntent background: prevents opening the host app when no action
-            // is configured and the user taps a non-chevron area.
-            // On systemSmall this consumes the 1 interactive-element slot, so the
-            // chevron is suppressed when there's no navigation need anyway.
-            if actionURL == nil {
+            // NoOpIntent: only needed when there's no navigation (single/empty slide)
+            // and no action configured — prevents the system from opening the app.
+            if !hasNavigation && actionURL == nil {
                 Button(intent: NoOpIntent()) { Color.clear }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .buttonStyle(.plain)
@@ -189,12 +187,15 @@ struct WidgetEntryView: View {
                                 .frame(width: geo.size.width, height: geo.size.height * 0.55)
                                 .frame(width: geo.size.width, height: geo.size.height)
                             if let label = slide.qrCodeLabel, !label.isEmpty {
-                                Text(label)
-                                    .font(.system(size: max(slide.qrCodeLabelSize, 7), weight: .medium))
-                                    .foregroundStyle(.black)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.5)
-                                    .padding(.top, geo.size.height * 0.62)
+                                VStack {
+                                    Spacer()
+                                    Text(label)
+                                        .font(.system(size: max(slide.qrCodeLabelSize, 7), weight: .medium))
+                                        .foregroundStyle(.black)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.5)
+                                        .padding(.bottom, 4)
+                                }
                             }
                         }
                     }
@@ -210,47 +211,39 @@ struct WidgetEntryView: View {
                     }
                 }
 
-                // Corner navigation chevrons — bottom-left and bottom-right.
-                // Use entry.entityUUID (not entry.configuration.id) — when makeEntry()
-                // falls back to .defaultConfiguration the config.id is a random UUID that
-                // won't match the slideIdx_ key written by AdvanceImageIntent.
-                // Pass slideCount so perform() never needs to call loadConfigurations().
+                // Three invisible tap zones covering the full widget height:
+                // left third = previous code, right third = next code,
+                // center third = action item (falls through to widgetURL).
                 if hasNavigation {
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Button(intent: AdvanceImageIntent(
-                                widgetID: entry.entityUUID,
-                                forward: false,
-                                slideCount: slides.count)) {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(Color(white: 0.5))
-                                    .padding(5)
-                                    .background(Color(white: 0.5).opacity(0.15))
-                                    .clipShape(Circle())
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.leading, 3)
-                            .padding(.bottom, 3)
-
-                            Spacer()
-
-                            Button(intent: AdvanceImageIntent(
-                                widgetID: entry.entityUUID,
-                                forward: true,
-                                slideCount: slides.count)) {
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(Color(white: 0.5))
-                                    .padding(5)
-                                    .background(Color(white: 0.5).opacity(0.15))
-                                    .clipShape(Circle())
-                            }
-                            .buttonStyle(.plain)
-                            .padding(.trailing, 3)
-                            .padding(.bottom, 3)
+                    HStack(spacing: 0) {
+                        Button(intent: AdvanceImageIntent(
+                            widgetID: entry.entityUUID,
+                            forward: false,
+                            slideCount: slides.count)) {
+                            Color.black.opacity(0.001)
                         }
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                        if actionURL == nil {
+                            Button(intent: NoOpIntent()) {
+                                Color.black.opacity(0.001)
+                            }
+                            .buttonStyle(.plain)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        } else {
+                            Color.black.opacity(0.001)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+
+                        Button(intent: AdvanceImageIntent(
+                            widgetID: entry.entityUUID,
+                            forward: true,
+                            slideCount: slides.count)) {
+                            Color.black.opacity(0.001)
+                        }
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
