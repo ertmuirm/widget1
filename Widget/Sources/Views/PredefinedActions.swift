@@ -249,10 +249,13 @@ class InstalledAppsManager: ObservableObject {
     private let predefinedBundleIDs: Set<String> = {
         var ids = Set<String>()
         for app in predefinedApps {
-            if app.openURL.hasPrefix("openapp://launch?bundle="),
-               let comps = URLComponents(string: app.openURL),
-               let id = comps.queryItems?.first(where: { $0.name == "bundle" })?.value {
-                ids.insert(id)
+            let url = app.openURL
+            if url.hasPrefix("openapp://launch?bundle=") {
+                // URLComponents fails on fallback=xxx:// query values — use string range
+                let suffix = String(url.dropFirst("openapp://launch?bundle=".count))
+                if let id = suffix.components(separatedBy: "&").first, !id.isEmpty {
+                    ids.insert(id)
+                }
             }
         }
         return ids
@@ -278,14 +281,17 @@ class InstalledAppsManager: ObservableObject {
     func isInstalled(_ app: AppActionGroup) -> Bool {
         let url = app.openURL
 
-        if url.hasPrefix("openapp://launch?bundle="),
-           let comps = URLComponents(string: url),
-           let bundleID = comps.queryItems?.first(where: { $0.name == "bundle" })?.value {
-            if hasSuccessfullyEnumerated {
-                return installedBundleIDs.contains(bundleID)
+        if url.hasPrefix("openapp://launch?bundle=") {
+            // URLComponents fails when fallback= contains ://, so extract with string range
+            let suffix = String(url.dropFirst("openapp://launch?bundle=".count))
+            let bundleID = suffix.components(separatedBy: "&").first ?? ""
+            if !bundleID.isEmpty {
+                if hasSuccessfullyEnumerated {
+                    return installedBundleIDs.contains(bundleID)
+                }
+                // Bulk enumeration unavailable — fall back to per-app workspace check
+                return InstalledAppsManager.workspaceIsInstalled(bundleID: bundleID)
             }
-            // Bulk enumeration unavailable — fall back to per-app workspace check
-            return InstalledAppsManager.workspaceIsInstalled(bundleID: bundleID)
         }
 
         guard hasCompletedScan else { return true }

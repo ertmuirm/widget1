@@ -8,8 +8,6 @@ struct WidgetApp: App {
             ContentView()
                 .onOpenURL { url in
                     Task { @MainActor in
-                        // Brief yield so the black ContentView renders before handing off
-                        try? await Task.sleep(for: .milliseconds(250))
                         if url.scheme == "openapp" {
                             let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
                             if let bundleID = comps?.queryItems?.first(where: { $0.name == "bundle" })?.value {
