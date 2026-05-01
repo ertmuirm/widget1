@@ -279,8 +279,32 @@ struct WidgetEntryView: View {
                         }
                     }
                 }
+
+                // Always-on debug overlay (top-leading). Stays visible regardless of
+                // whether the QR/image rendered, so we can see what the slide actually
+                // contains when the widget appears empty/white.
+                slideDebugOverlay(slide: slide, index: index, total: slides.count)
             }
         }
+    }
+
+    @ViewBuilder
+    private func slideDebugOverlay(slide: ImageSlide, index: Int, total: Int) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text("\(index + 1)/\(total) \(slide.isQRCode ? "QR" : "IMG")")
+            if slide.isQRCode {
+                Text("c:\(slide.qrCodeContent.map { String($0.prefix(18)) } ?? "nil")")
+            } else {
+                Text("d:\(slide.imageData.map { "\($0.count)" } ?? "nil") f:\(slide.filename.isEmpty ? "-" : String(slide.filename.prefix(12)))")
+                Text(String(format: "s:%.2f x:%.2f y:%.2f", slide.scale, slide.offsetX, slide.offsetY))
+            }
+        }
+        .font(.system(size: 7, design: .monospaced))
+        .foregroundStyle(.green)
+        .padding(2)
+        .background(Color.black.opacity(0.7))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .allowsHitTesting(false)
     }
 
     // MARK: - Lock Screen

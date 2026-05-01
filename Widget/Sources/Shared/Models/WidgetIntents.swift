@@ -533,6 +533,10 @@ struct NoOpIntent: AppIntent {
 
 struct AdvanceImageIntent: AppIntent {
     static var title: LocalizedStringResource = "Advance Image"
+    /// Critical: without this, tapping the button opens the host app instead of
+    /// running the intent in-place, so the left/right zone taps appear to do nothing
+    /// (they actually launch the host app silently and never refresh the widget).
+    static var openAppWhenRun: Bool = false
 
     @Parameter(title: "Widget ID") var widgetID: String
     @Parameter(title: "Forward")   var forward: Bool
