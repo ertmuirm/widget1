@@ -14,6 +14,11 @@ extension UIImage {
         let scaled = raw.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
         let ctx = CIContext()
         guard let cg = ctx.createCGImage(scaled, from: scaled.extent) else { return nil }
-        return UIImage(cgImage: cg)
+        // Force RGBA output — CIQRCodeGenerator produces grayscale which renders as
+        // a white square in the widget extension context due to color space mismatch.
+        let targetSize = CGSize(width: size, height: size)
+        return UIGraphicsImageRenderer(size: targetSize).image { _ in
+            UIImage(cgImage: cg).draw(in: CGRect(origin: .zero, size: targetSize))
+        }
     }
 }

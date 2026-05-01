@@ -1,5 +1,6 @@
 import AppIntents
 import WidgetKit
+import UIKit
 
 // MARK: - Entity ID encoding
 //
@@ -9,15 +10,40 @@ import WidgetKit
 // entities on every timeline refresh; if the query returns an empty array the
 // selectedWidget becomes nil. Embedding the config in the ID prevents that.
 
+/// Downsample image data to a small thumbnail for embedding in entity IDs.
+/// Keeps entity IDs compact (~2-4 KB/image) while still providing a fallback
+/// when the app-group / keychain channel is unavailable (e.g. SideStore free accounts).
+private func thumbnailData(from data: Data, maxDimension: CGFloat = 80) -> Data? {
+    guard let src = UIImage(data: data) else { return nil }
+    let s = src.size
+    guard s.width > 0, s.height > 0 else { return nil }
+    let factor = min(maxDimension / s.width, maxDimension / s.height, 1.0)
+    if factor >= 1.0 { return data }
+    let newSize = CGSize(width: (s.width * factor).rounded(), height: (s.height * factor).rounded())
+    let thumb = UIGraphicsImageRenderer(size: newSize).image { _ in
+        src.draw(in: CGRect(origin: .zero, size: newSize))
+    }
+    return thumb.jpegData(compressionQuality: 0.5)
+}
+
 private func encodeEntityID(_ config: WidgetConfig) -> String {
-    // Strip imageData from slides and items to keep entity IDs compact.
-    // The widget extension reads imageData from the full config JSON in shared storage.
+    // Downsample imageData to small thumbnails before embedding in the entity ID.
+    // This keeps entity IDs manageable (~2-4 KB/image) while still providing a
+    // fallback path when app-group / keychain storage is inaccessible in the extension.
     var lite = config
     if var slides = lite.slides {
-        for i in slides.indices { slides[i].imageData = nil }
+        for i in slides.indices {
+            if let d = slides[i].imageData {
+                slides[i].imageData = thumbnailData(from: d) ?? d
+            }
+        }
         lite.slides = slides
     }
-    for i in lite.items.indices { lite.items[i].imageData = nil }
+    for i in lite.items.indices {
+        if let d = lite.items[i].imageData {
+            lite.items[i].imageData = thumbnailData(from: d) ?? d
+        }
+    }
     guard let data = try? {
         let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601; return try enc.encode(lite)
     }() else { return config.id.uuidString }
