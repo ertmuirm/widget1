@@ -91,7 +91,7 @@ enum WidgetKind: String, Codable {
     var displayName: String {
         switch self {
         case .grid:            return "Grid"
-        case .imageSlideshow:  return "Image Slideshow"
+        case .imageSlideshow:  return "Code"
         case .lockScreen:      return "Lock Screen"
         }
     }

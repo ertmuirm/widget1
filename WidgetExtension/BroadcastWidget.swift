@@ -91,7 +91,7 @@ struct BroadcastLockWidget: Widget {
     }
 }
 
-// MARK: - Image Slideshow Widget
+// MARK: - Code Widget (QR slideshow)
 
 struct BroadcastImageWidget: Widget {
     let kind = "BroadcastImage"
@@ -103,11 +103,14 @@ struct BroadcastImageWidget: Widget {
             provider: ImageBroadcastProvider()
         ) { entry in
             WidgetEntryView(entry: entry)
-                .containerBackground(for: .widget) { Color.black }
+                .containerBackground(for: .widget) { Color.white }
         }
-        .configurationDisplayName("Image Widget")
-        .description("Display and cycle through your images")
+        .configurationDisplayName("Code Widget")
+        .description("Display QR codes on your home screen")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        // Prevent iOS 26 Clear/Liquid Glass mode from stripping the white background,
+        // which would make the black-on-white QR code invisible.
+        .containerBackgroundRemovable(false)
     }
 }
 

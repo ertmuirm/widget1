@@ -77,7 +77,7 @@ struct WidgetListView: View {
         }
         .sheet(isPresented: $showAddImageSheet) {
             let newConfig = WidgetConfig(
-                name: "Image Widget",
+                name: "Code Widget",
                 size: .systemSmall,
                 widgetKind: .imageSlideshow,
                 slides: []

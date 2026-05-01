@@ -137,103 +137,49 @@ struct WidgetEntryView: View {
         let hasAction = actionURL != nil
 
         ZStack {
+            // Solid white base — visible in iOS 26 Clear/Liquid Glass mode where the
+            // container background is replaced with a glass material. This ensures
+            // the QR code always has a white surface to render on.
+            Color.white
+
             if slides.isEmpty {
-                Color.black
                 VStack(spacing: 8) {
-                    Image(systemName: "photo.on.rectangle.angled")
+                    Image(systemName: "qrcode")
                         .font(.title)
                         .foregroundStyle(.secondary)
-                    Text("Add Images")
+                    Text("Add QR Code")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             } else {
                 let slide = slides[index]
-                if slide.isQRCode {
-                    if let content = slide.qrCodeContent, !content.isEmpty {
-                        GeometryReader { geo in
-                            ZStack {
-                                // QRCodeCanvasView renders via SwiftUI Canvas — no UIImage,
-                                // no colour-space issues, immune to iOS 18 Tinted mode.
-                                QRCodeCanvasView(content: content)
-                                    .frame(width: geo.size.width, height: geo.size.height)
-                                if let label = slide.qrCodeLabel, !label.isEmpty {
-                                    Text(label)
-                                        .font(.system(size: 9, weight: .bold))
-                                        .foregroundStyle(.white)
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.5)
-                                        .padding(.horizontal, 4)
-                                        .padding(.vertical, 3)
-                                        .background(Color.black)
-                                        .clipShape(RoundedRectangle(cornerRadius: 3))
-                                }
-                            }
-                        }
-                        .padding(-10)
-                    } else {
-                        Color.black
-                        VStack(spacing: 3) {
-                            Text("QR Debug")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(.green)
-                            if let content = slide.qrCodeContent {
-                                if content.isEmpty {
-                                    Text("content: empty")
-                                        .font(.system(size: 8))
-                                        .foregroundStyle(.green)
-                                } else {
-                                    Text("gen failed")
-                                        .font(.system(size: 8))
-                                        .foregroundStyle(.green)
-                                    Text("\"\(content.prefix(24))\"")
-                                        .font(.system(size: 7))
-                                        .foregroundStyle(.green)
-                                        .lineLimit(2)
-                                }
-                            } else {
-                                Text("content: nil")
-                                    .font(.system(size: 8))
-                                    .foregroundStyle(.green)
-                            }
-                        }
-                        .multilineTextAlignment(.center)
-                        .padding(4)
-                    }
-                } else {
-                    let image = slide.imageData.flatMap { UIImage(data: $0) }
-                    if let image {
-                        GeometryReader { geo in
-                            Image(uiImage: image)
-                                .resizable()
-                                .scaledToFill()
-                                .scaleEffect(CGFloat(slide.scale))
-                                .offset(
-                                    x: CGFloat(slide.offsetX) * geo.size.width,
-                                    y: CGFloat(slide.offsetY) * geo.size.height
-                                )
+                if let content = slide.qrCodeContent, !content.isEmpty {
+                    GeometryReader { geo in
+                        ZStack {
+                            QRCodeCanvasView(content: content)
                                 .frame(width: geo.size.width, height: geo.size.height)
-                                .clipped()
+                            if let label = slide.qrCodeLabel, !label.isEmpty {
+                                Text(label)
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.5)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 3)
+                                    .background(Color.black)
+                                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                            }
                         }
-                        .padding(-10)
-                    } else {
-                        Color.black.opacity(0.7)
-                        VStack(spacing: 3) {
-                            Image(systemName: "photo")
-                                .font(.title2)
-                                .foregroundStyle(.green)
-                            Text(slide.imageData != nil
-                                 ? "data: \(slide.imageData!.count)B"
-                                 : "data: nil")
-                                .font(.system(size: 8))
-                                .foregroundStyle(.green)
-                            Text("file: \(slide.filename.isEmpty ? "empty" : slide.filename)")
-                                .font(.system(size: 7))
-                                .foregroundStyle(.green)
-                                .lineLimit(2)
-                                .multilineTextAlignment(.center)
-                        }
-                        .padding(4)
+                    }
+                    .padding(-10)
+                } else {
+                    VStack(spacing: 4) {
+                        Image(systemName: "qrcode")
+                            .font(.title2)
+                            .foregroundStyle(.secondary)
+                        Text("No content")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -276,32 +222,8 @@ struct WidgetEntryView: View {
                         }
                     }
                 }
-
-                // Always-on debug overlay (top-leading). Stays visible regardless of
-                // whether the QR/image rendered, so we can see what the slide actually
-                // contains when the widget appears empty/white.
-                slideDebugOverlay(slide: slide, index: index, total: slides.count)
             }
         }
-    }
-
-    @ViewBuilder
-    private func slideDebugOverlay(slide: ImageSlide, index: Int, total: Int) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text("\(index + 1)/\(total) \(slide.isQRCode ? "QR" : "IMG")")
-            if slide.isQRCode {
-                Text("c:\(slide.qrCodeContent.map { String($0.prefix(18)) } ?? "nil")")
-            } else {
-                Text("d:\(slide.imageData.map { "\($0.count)" } ?? "nil") f:\(slide.filename.isEmpty ? "-" : String(slide.filename.prefix(12)))")
-                Text(String(format: "s:%.2f x:%.2f y:%.2f", slide.scale, slide.offsetX, slide.offsetY))
-            }
-        }
-        .font(.system(size: 7, design: .monospaced))
-        .foregroundStyle(.green)
-        .padding(2)
-        .background(Color.black.opacity(0.7))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .allowsHitTesting(false)
     }
 
     // MARK: - Lock Screen

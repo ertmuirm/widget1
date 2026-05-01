@@ -18,10 +18,8 @@ struct WidgetEditorView: View {
     @State private var editingItemIndex: EditingItemIndex?
     @State private var isReordering = false
 
-    // Image slide editing
+    // QR slide editing
     @State private var editingSlideIndex: EditingItemIndex?
-    @State private var photoPickerItems: [PhotosPickerItem] = []
-    @State private var showFileImporter = false
 
     private var isImageWidget: Bool { configuration.widgetKind == .imageSlideshow }
     private var isLockScreenWidget: Bool { configuration.widgetKind == .lockScreen }
@@ -84,28 +82,10 @@ struct WidgetEditorView: View {
                 ItemEditorView(item: $configuration.items[sel.id], widgetKind: configuration.widgetKind)
             }
         }
-        // Slide position/scale editor sheet
+        // Slide editor sheet
         .sheet(item: $editingSlideIndex) { sel in
             NavigationStack {
                 SlideEditorView(slide: bindingForSlide(sel.id))
-            }
-        }
-        // Photos picker for slides
-        .photosPicker(isPresented: .constant(false),
-                      selection: $photoPickerItems,
-                      matching: .images)
-        .onChange(of: photoPickerItems) { items in
-            for item in items { loadPhotoItem(item) }
-            photoPickerItems = []
-        }
-        // File importer for slides
-        .fileImporter(
-            isPresented: $showFileImporter,
-            allowedContentTypes: [.image],
-            allowsMultipleSelection: true
-        ) { result in
-            if case .success(let urls) = result {
-                for url in urls { loadImageFile(url) }
             }
         }
     }
@@ -117,33 +97,20 @@ struct WidgetEditorView: View {
         Section {
             ForEach(Array((configuration.slides ?? []).enumerated()), id: \.element.id) { index, slide in
                 SlideRowView(slide: slide, index: index) {
-                    SharedStorage.shared.deleteWidgetImage(filename: slide.filename)
                     configuration.slides?.remove(at: index)
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { editingSlideIndex = EditingItemIndex(id: index) }
             }
         } header: {
-            Text("Images (\(configuration.slides?.count ?? 0))")
+            Text("QR Codes (\(configuration.slides?.count ?? 0))")
         }
 
-        Section("Add Slides") {
-            PhotosPicker(selection: $photoPickerItems, matching: .images) {
-                Label("Add from Photos", systemImage: "photo.on.rectangle")
-            }
-            .foregroundStyle(.white)
-
-            Button {
-                showFileImporter = true
-            } label: {
-                Label("Add from Files", systemImage: "folder")
-            }
-            .foregroundStyle(.white)
-
+        Section {
             Button {
                 addQRSlide()
             } label: {
-                Label("Add QR Code Slide", systemImage: "qrcode")
+                Label("Add QR Code", systemImage: "qrcode")
             }
             .foregroundStyle(.white)
         }
@@ -298,29 +265,26 @@ struct WidgetEditorView: View {
 
         ZStack {
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color.black)
+                .fill(Color.white)
                 .frame(height: 200)
 
             if slides.isEmpty {
                 VStack(spacing: 8) {
-                    Image(systemName: "photo.on.rectangle.angled")
+                    Image(systemName: "qrcode")
                         .font(.title)
                         .foregroundStyle(.secondary)
-                    Text("No images added yet")
+                    Text("No QR codes added yet")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             } else if index < slides.count {
                 let slide = slides[index]
-                if slide.isQRCode, let content = slide.qrCodeContent, !content.isEmpty,
-                   let qr = UIImage.qrCode(from: content, size: 300) {
+                if let content = slide.qrCodeContent, !content.isEmpty {
                     ZStack {
-                        Image(uiImage: qr)
-                            .interpolation(.none)
-                            .resizable()
-                            .scaledToFit()
+                        QRCodeCanvasView(content: content)
                             .frame(maxHeight: 200)
                             .frame(maxWidth: .infinity)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                         if let label = slide.qrCodeLabel, !label.isEmpty {
                             Text(label)
                                 .font(.system(size: 12, weight: .bold))
@@ -331,18 +295,6 @@ struct WidgetEditorView: View {
                                 .background(Color.black)
                                 .clipShape(RoundedRectangle(cornerRadius: 4))
                         }
-                    }
-                } else {
-                    let image = slide.imageData.flatMap { UIImage(data: $0) }
-                        ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
-                    if let image {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .scaleEffect(CGFloat(slide.scale))
-                            .offset(x: CGFloat(slide.offsetX) * 150, y: CGFloat(slide.offsetY) * 100)
-                            .frame(maxWidth: .infinity, maxHeight: 200)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }
             }
@@ -385,42 +337,12 @@ struct WidgetEditorView: View {
         )
     }
 
-    private func loadPhotoItem(_ item: PhotosPickerItem) {
-        item.loadTransferable(type: Data.self) { result in
-            DispatchQueue.main.async {
-                guard case .success(let data) = result, let data else { return }
-                self.addSlide(imageData: data)
-            }
-        }
-    }
-
-    private func loadImageFile(_ url: URL) {
-        guard url.startAccessingSecurityScopedResource() else { return }
-        defer { url.stopAccessingSecurityScopedResource() }
-        guard let data = try? Data(contentsOf: url) else { return }
-        addSlide(imageData: data)
-    }
-
     private func addQRSlide() {
         let slide = ImageSlide(filename: "", qrCodeContent: "")
         if configuration.slides == nil { configuration.slides = [] }
         configuration.slides?.append(slide)
         let newIndex = (configuration.slides?.count ?? 1) - 1
         editingSlideIndex = EditingItemIndex(id: newIndex)
-    }
-
-    private func addSlide(imageData: Data) {
-        guard let image = UIImage(data: imageData) else { return }
-        // 500 px max keeps decoded bitmap memory ~1 MB — well within WidgetKit's 30 MB limit.
-        let downsized = image.downsizedForWidget(maxDimension: 500)
-        guard let jpeg = downsized.jpegData(compressionQuality: 0.8) else { return }
-        let filename = "\(UUID().uuidString).jpg"
-        SharedStorage.shared.saveWidgetImage(jpeg, filename: filename)
-        // Do not embed jpeg in the slide struct — saveConfigurations strips it anyway
-        // and the inline blob would bloat the config JSON past UserDefaults limits.
-        let slide = ImageSlide(filename: filename)
-        if configuration.slides == nil { configuration.slides = [] }
-        configuration.slides?.append(slide)
     }
 
     private func saveConfiguration() {
