@@ -118,15 +118,14 @@ struct WidgetEditorView: View {
                 } label: {
                     SlideRowView(slide: slide, index: index)
                 }
-            }
-            .onDelete { indexSet in
-                // Delete associated image files
-                for i in indexSet {
-                    if let slide = configuration.slides?[i] {
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
                         SharedStorage.shared.deleteWidgetImage(filename: slide.filename)
+                        configuration.slides?.remove(at: index)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
                     }
                 }
-                configuration.slides?.remove(atOffsets: indexSet)
             }
         } header: {
             Text("Images (\(configuration.slides?.count ?? 0))")
@@ -523,7 +522,7 @@ struct SlideEditorView: View {
                 Section {
                     TextField("URL or text to encode", text: Binding(
                         get: { slide.qrCodeContent ?? "" },
-                        set: { slide.qrCodeContent = $0.isEmpty ? nil : $0 }
+                        set: { slide.qrCodeContent = $0 }
                     ))
                     .foregroundStyle(.white)
                     .autocorrectionDisabled()

@@ -29,91 +29,91 @@ func bundleIDURL(_ bundleID: String, fallback: String? = nil) -> String {
 // MARK: - Predefined list (flat, alphabetical)
 
 let predefinedApps: [AppActionGroup] = [
-    AppActionGroup(category: "", name: "Alipay",           openURL: "alipay://", deepLinks: [
+    AppActionGroup(category: "", name: "Alipay",           openURL: bundleIDURL("com.alipay.iphoneclient", fallback: "alipay://"), deepLinks: [
         DeepLink(name: "Scan QR Code",   urlString: "alipayqr://platformapi/startapp?saId=10000007"),
         DeepLink(name: "Payment QR",     urlString: "alipayqr://platformapi/startapp?appId=20000056"),
         DeepLink(name: "Transfer Money", urlString: "alipays://platformapi/startapp?appId=20000116"),
         DeepLink(name: "Phone Top-Up",   urlString: "alipayqr://platformapi/startapp?appId=10000003"),
     ]),
-    AppActionGroup(category: "", name: "App Store",        openURL: "itms-apps://", deepLinks: [
+    AppActionGroup(category: "", name: "App Store",        openURL: bundleIDURL("com.apple.AppStore", fallback: "itms-apps://"), deepLinks: [
         DeepLink(name: "Today Tab", urlString: "itms-apps://?action=today"),
         DeepLink(name: "Search",    urlString: "itms-apps://?action=search&term="),
     ]),
     AppActionGroup(category: "", name: "Bank of Singapore", openURL: bundleIDURL("com.bankofsingapore.digital.iphone"), deepLinks: []),
     AppActionGroup(category: "", name: "Calculator",       openURL: bundleIDURL("com.apple.calculator"), deepLinks: []),
-    AppActionGroup(category: "", name: "Chase",            openURL: "chase://", deepLinks: []),
-    AppActionGroup(category: "", name: "ChatGPT",          openURL: "chatgpt://", deepLinks: []),
-    AppActionGroup(category: "", name: "Citibank",         openURL: "citi://", deepLinks: []),
+    AppActionGroup(category: "", name: "Chase",            openURL: bundleIDURL("com.chase.sig.ios", fallback: "chase://"), deepLinks: []),
+    AppActionGroup(category: "", name: "ChatGPT",          openURL: bundleIDURL("com.openai.chat", fallback: "chatgpt://"), deepLinks: []),
+    AppActionGroup(category: "", name: "Citibank",         openURL: bundleIDURL("com.citi.mobile.citi", fallback: "citi://"), deepLinks: []),
     AppActionGroup(category: "", name: "Claude",           openURL: bundleIDURL("com.anthropic.claudeios"), deepLinks: []),
     AppActionGroup(category: "", name: "Contacts",         openURL: bundleIDURL("com.apple.MobileAddressBook"), deepLinks: []),
-    AppActionGroup(category: "", name: "Copilot",          openURL: "ms-officemobile://", deepLinks: []),
-    AppActionGroup(category: "", name: "DBS digibank",     openURL: "dbsnow://", deepLinks: []),
-    AppActionGroup(category: "", name: "Doubao 豆包",       openURL: "doubao://", deepLinks: []),
-    AppActionGroup(category: "", name: "Duolingo",         openURL: "duolingo://", deepLinks: []),
-    AppActionGroup(category: "", name: "Files",            openURL: "shareddocuments://", deepLinks: []),
-    AppActionGroup(category: "", name: "Gemini",           openURL: "googleapp://robin", deepLinks: [
+    AppActionGroup(category: "", name: "Copilot",          openURL: bundleIDURL("com.microsoft.copilot", fallback: "ms-officemobile://"), deepLinks: []),
+    AppActionGroup(category: "", name: "DBS digibank",     openURL: bundleIDURL("com.dbs.dbsaltbanking", fallback: "dbsnow://"), deepLinks: []),
+    AppActionGroup(category: "", name: "Doubao 豆包",       openURL: bundleIDURL("com.lark.tosapp.doubaomobile", fallback: "doubao://"), deepLinks: []),
+    AppActionGroup(category: "", name: "Duolingo",         openURL: bundleIDURL("com.duolingo.DuolingoMobile", fallback: "duolingo://"), deepLinks: []),
+    AppActionGroup(category: "", name: "Files",            openURL: bundleIDURL("com.apple.DocumentsApp", fallback: "shareddocuments://"), deepLinks: []),
+    AppActionGroup(category: "", name: "Gemini",           openURL: bundleIDURL("com.google.Gemini", fallback: "googleapp://robin"), deepLinks: [
         DeepLink(name: "Open Microphone", urlString: "googlegeminiai://open-mic"),
     ]),
-    AppActionGroup(category: "", name: "Google Home",      openURL: "googlehome://", deepLinks: []),
-    AppActionGroup(category: "", name: "Google Maps",      openURL: "comgooglemaps://", deepLinks: [
+    AppActionGroup(category: "", name: "Google Home",      openURL: bundleIDURL("com.google.GoogleHome", fallback: "googlehome://"), deepLinks: []),
+    AppActionGroup(category: "", name: "Google Maps",      openURL: bundleIDURL("com.google.Maps", fallback: "comgooglemaps://"), deepLinks: [
         DeepLink(name: "Search",                urlString: "comgooglemaps://?q="),
         DeepLink(name: "Directions (Driving)",  urlString: "comgooglemaps://?saddr=&daddr=&directionsmode=driving"),
         DeepLink(name: "Directions (Transit)",  urlString: "comgooglemaps://?saddr=&daddr=&directionsmode=transit"),
         DeepLink(name: "Directions (Walking)",  urlString: "comgooglemaps://?saddr=&daddr=&directionsmode=walking"),
         DeepLink(name: "Directions (Cycling)",  urlString: "comgooglemaps://?saddr=&daddr=&directionsmode=bicycling"),
     ]),
-    AppActionGroup(category: "", name: "Google Photos",    openURL: "googlephotos://", deepLinks: []),
-    AppActionGroup(category: "", name: "Google Translate", openURL: "googletranslate://", deepLinks: [
-        DeepLink(name: "Translate to English", urlString: "googletranslate://?sl=auto&tl=en&text="),
-        DeepLink(name: "Translate to Chinese", urlString: "googletranslate://?sl=auto&tl=zh&text="),
-        DeepLink(name: "Translate to Spanish", urlString: "googletranslate://?sl=auto&tl=es&text="),
-        DeepLink(name: "Translate to French",  urlString: "googletranslate://?sl=auto&tl=fr&text="),
+    AppActionGroup(category: "", name: "Google Photos",    openURL: bundleIDURL("com.google.photos", fallback: "googlephotos://"), deepLinks: []),
+    AppActionGroup(category: "", name: "Google Translate", openURL: bundleIDURL("com.google.Translate", fallback: "googletranslate://"), deepLinks: [
+        DeepLink(name: "Translate to English",  urlString: "googletranslate://?sl=auto&tl=en&text="),
+        DeepLink(name: "Translate to Chinese",  urlString: "googletranslate://?sl=auto&tl=zh&text="),
+        DeepLink(name: "Translate to Spanish",  urlString: "googletranslate://?sl=auto&tl=es&text="),
+        DeepLink(name: "Translate to French",   urlString: "googletranslate://?sl=auto&tl=fr&text="),
         DeepLink(name: "Translate to Japanese", urlString: "googletranslate://?sl=auto&tl=ja&text="),
     ]),
-    AppActionGroup(category: "", name: "Google Voice",     openURL: "googlevoice://", deepLinks: []),
-    AppActionGroup(category: "", name: "Grab",             openURL: "grab://", deepLinks: []),
+    AppActionGroup(category: "", name: "Google Voice",     openURL: bundleIDURL("com.google.GoogleVoice", fallback: "googlevoice://"), deepLinks: []),
+    AppActionGroup(category: "", name: "Grab",             openURL: bundleIDURL("com.grabtaxi.passenger", fallback: "grab://"), deepLinks: []),
     AppActionGroup(category: "", name: "Granola",          openURL: bundleIDURL("com.granola.ios-prod"), deepLinks: []),
     AppActionGroup(category: "", name: "Grok",             openURL: bundleIDURL("ai.x.GrokApp", fallback: "grok://"), deepLinks: []),
     AppActionGroup(category: "", name: "HDFlix",           openURL: bundleIDURL("com.box.hd.flix.drama.hub"), deepLinks: []),
     AppActionGroup(category: "", name: "HeyCyan",          openURL: bundleIDURL("com.heycyan.app"), deepLinks: []),
-    AppActionGroup(category: "", name: "Hilton Honors",    openURL: "hiltonhhonors://", deepLinks: []),
+    AppActionGroup(category: "", name: "Hilton Honors",    openURL: bundleIDURL("com.hilton.hhonors", fallback: "hiltonhhonors://"), deepLinks: []),
     AppActionGroup(category: "", name: "iCondo",           openURL: bundleIDURL("com.project.icondo"), deepLinks: []),
     AppActionGroup(category: "", name: "iSH Shell",        openURL: bundleIDURL("app.ish.iSH"), deepLinks: []),
-    AppActionGroup(category: "", name: "Lark",             openURL: "https://applink.larksuite.com/", deepLinks: []),
+    AppActionGroup(category: "", name: "Lark",             openURL: bundleIDURL("com.larksuite.lark", fallback: "https://applink.larksuite.com/"), deepLinks: []),
     AppActionGroup(category: "", name: "Libby",            openURL: bundleIDURL("com.overdrive.dewey", fallback: "libbyapp://"), deepLinks: []),
     AppActionGroup(category: "", name: "M1 (My M1+)",      openURL: bundleIDURL("sg.com.m1.sunshine"), deepLinks: []),
     AppActionGroup(category: "", name: "Maribank",         openURL: bundleIDURL("sg.com.maribankmobile.digitalbank"), deepLinks: []),
-    AppActionGroup(category: "", name: "Marriott Bonvoy",  openURL: "marriott://", deepLinks: []),
-    AppActionGroup(category: "", name: "McDonald's",       openURL: "mcdonalds://", deepLinks: []),
+    AppActionGroup(category: "", name: "Marriott Bonvoy",  openURL: bundleIDURL("com.marriott.mobile", fallback: "marriott://"), deepLinks: []),
+    AppActionGroup(category: "", name: "McDonald's",       openURL: bundleIDURL("com.mcdonalds.mcd", fallback: "mcdonalds://"), deepLinks: []),
     AppActionGroup(category: "", name: "Messages",         openURL: bundleIDURL("com.apple.MobileSMS"), deepLinks: [
         DeepLink(name: "New Message",       urlString: "sms:"),
         DeepLink(name: "Message to Number", urlString: "sms:+"),
     ]),
-    AppActionGroup(category: "", name: "Microsoft Teams",  openURL: "msteams://", deepLinks: [
+    AppActionGroup(category: "", name: "Microsoft Teams",  openURL: bundleIDURL("com.microsoft.skype.teams", fallback: "msteams://"), deepLinks: [
         DeepLink(name: "New Meeting",  urlString: "https://teams.microsoft.com/l/meeting/new"),
         DeepLink(name: "New Chat",     urlString: "https://teams.microsoft.com/l/chat/0/0?users="),
         DeepLink(name: "Audio Call",   urlString: "https://teams.microsoft.com/l/call/0/0?users="),
         DeepLink(name: "Video Call",   urlString: "https://teams.microsoft.com/l/call/0/0?users=&withVideo=true"),
     ]),
-    AppActionGroup(category: "", name: "MiHome",           openURL: "mihome://", deepLinks: []),
-    AppActionGroup(category: "", name: "OneDrive",         openURL: "ms-onedrive://", deepLinks: [
+    AppActionGroup(category: "", name: "MiHome",           openURL: bundleIDURL("com.xiaomi.mihome", fallback: "mihome://"), deepLinks: []),
+    AppActionGroup(category: "", name: "OneDrive",         openURL: bundleIDURL("com.microsoft.skydrive", fallback: "ms-onedrive://"), deepLinks: [
         DeepLink(name: "My Files",       urlString: "ms-onedrive://files"),
         DeepLink(name: "Recent Files",   urlString: "ms-onedrive://recent"),
         DeepLink(name: "Shared with Me", urlString: "ms-onedrive://shared"),
     ]),
-    AppActionGroup(category: "", name: "Phone",            openURL: "mobilephone-keypad://", deepLinks: [
+    AppActionGroup(category: "", name: "Phone",            openURL: bundleIDURL("com.apple.mobilephone", fallback: "mobilephone-keypad://"), deepLinks: [
         DeepLink(name: "Recents",   urlString: "mobilephone-recents://"),
         DeepLink(name: "Voicemail", urlString: "mobilephone-voicemail://"),
     ]),
     AppActionGroup(category: "", name: "Photos",           openURL: bundleIDURL("com.apple.mobileslideshow"), deepLinks: []),
     AppActionGroup(category: "", name: "S&P Capital IQ",   openURL: bundleIDURL("com.capitaliq.mobile.MarketIntelligence"), deepLinks: []),
     AppActionGroup(category: "", name: "Safemate",         openURL: bundleIDURL("com.safemate2.yet"), deepLinks: []),
-    AppActionGroup(category: "", name: "SAP Concur",       openURL: "concurmobile://", deepLinks: [
+    AppActionGroup(category: "", name: "SAP Concur",       openURL: bundleIDURL("com.concur.concur", fallback: "concurmobile://"), deepLinks: [
         DeepLink(name: "Deep Link",      urlString: "concurmobiledeeplink://"),
         DeepLink(name: "Expense Report", urlString: "https://www.concursolutions.com/goto/expense-report/"),
     ]),
-    AppActionGroup(category: "", name: "Shopee",           openURL: "shopee://", deepLinks: []),
-    AppActionGroup(category: "", name: "Shortcuts",        openURL: "shortcuts://", deepLinks: [
+    AppActionGroup(category: "", name: "Shopee",           openURL: bundleIDURL("com.shopee.ShopeeSG", fallback: "shopee://"), deepLinks: []),
+    AppActionGroup(category: "", name: "Shortcuts",        openURL: bundleIDURL("com.apple.shortcuts", fallback: "shortcuts://"), deepLinks: [
         DeepLink(name: "Run Shortcut",       urlString: "shortcuts://run-shortcut?name="),
         DeepLink(name: "Run with Clipboard", urlString: "shortcuts://run-shortcut?name=&input=clipboard"),
         DeepLink(name: "Open Shortcut",      urlString: "shortcuts://open-shortcut?name="),
@@ -121,10 +121,10 @@ let predefinedApps: [AppActionGroup] = [
         DeepLink(name: "Open Gallery",       urlString: "shortcuts://gallery"),
     ]),
     AppActionGroup(category: "", name: "Singapore Airlines", openURL: bundleIDURL("com.amadeus.sqmobile", fallback: "https://www.singaporeair.com/"), deepLinks: []),
-    AppActionGroup(category: "", name: "Singpass",         openURL: "sg.gov.singpass.app://", deepLinks: [
+    AppActionGroup(category: "", name: "Singpass",         openURL: bundleIDURL("sg.gov.singpass.app", fallback: "sg.gov.singpass.app://"), deepLinks: [
         DeepLink(name: "Open (web fallback)", urlString: "https://app.singpass.gov.sg"),
     ]),
-    AppActionGroup(category: "", name: "Spotify",          openURL: "spotify:", deepLinks: [
+    AppActionGroup(category: "", name: "Spotify",          openURL: bundleIDURL("com.spotify.client", fallback: "spotify:"), deepLinks: [
         DeepLink(name: "Search",        urlString: "spotify:search:"),
         DeepLink(name: "Open Artist",   urlString: "spotify:artist:"),
         DeepLink(name: "Open Album",    urlString: "spotify:album:"),
@@ -133,11 +133,11 @@ let predefinedApps: [AppActionGroup] = [
         DeepLink(name: "Open Show",     urlString: "spotify:show:"),
     ]),
     AppActionGroup(category: "", name: "Stocks",           openURL: bundleIDURL("com.apple.stocks"), deepLinks: []),
-    AppActionGroup(category: "", name: "Taobao 淘宝",       openURL: "taobao://", deepLinks: [
+    AppActionGroup(category: "", name: "Taobao 淘宝",       openURL: bundleIDURL("com.taobao.taobao4iphone", fallback: "taobao://"), deepLinks: [
         DeepLink(name: "Search Products", urlString: "taobao://s.taobao.com?q="),
         DeepLink(name: "Search Shops",    urlString: "taobao://shopsearch.taobao.com/browse/shop_search.htm?q="),
     ]),
-    AppActionGroup(category: "", name: "Telegram",         openURL: "tg://", deepLinks: [
+    AppActionGroup(category: "", name: "Telegram",         openURL: bundleIDURL("ph.telegra.Telegraph", fallback: "tg://"), deepLinks: [
         DeepLink(name: "Settings",         urlString: "tg://settings"),
         DeepLink(name: "Privacy Settings", urlString: "tg://settings/privacy"),
         DeepLink(name: "Open Username",    urlString: "tg://resolve?domain="),
@@ -145,25 +145,25 @@ let predefinedApps: [AppActionGroup] = [
         DeepLink(name: "Join via Invite",  urlString: "tg://join?invite="),
     ]),
     AppActionGroup(category: "", name: "Trust Bank",       openURL: bundleIDURL("sg.trust"), deepLinks: []),
-    AppActionGroup(category: "", name: "Uber",             openURL: "uber://", deepLinks: [
+    AppActionGroup(category: "", name: "Uber",             openURL: bundleIDURL("com.ubercab.UberClient", fallback: "uber://"), deepLinks: [
         DeepLink(name: "Request Ride (from here)", urlString: "uber://?action=setPickup&pickup=my_location"),
         DeepLink(name: "Set Pickup & Dropoff",     urlString: "uber://?action=setPickup&pickup[latitude]=&pickup[longitude]=&dropoff[latitude]=&dropoff[longitude]="),
     ]),
-    AppActionGroup(category: "", name: "Wallet",           openURL: "wallet://", deepLinks: []),
-    AppActionGroup(category: "", name: "WeChat",           openURL: "weixin://", deepLinks: [
+    AppActionGroup(category: "", name: "Wallet",           openURL: bundleIDURL("com.apple.Passbook", fallback: "wallet://"), deepLinks: []),
+    AppActionGroup(category: "", name: "WeChat",           openURL: bundleIDURL("com.tencent.xin", fallback: "weixin://"), deepLinks: [
         DeepLink(name: "Scan QR Code", urlString: "weixin://scanqrcode"),
     ]),
-    AppActionGroup(category: "", name: "WhatsApp",         openURL: "whatsapp://", deepLinks: [
+    AppActionGroup(category: "", name: "WhatsApp",         openURL: bundleIDURL("net.whatsapp.WhatsApp", fallback: "whatsapp://"), deepLinks: [
         DeepLink(name: "New Message",       urlString: "whatsapp://send"),
         DeepLink(name: "Message with Text", urlString: "whatsapp://send?text="),
         DeepLink(name: "Message to Number", urlString: "whatsapp://send?phone="),
     ]),
-    AppActionGroup(category: "", name: "Widgetsmith",      openURL: "widgetsmith://", deepLinks: []),
-    AppActionGroup(category: "", name: "YouTube",          openURL: "vnd.youtube://", deepLinks: [
+    AppActionGroup(category: "", name: "Widgetsmith",      openURL: bundleIDURL("com.david-smith.widgetsmith", fallback: "widgetsmith://"), deepLinks: []),
+    AppActionGroup(category: "", name: "YouTube",          openURL: bundleIDURL("com.google.ios.youtube", fallback: "vnd.youtube://"), deepLinks: [
         DeepLink(name: "Open Video", urlString: "vnd.youtube://"),
         DeepLink(name: "Search",     urlString: "https://www.youtube.com/results?search_query="),
     ]),
-    AppActionGroup(category: "", name: "Zoom",             openURL: "zoomus://", deepLinks: [
+    AppActionGroup(category: "", name: "Zoom",             openURL: bundleIDURL("us.zoom.videomeetings", fallback: "zoomus://"), deepLinks: [
         DeepLink(name: "Join Meeting", urlString: "zoomus://zoom.us/join?confno="),
     ]),
 ]
@@ -219,7 +219,8 @@ class InstalledAppsManager: ObservableObject {
         if url.hasPrefix("openapp://launch?bundle="),
            let comps = URLComponents(string: url),
            let bundleID = comps.queryItems?.first(where: { $0.name == "bundle" })?.value {
-            return installedBundleIDs.contains(bundleID)
+            // Check scan results first, then fall back to direct workspace query
+            return installedBundleIDs.contains(bundleID) || Self.workspaceIsInstalled(bundleID: bundleID)
         }
 
         if url.hasPrefix("http://") || url.hasPrefix("https://") { return true }
@@ -228,6 +229,15 @@ class InstalledAppsManager: ObservableObject {
             return installedURLSchemes.contains(scheme)
         }
         return true
+    }
+
+    private static func workspaceIsInstalled(bundleID: String) -> Bool {
+        guard let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
+              let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject
+        else { return false }
+        let sel = NSSelectorFromString("applicationIsInstalled:")
+        guard ws.responds(to: sel) else { return false }
+        return ws.perform(sel, with: bundleID)?.takeUnretainedValue() as? Bool ?? false
     }
 
     private func fetchUserApps() -> ([AppActionGroup], Set<String>, Set<String>) {

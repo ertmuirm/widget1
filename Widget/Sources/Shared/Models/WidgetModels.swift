@@ -106,7 +106,7 @@ struct ImageSlide: Codable, Identifiable, Equatable {
     // imageData is intentionally excluded from JSON to keep config sizes small.
     enum CodingKeys: CodingKey { case id, filename, offsetX, offsetY, scale, action, qrCodeContent, qrCodeLabel }
 
-    var isQRCode: Bool { qrCodeContent != nil && !qrCodeContent!.isEmpty }
+    var isQRCode: Bool { qrCodeContent != nil }
 
     init(id: UUID = UUID(), filename: String,
          offsetX: Double = 0, offsetY: Double = 0, scale: Double = 1.0,

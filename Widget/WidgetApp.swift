@@ -42,22 +42,21 @@ private func dialPhoneNumber(url: URL) {
 // MARK: - Bundle-ID app launch via LSApplicationWorkspace (private API)
 
 private func openAppByBundleID(_ bundleID: String, fallbackURLString: String? = nil) {
-    // Try URL scheme fallback first — most reliable on SideStore where private APIs may not work.
+    // Try LSApplicationWorkspace first (works without URL scheme registration).
+    // Fall back to URL scheme only if the workspace call is unavailable.
+    if openViaWorkspace(bundleID) { return }
     if let str = fallbackURLString, let url = URL(string: str) {
-        Task {
-            if await UIApplication.shared.open(url) { return }
-            // URL scheme failed; try LSApplicationWorkspace as last resort
-            openViaWorkspace(bundleID)
-        }
-        return
+        Task { await UIApplication.shared.open(url) }
     }
-    openViaWorkspace(bundleID)
 }
 
-private func openViaWorkspace(_ bundleID: String) {
+@discardableResult
+private func openViaWorkspace(_ bundleID: String) -> Bool {
     guard let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
           let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject
-    else { return }
+    else { return false }
     let sel = NSSelectorFromString("openApplicationWithBundleID:")
-    if ws.responds(to: sel) { ws.perform(sel, with: bundleID) }
+    guard ws.responds(to: sel) else { return false }
+    ws.perform(sel, with: bundleID)
+    return true
 }
