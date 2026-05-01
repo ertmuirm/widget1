@@ -281,15 +281,26 @@ final class SharedStorage {
             return []
         }
         var configs = try decoder.decode([WidgetConfig].self, from: data)
-        // Populate imageData for every slide from the image store (imageData is not serialized
-        // to keep JSON small; SharedStorage holds the authoritative copy).
+        // Populate imageData from storage, preserving JSON-embedded data as cross-process fallback.
         for i in configs.indices {
-            guard configs[i].slides != nil else { continue }
-            for j in configs[i].slides!.indices {
-                let fn = configs[i].slides![j].filename
-                // Storage takes priority; if unavailable (cross-process) keep data from JSON
+            // Slides (Image Slideshow widget)
+            if configs[i].slides != nil {
+                for j in configs[i].slides!.indices {
+                    let fn = configs[i].slides![j].filename
+                    guard !fn.isEmpty else { continue }  // QR slides have empty filename
+                    if let d = loadWidgetImageData(filename: fn) {
+                        configs[i].slides![j].imageData = d
+                    }
+                    // else: keep imageData already decoded from JSON (cross-process fallback)
+                }
+            }
+            // Grid / lock-screen items with displayType == .image
+            for j in configs[i].items.indices {
+                guard configs[i].items[j].displayType == .image,
+                      let fn = configs[i].items[j].customImageFilename,
+                      !fn.isEmpty else { continue }
                 if let d = loadWidgetImageData(filename: fn) {
-                    configs[i].slides![j].imageData = d
+                    configs[i].items[j].imageData = d
                 }
             }
         }

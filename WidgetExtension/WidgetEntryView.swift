@@ -145,7 +145,7 @@ struct WidgetEntryView: View {
                 if slide.isQRCode, let content = slide.qrCodeContent, !content.isEmpty,
                    let qr = UIImage.qrCode(from: content) {
                     GeometryReader { geo in
-                        ZStack(alignment: .bottom) {
+                        ZStack {
                             Image(uiImage: qr)
                                 .interpolation(.none)
                                 .resizable()
@@ -153,14 +153,14 @@ struct WidgetEntryView: View {
                                 .frame(width: geo.size.width, height: geo.size.height)
                             if let label = slide.qrCodeLabel, !label.isEmpty {
                                 Text(label)
-                                    .font(.system(size: 9, weight: .medium))
+                                    .font(.system(size: 9, weight: .bold))
                                     .foregroundStyle(.white)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.5)
                                     .padding(.horizontal, 4)
-                                    .padding(.vertical, 2)
-                                    .background(.black.opacity(0.6))
-                                    .padding(.bottom, -8)
+                                    .padding(.vertical, 3)
+                                    .background(Color.black)
+                                    .clipShape(RoundedRectangle(cornerRadius: 3))
                             }
                         }
                     }
@@ -181,6 +181,7 @@ struct WidgetEntryView: View {
                                 .frame(width: geo.size.width, height: geo.size.height)
                                 .clipped()
                         }
+                        .padding(-10)
                     } else {
                         Color.gray.opacity(0.3)
                         Image(systemName: "photo")
@@ -330,25 +331,27 @@ struct ItemView: View {
 
             if item.displayType == .qrCode, let content = item.qrCodeContent, !content.isEmpty,
                let qr = UIImage.qrCode(from: content) {
-                let hasLabel = !(item.qrCodeLabel ?? "").isEmpty
-                VStack(spacing: 1) {
+                ZStack {
                     Image(uiImage: qr)
                         .interpolation(.none)
                         .resizable()
                         .scaledToFit()
-                        .padding(.horizontal, 2)
-                        .padding(.top, 2)
-                    if hasLabel {
-                        Text(item.qrCodeLabel!)
-                            .font(.system(size: item.qrCodeLabelSize, weight: .medium))
-                            .foregroundStyle(item.foregroundColor.swiftUIColor)
+                        .padding(2)
+                    if let label = item.qrCodeLabel, !label.isEmpty {
+                        Text(label)
+                            .font(.system(size: item.qrCodeLabelSize, weight: .bold))
+                            .foregroundStyle(.white)
                             .lineLimit(1)
                             .minimumScaleFactor(0.4)
-                            .padding(.bottom, 2)
+                            .padding(.horizontal, 3)
+                            .padding(.vertical, 2)
+                            .background(Color.black)
+                            .clipShape(RoundedRectangle(cornerRadius: 2))
                     }
                 }
             } else if item.displayType == .image, let filename = item.customImageFilename,
-               let image = SharedStorage.shared.loadWidgetImage(filename: filename) {
+               let image = (item.imageData.flatMap(UIImage.init)
+                            ?? SharedStorage.shared.loadWidgetImage(filename: filename)) {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()

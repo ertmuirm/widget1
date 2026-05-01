@@ -10,13 +10,14 @@ import WidgetKit
 // selectedWidget becomes nil. Embedding the config in the ID prevents that.
 
 private func encodeEntityID(_ config: WidgetConfig) -> String {
-    // Strip imageData from slides to keep entity IDs compact. The widget extension
-    // reads imageData from the full config JSON in shared storage instead.
+    // Strip imageData from slides and items to keep entity IDs compact.
+    // The widget extension reads imageData from the full config JSON in shared storage.
     var lite = config
     if var slides = lite.slides {
         for i in slides.indices { slides[i].imageData = nil }
         lite.slides = slides
     }
+    for i in lite.items.indices { lite.items[i].imageData = nil }
     guard let data = try? {
         let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601; return try enc.encode(lite)
     }() else { return config.id.uuidString }
@@ -96,10 +97,19 @@ private func makeEntry(configID: String?) -> WidgetEntry {
         if let found = liveConfigs.first(where: { $0.id.uuidString == uuid }) {
             config = found
         } else if var embedded = decodeConfigFromID(id) {
-            // Populate imageData for slides not already populated by loadConfigurations
+            // Populate imageData for slides/items not already populated by loadConfigurations
             if embedded.slides != nil {
                 for j in embedded.slides!.indices where embedded.slides![j].imageData == nil {
-                    embedded.slides![j].imageData = storage.loadWidgetImageData(filename: embedded.slides![j].filename)
+                    let fn = embedded.slides![j].filename
+                    if !fn.isEmpty {
+                        embedded.slides![j].imageData = storage.loadWidgetImageData(filename: fn)
+                    }
+                }
+            }
+            for j in embedded.items.indices where embedded.items[j].imageData == nil {
+                if embedded.items[j].displayType == .image,
+                   let fn = embedded.items[j].customImageFilename, !fn.isEmpty {
+                    embedded.items[j].imageData = storage.loadWidgetImageData(filename: fn)
                 }
             }
             config = embedded

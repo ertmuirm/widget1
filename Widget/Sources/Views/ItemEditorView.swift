@@ -16,6 +16,7 @@ struct ItemEditorView: View {
     @State private var showAppActionPicker = false
     @State private var photoPickerItems: [PhotosPickerItem] = []
     @State private var qrScanPickerItems: [PhotosPickerItem] = []
+    @State private var showFileImporter = false
     @State private var fileImporterPurpose: FileImporterPurpose? = nil
     @State private var scanError: String?
 
@@ -97,6 +98,7 @@ struct ItemEditorView: View {
 
                     Button {
                         fileImporterPurpose = .loadImage
+                        showFileImporter = true
                     } label: {
                         Label(item.customImageFilename == nil ? "Import from Files" : "Replace from Files",
                               systemImage: "folder")
@@ -138,6 +140,7 @@ struct ItemEditorView: View {
                     // Scan QR / barcode from Files
                     Button {
                         fileImporterPurpose = .scanQR
+                        showFileImporter = true
                     } label: {
                         Label("Scan from Files", systemImage: "folder.badge.questionmark")
                     }
@@ -157,7 +160,7 @@ struct ItemEditorView: View {
                 if let content = item.qrCodeContent, !content.isEmpty,
                    let qr = UIImage.qrCode(from: content, size: 300) {
                     Section("Preview") {
-                        VStack(spacing: 6) {
+                        ZStack {
                             Image(uiImage: qr)
                                 .interpolation(.none)
                                 .resizable()
@@ -166,10 +169,14 @@ struct ItemEditorView: View {
                                 .frame(maxWidth: .infinity)
                             if let label = item.qrCodeLabel, !label.isEmpty {
                                 Text(label)
-                                    .font(.system(size: item.qrCodeLabelSize, weight: .medium))
+                                    .font(.system(size: item.qrCodeLabelSize, weight: .bold))
                                     .foregroundStyle(.white)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.5)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 3)
+                                    .background(Color.black)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
                             }
                         }
                         .padding(.vertical, 6)
@@ -177,8 +184,8 @@ struct ItemEditorView: View {
                     }
                 }
 
-                Section("Label (optional)") {
-                    TextField("Label shown below QR code", text: Binding(
+                Section("Center Label (optional)") {
+                    TextField("Label in center of QR code", text: Binding(
                         get: { item.qrCodeLabel ?? "" },
                         set: { item.qrCodeLabel = $0.isEmpty ? nil : $0 }
                     ))
@@ -333,13 +340,12 @@ struct ItemEditorView: View {
             }
         }
         .fileImporter(
-            isPresented: Binding(
-                get: { fileImporterPurpose != nil },
-                set: { if !$0 { fileImporterPurpose = nil } }
-            ),
+            isPresented: $showFileImporter,
             allowedContentTypes: [.image],
             allowsMultipleSelection: false
         ) { result in
+            // Capture purpose before clearing — showFileImporter going false would
+            // otherwise race with a binding-set nil that kills fileImporterPurpose.
             let purpose = fileImporterPurpose
             fileImporterPurpose = nil
             if case .success(let urls) = result, let url = urls.first {
@@ -387,6 +393,8 @@ struct ItemEditorView: View {
         let filename = "\(UUID().uuidString).\(ext)"
         SharedStorage.shared.saveWidgetImage(saveData, filename: filename)
         item.customImageFilename = filename
+        // Embed data in item so it crosses the process boundary on SideStore
+        item.imageData = saveData
     }
 
     // MARK: - QR/barcode scan

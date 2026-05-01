@@ -13,13 +13,22 @@ struct WidgetItem: Codable, Identifiable, Equatable {
     var customText: String?
     var customImageFilename: String?  // used when displayType == .image
     var qrCodeContent: String?        // used when displayType == .qrCode
-    var qrCodeLabel: String?          // optional label shown below the QR code
+    var qrCodeLabel: String?          // optional center label on the QR code
     var qrCodeLabelSize: CGFloat      // font size for the label
     var fontSize: CGFloat
     var foregroundColor: CodableColor
     var backgroundColor: CodableColor
     var backgroundOpacity: Double
     var action: WidgetAction?
+    /// In-memory image data for displayType == .image. Serialized in config JSON so it
+    /// crosses process boundaries on SideStore. Stripped from entity IDs in WidgetIntents.
+    var imageData: Data?
+
+    enum CodingKeys: CodingKey {
+        case id, displayType, sfSymbolName, customText, customImageFilename
+        case qrCodeContent, qrCodeLabel, qrCodeLabelSize, fontSize
+        case foregroundColor, backgroundColor, backgroundOpacity, action, imageData
+    }
 
     init(
         id: UUID = UUID(),
@@ -30,11 +39,12 @@ struct WidgetItem: Codable, Identifiable, Equatable {
         qrCodeContent: String? = nil,
         qrCodeLabel: String? = nil,
         qrCodeLabelSize: CGFloat = 8,
-        fontSize: CGFloat = 14,
+        fontSize: CGFloat = 10,
         foregroundColor: CodableColor = CodableColor(.white),
         backgroundColor: CodableColor = CodableColor(.clear),
         backgroundOpacity: Double = 1.0,
-        action: WidgetAction? = nil
+        action: WidgetAction? = nil,
+        imageData: Data? = nil
     ) {
         self.id = id
         self.displayType = displayType
@@ -49,6 +59,7 @@ struct WidgetItem: Codable, Identifiable, Equatable {
         self.backgroundColor = backgroundColor
         self.backgroundOpacity = backgroundOpacity
         self.action = action
+        self.imageData = imageData
     }
 }
 
@@ -186,7 +197,7 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
                 displayType: .icon,
                 sfSymbolName: "star.fill",
                 customText: nil,
-                fontSize: 14,
+                fontSize: 10,
                 foregroundColor: CodableColor.white,
                 backgroundColor: CodableColor.clear,
                 backgroundOpacity: 1.0,

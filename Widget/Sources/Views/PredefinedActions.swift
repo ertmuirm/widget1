@@ -182,6 +182,7 @@ class InstalledAppsManager: ObservableObject {
     @Published var isScanning = false
     @Published var hasCompletedScan = false
     @Published var isWorkspaceAccessible = false
+    @Published var hasSuccessfullyEnumerated = false
     @Published var installedBundleIDs: Set<String> = []
     @Published var installedURLSchemes: Set<String> = []
 
@@ -207,6 +208,7 @@ class InstalledAppsManager: ObservableObject {
                 self.installedBundleIDs = bundleIDs
                 self.installedURLSchemes = urlSchemes
                 self.isWorkspaceAccessible = workspaceOK
+                self.hasSuccessfullyEnumerated = !bundleIDs.isEmpty
                 self.hasCompletedScan = workspaceOK
                 self.isScanning = false
             }
@@ -219,11 +221,12 @@ class InstalledAppsManager: ObservableObject {
         if url.hasPrefix("openapp://launch?bundle="),
            let comps = URLComponents(string: url),
            let bundleID = comps.queryItems?.first(where: { $0.name == "bundle" })?.value {
-            if isWorkspaceAccessible {
-                // Scan found it, or direct applicationIsInstalled: check confirms it
-                return installedBundleIDs.contains(bundleID) || Self.workspaceIsInstalled(bundleID: bundleID)
+            // Only filter by installed status if app enumeration actually succeeded.
+            // If workspace is unavailable or allApplications failed, show all predefined apps.
+            if hasSuccessfullyEnumerated {
+                return installedBundleIDs.contains(bundleID)
             }
-            return true  // workspace unavailable — show all bundle-ID apps
+            return true
         }
 
         guard hasCompletedScan else { return true }

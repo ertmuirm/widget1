@@ -17,17 +17,12 @@ struct WidgetListView: View {
             } else {
                 ForEach(viewModel.configurations) { config in
                     ZStack {
-                        // Invisible NavigationLink drives navigation without intercepting swipes
+                        // Invisible NavigationLink drives navigation
                         NavigationLink(value: config.id) { EmptyView() }.opacity(0)
-                        WidgetRowView(configuration: config)
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
+                        WidgetRowView(configuration: config) {
                             if let idx = viewModel.configurations.firstIndex(where: { $0.id == config.id }) {
                                 viewModel.deleteConfiguration(at: IndexSet([idx]))
                             }
-                        } label: {
-                            Label("Delete", systemImage: "trash")
                         }
                     }
                 }
@@ -133,6 +128,7 @@ struct WidgetListView: View {
 
 struct WidgetRowView: View {
     let configuration: WidgetConfig
+    var onDelete: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 12) {
@@ -160,6 +156,15 @@ struct WidgetRowView: View {
             }
 
             Spacer()
+
+            if let onDelete {
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .foregroundStyle(.red)
+                        .padding(8)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(.vertical, 4)
     }
@@ -190,10 +195,22 @@ struct WidgetPreviewView: View {
                         let slide = slides[idx]
                         if slide.isQRCode, let content = slide.qrCodeContent, !content.isEmpty,
                            let qr = UIImage.qrCode(from: content, size: 120) {
-                            Image(uiImage: qr)
-                                .interpolation(.none)
-                                .resizable()
-                                .scaledToFit()
+                            ZStack {
+                                Image(uiImage: qr)
+                                    .interpolation(.none)
+                                    .resizable()
+                                    .scaledToFit()
+                                if let label = slide.qrCodeLabel, !label.isEmpty {
+                                    Text(label)
+                                        .font(.system(size: 7, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .lineLimit(1)
+                                        .padding(.horizontal, 2)
+                                        .padding(.vertical, 1)
+                                        .background(Color.black)
+                                        .clipShape(RoundedRectangle(cornerRadius: 2))
+                                }
+                            }
                         } else {
                             let img = slide.imageData.flatMap { UIImage(data: $0) }
                                 ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
@@ -245,20 +262,20 @@ struct ItemPreviewView: View {
 
             if item.displayType == .qrCode, let content = item.qrCodeContent, !content.isEmpty,
                let qr = UIImage.qrCode(from: content, size: max(size.width, 60) * 2) {
-                let hasLabel = !(item.qrCodeLabel ?? "").isEmpty
-                VStack(spacing: 1) {
-                    Image(uiImage: qr).interpolation(.none).resizable().scaledToFit()
-                        .padding(.horizontal, 2).padding(.top, 2)
-                    if hasLabel {
-                        Text(item.qrCodeLabel!)
-                            .font(.system(size: max(item.qrCodeLabelSize * size.width / 40, 5), weight: .medium))
-                            .foregroundStyle(item.foregroundColor.swiftUIColor)
+                ZStack {
+                    Image(uiImage: qr).interpolation(.none).resizable().scaledToFit().padding(2)
+                    if let label = item.qrCodeLabel, !label.isEmpty {
+                        Text(label)
+                            .font(.system(size: max(item.qrCodeLabelSize * size.width / 40, 5), weight: .bold))
+                            .foregroundStyle(.white)
                             .lineLimit(1).minimumScaleFactor(0.4)
-                            .padding(.bottom, 2)
+                            .padding(.horizontal, 2).padding(.vertical, 1)
+                            .background(Color.black)
+                            .clipShape(RoundedRectangle(cornerRadius: 2))
                     }
                 }
             } else if item.displayType == .image, let fn = item.customImageFilename,
-                      let img = SharedStorage.shared.loadWidgetImage(filename: fn) {
+                      let img = (item.imageData.flatMap(UIImage.init) ?? SharedStorage.shared.loadWidgetImage(filename: fn)) {
                 Image(uiImage: img).resizable().scaledToFill()
                     .frame(width: size.width, height: size.height).clipped()
             } else if item.displayType == .icon {
