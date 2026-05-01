@@ -372,8 +372,8 @@ struct WidgetEditorView: View {
     private func addItem() {
         guard configuration.items.count < configuration.maxItems else { return }
         configuration.items.append(WidgetItem(
-            fontSize: CGFloat(defaultTextFontSize),
-            qrCodeLabelSize: CGFloat(defaultQRLabelSize)
+            qrCodeLabelSize: CGFloat(defaultQRLabelSize),
+            fontSize: CGFloat(defaultTextFontSize)
         ))
         editingItemIndex = EditingItemIndex(id: configuration.items.count - 1)
     }
