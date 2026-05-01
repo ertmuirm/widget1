@@ -1,11 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Key bow (round head with hole), centered horizontally -->
-  <circle cx="6.5" cy="11.5" r="3.5"/>
-  <circle cx="6.5" cy="11.5" r="1.5"/>
-  <!-- Shaft top edge -->
-  <line x1="10" y1="10.5" x2="22" y2="10.5"/>
-  <!-- Shaft right cap -->
-  <line x1="22" y1="10.5" x2="22" y2="12.5"/>
-  <!-- Shaft bottom + teeth (jagged steps going down) -->
-  <path d="M22 12.5 L19 12.5 L19 15 L17 15 L17 12.5 L14.5 12.5 L14.5 16 L12.5 16 L12.5 12.5 L10 12.5"/>
+  <!-- Bow: large circle with central hole, positioned left -->
+  <circle cx="7" cy="12" r="5.5"/>
+  <circle cx="7" cy="12" r="2.5"/>
+  <!-- Shaft top edge + right cap + bottom edge with two stepped teeth -->
+  <path d="M12.5 10.5 H22.5 V13.5 H20.5 V16 H18.5 V13.5 H16 V17 H14 V13.5 H12.5 Z"/>
 </svg>

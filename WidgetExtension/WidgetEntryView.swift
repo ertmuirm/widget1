@@ -211,30 +211,35 @@ struct WidgetEntryView: View {
                 }
 
                 // Corner navigation chevrons — bottom-left and bottom-right.
-                // systemSmall only allows 1 interactive element; show forward-only there.
+                // Use entry.entityUUID (not entry.configuration.id) — when makeEntry()
+                // falls back to .defaultConfiguration the config.id is a random UUID that
+                // won't match the slideIdx_ key written by AdvanceImageIntent.
+                // Pass slideCount so perform() never needs to call loadConfigurations().
                 if hasNavigation {
                     VStack {
                         Spacer()
                         HStack {
-                            if widgetFamily != .systemSmall {
-                                Button(intent: AdvanceImageIntent(
-                                    widgetID: entry.configuration.id.uuidString, forward: false)) {
-                                    Image(systemName: "chevron.left")
-                                        .font(.system(size: 10, weight: .semibold))
-                                        .foregroundStyle(Color(white: 0.5))
-                                        .padding(5)
-                                        .background(Color(white: 0.5).opacity(0.15))
-                                        .clipShape(Circle())
-                                }
-                                .buttonStyle(.plain)
-                                .padding(.leading, 3)
-                                .padding(.bottom, 3)
+                            Button(intent: AdvanceImageIntent(
+                                widgetID: entry.entityUUID,
+                                forward: false,
+                                slideCount: slides.count)) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(Color(white: 0.5))
+                                    .padding(5)
+                                    .background(Color(white: 0.5).opacity(0.15))
+                                    .clipShape(Circle())
                             }
+                            .buttonStyle(.plain)
+                            .padding(.leading, 3)
+                            .padding(.bottom, 3)
 
                             Spacer()
 
                             Button(intent: AdvanceImageIntent(
-                                widgetID: entry.configuration.id.uuidString, forward: true)) {
+                                widgetID: entry.entityUUID,
+                                forward: true,
+                                slideCount: slides.count)) {
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 10, weight: .semibold))
                                     .foregroundStyle(Color(white: 0.5))
@@ -251,47 +256,52 @@ struct WidgetEntryView: View {
                 }
             }
 
-            // Debug overlay — compile out of release builds
-            #if DEBUG
             debugOverlay
-            #endif
         }
         .widgetURL(actionURL)
     }
 
-    #if DEBUG
     private var debugOverlay: some View {
         let slides = entry.configuration.slides ?? []
         let idx = entry.configuration.currentSlideIndex ?? 0
-        let widgetID = entry.configuration.id.uuidString
-        let shortID = String(widgetID.suffix(8))
-        let idxKey = "slideIdx_\(widgetID)"
-        let storedIdx = UserDefaults.standard.object(forKey: idxKey) as? Int
+        let entityID = entry.entityUUID
+        let configID = entry.configuration.id.uuidString
+        let shortEntity = String(entityID.suffix(8))
+        let idxKey = "slideIdx_\(entityID)"
+        var storedIdx: Int? = nil
+        for gid in SharedStorage.appGroupCandidates {
+            if let v = UserDefaults(suiteName: gid)?.object(forKey: idxKey) as? Int {
+                storedIdx = v; break
+            }
+        }
+        if storedIdx == nil {
+            storedIdx = UserDefaults.standard.object(forKey: idxKey) as? Int
+        }
+        let uuidMatch = entityID == configID
 
         return VStack {
             HStack {
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("id:\(shortID)")
-                        .font(.system(size: 6, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.red)
-                    Text("slide:\(idx)/\(max(slides.count-1,0))")
-                        .font(.system(size: 6, weight: .bold, design: .monospaced))
-                        .foregroundStyle(.red)
-                    Text("ud:\(storedIdx.map { "\($0)" } ?? "nil")")
-                        .font(.system(size: 6, weight: .bold, design: .monospaced))
-                        .foregroundStyle(storedIdx != nil ? .green : .orange)
+                    Text("eid:\(shortEntity)")
+                        .font(.system(size: 5.5, weight: .bold, design: .monospaced))
+                        .foregroundStyle(uuidMatch ? .green : .red)
+                    Text("cfg:\(String(configID.suffix(8)))")
+                        .font(.system(size: 5.5, weight: .bold, design: .monospaced))
+                        .foregroundStyle(uuidMatch ? .green : .orange)
+                    Text("s:\(idx)/\(max(slides.count-1,0)) ud:\(storedIdx.map{"\($0)"}  ?? "nil")")
+                        .font(.system(size: 5.5, weight: .bold, design: .monospaced))
+                        .foregroundStyle(storedIdx != nil ? .green : .red)
                 }
                 .padding(2)
-                .background(Color.black.opacity(0.6))
+                .background(Color.black.opacity(0.75))
                 .clipShape(RoundedRectangle(cornerRadius: 3))
                 Spacer()
             }
             Spacer()
         }
-        .padding(4)
+        .padding(3)
         .allowsHitTesting(false)
     }
-    #endif
 
     // MARK: - Lock Screen
 

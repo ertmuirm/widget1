@@ -461,7 +461,7 @@ struct WidgetEditorView: View {
                 }
                 // QR codes go into qrCodeContent; all other symbologies into barcodeContent
                 let isQR = result.symbology == .qr || result.symbology == .microQR
-                var slide = ImageSlide(filename: "")
+                var slide = ImageSlide(filename: "", qrCodeLabelSize: CGFloat(self.defaultQRLabelSize))
                 if isQR {
                     slide.qrCodeContent = payload
                 } else {

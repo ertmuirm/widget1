@@ -103,12 +103,19 @@ struct WidgetEntry: TimelineEntry {
     let date: Date
     let configuration: WidgetConfig
     let showItemLabels: Bool
+    /// The UUID extracted from the entity ID, which may differ from configuration.id
+    /// when makeEntry() fell back to .defaultConfiguration (random UUID). Buttons in
+    /// WidgetEntryView must use this UUID — not configuration.id — when constructing
+    /// AdvanceImageIntent so the intent can match the correct slideIdx_ key.
+    let entityUUID: String
 
     init(date: Date, configuration: WidgetConfig,
-         showItemLabels: Bool = SharedStorage.shared.showItemLabels) {
+         showItemLabels: Bool = SharedStorage.shared.showItemLabels,
+         entityUUID: String = "") {
         self.date = date
         self.configuration = configuration
         self.showItemLabels = showItemLabels
+        self.entityUUID = entityUUID.isEmpty ? configuration.id.uuidString : entityUUID
     }
 }
 
@@ -187,7 +194,8 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     }
 
     let showLabels = finalConfig.showItemLabels ?? storage.showItemLabels
-    return WidgetEntry(date: Date(), configuration: finalConfig, showItemLabels: showLabels)
+    return WidgetEntry(date: Date(), configuration: finalConfig,
+                       showItemLabels: showLabels, entityUUID: entityUUID)
 }
 
 private func makeTimeline(configID: String?) -> Timeline<WidgetEntry> {
@@ -573,39 +581,58 @@ struct NoOpIntent: AppIntent {
 
 struct AdvanceImageIntent: AppIntent {
     static var title: LocalizedStringResource = "Advance Image"
-    /// Critical: without this, tapping the button opens the host app instead of
-    /// running the intent in-place, so the left/right zone taps appear to do nothing
-    /// (they actually launch the host app silently and never refresh the widget).
+    /// Without this, tapping the button opens the host app instead of running
+    /// the intent in-place inside the extension process.
     static var openAppWhenRun: Bool = false
 
-    @Parameter(title: "Widget ID") var widgetID: String
-    @Parameter(title: "Forward")   var forward: Bool
+    @Parameter(title: "Widget ID")   var widgetID: String
+    @Parameter(title: "Forward")     var forward: Bool
+    /// Total number of slides — embedded in the intent so perform() never needs
+    /// to call SharedStorage.loadConfigurations(), which returns [] on SideStore
+    /// (app group entitlement stripped) and would cause an early return.
+    @Parameter(title: "Slide Count") var slideCount: Int
 
-    init() { widgetID = ""; forward = true }
-    init(widgetID: String, forward: Bool) { self.widgetID = widgetID; self.forward = forward }
+    init() { widgetID = ""; forward = true; slideCount = 0 }
+    init(widgetID: String, forward: Bool, slideCount: Int) {
+        self.widgetID = widgetID; self.forward = forward; self.slideCount = slideCount
+    }
 
     func perform() async throws -> some IntentResult {
-        var configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
-        guard let idx = configs.firstIndex(where: { $0.id.uuidString == widgetID }) else {
-            return .result()
-        }
-        let count = configs[idx].slides?.count ?? 0
-        guard count > 1 else { return .result() }
-        let current = configs[idx].currentSlideIndex ?? 0
-        let nextIndex = forward
-            ? (current + 1) % count
-            : (current - 1 + count) % count
-        configs[idx].currentSlideIndex = nextIndex
-        try? SharedStorage.shared.saveConfigurations(configs)
+        guard slideCount > 1 else { return .result() }
 
-        // Write the new index to a dedicated lightweight key so makeEntry() can
-        // apply it even if saveConfigurations doesn't cross the process boundary
-        // (e.g. on SideStore where the shared keychain entitlement is stripped).
+        // Read the current index from the lightweight UserDefaults key.
+        // We deliberately avoid loadConfigurations() here: on SideStore the app-group
+        // entitlement is stripped, so it always returns [], which previously caused
+        // the firstIndex lookup to fail and the function to return early without
+        // updating anything.
         let idxKey = "slideIdx_\(widgetID)"
+        var currentIndex = 0
+        for id in SharedStorage.appGroupCandidates {
+            if let v = UserDefaults(suiteName: id)?.object(forKey: idxKey) as? Int {
+                currentIndex = v; break
+            }
+        }
+        if let v = UserDefaults.standard.object(forKey: idxKey) as? Int {
+            currentIndex = v
+        }
+
+        let nextIndex = forward
+            ? (currentIndex + 1) % slideCount
+            : (currentIndex - 1 + slideCount) % slideCount
+
+        // Write new index to every available store.
         for id in SharedStorage.appGroupCandidates {
             UserDefaults(suiteName: id)?.set(nextIndex, forKey: idxKey)
         }
         UserDefaults.standard.set(nextIndex, forKey: idxKey)
+
+        // Best-effort: also update the persisted config so the index survives
+        // a full timeline refresh that re-reads from SharedStorage.
+        if var configs = try? SharedStorage.shared.loadConfigurations(),
+           let idx = configs.firstIndex(where: { $0.id.uuidString == widgetID }) {
+            configs[idx].currentSlideIndex = nextIndex
+            try? SharedStorage.shared.saveConfigurations(configs)
+        }
 
         WidgetCenter.shared.reloadTimelines(ofKind: "BroadcastImage")
         return .result()

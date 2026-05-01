@@ -1,10 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Front-facing car: body, windshield, headlights, grille, mirrors -->
-  <path d="M3 18 L3 14 Q3 12 5 11.5 L7 10.5 L8.5 8 L15.5 8 L17 10.5 L19 11.5 Q21 12 21 14 L21 18 Z"/>
-  <path d="M8.5 8 L9.5 11.5 L14.5 11.5 L15.5 8"/>
-  <rect x="3" y="14.5" width="3.5" height="1.75" rx="0.75"/>
-  <rect x="17.5" y="14.5" width="3.5" height="1.75" rx="0.75"/>
-  <rect x="9.5" y="15.5" width="5" height="1.25" rx="0.5"/>
-  <path d="M3 12.5 L1.5 12.5 L1.5 14 L3 14"/>
-  <path d="M21 12.5 L22.5 12.5 L22.5 14 L21 14"/>
+  <!-- Roof / cabin (narrow, centred) -->
+  <path d="M8 9 L9 5 L15 5 L16 9"/>
+  <!-- Body + A-pillars (wider than cabin) -->
+  <path d="M2 19 L3 12 Q4 10 7 9.5 L8 9 L16 9 L17 9.5 Q20 10 21 12 L22 19 Z"/>
+  <!-- Windshield glass (inside cabin) -->
+  <path d="M9 9 L9.5 5.5 L14.5 5.5 L15 9"/>
+  <!-- Left headlight -->
+  <rect x="2.5" y="14" width="4" height="2.5" rx="1"/>
+  <!-- Right headlight -->
+  <rect x="17.5" y="14" width="4" height="2.5" rx="1"/>
+  <!-- Front grille / bumper detail -->
+  <path d="M9.5 16.5 L14.5 16.5"/>
+  <path d="M9 18.5 L15 18.5"/>
 </svg>
