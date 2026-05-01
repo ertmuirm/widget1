@@ -592,7 +592,8 @@ struct SymbolPickerView: View {
         SymbolEntry(name: "waveform",                label: "waveform audio signal"),
     ]
 
-    private let gridColumns = [GridItem(.adaptive(minimum: 56, maximum: 72))]
+    private let outlineColumns = Array(repeating: GridItem(.flexible()), count: 5)
+    private let systemColumns  = [GridItem(.adaptive(minimum: 56, maximum: 72))]
 
     private var filteredSFEntries: [SymbolEntry] {
         guard !searchText.isEmpty else { return sfSymbolEntries }
@@ -616,14 +617,14 @@ struct SymbolPickerView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     if !filteredCustomIcons.isEmpty {
-                        iconSection(title: "Custom Icons") {
+                        outlineIconSection {
                             ForEach(filteredCustomIcons, id: \.name) { icon in
                                 iconCell(name: icon.name, isCustom: true)
                             }
                         }
                     }
                     if !filteredSFEntries.isEmpty {
-                        iconSection(title: "Icons") {
+                        systemIconSection {
                             ForEach(filteredSFEntries) { entry in
                                 iconCell(name: entry.name, isCustom: false)
                             }
@@ -646,13 +647,26 @@ struct SymbolPickerView: View {
     }
 
     @ViewBuilder
-    private func iconSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
+    private func outlineIconSection<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title)
+            Text("Outline Icons")
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 4)
-            LazyVGrid(columns: gridColumns, spacing: 10) {
+            LazyVGrid(columns: outlineColumns, spacing: 10) {
+                content()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func systemIconSection<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("System Icons")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
+            LazyVGrid(columns: systemColumns, spacing: 10) {
                 content()
             }
         }
