@@ -201,44 +201,43 @@ struct WidgetEntryView: View {
                     }
                 }
 
-                // Three-zone tap overlay: left third (prev), center (action), right third (next).
-                // Color.black.opacity(0.001) instead of Color.clear — clear has no hit area
-                // in WidgetKit even with contentShape; near-zero opacity is reliably tappable.
-                if hasNavigation || hasAction {
-                    HStack(spacing: 0) {
-                        if hasNavigation {
+                // Corner navigation arrows — visible at 50% opacity in bottom corners.
+                // Solid-color label ensures WidgetKit registers the tap target.
+                if hasNavigation {
+                    VStack {
+                        Spacer()
+                        HStack {
                             Button(intent: AdvanceImageIntent(
                                 widgetID: entry.configuration.id.uuidString, forward: false)) {
-                                Color.black.opacity(0.001)
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.black)
+                                    .padding(6)
+                                    .background(Color.black.opacity(0.12))
+                                    .clipShape(Circle())
                             }
                             .buttonStyle(.plain)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .contentShape(Rectangle())
-                        } else {
-                            Color.black.opacity(0.001).frame(maxWidth: .infinity, maxHeight: .infinity)
-                        }
+                            .opacity(0.5)
+                            .padding(.leading, 6)
+                            .padding(.bottom, 6)
 
-                        if let url = actionURL {
-                            Link(destination: url) { Color.black.opacity(0.001) }
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .contentShape(Rectangle())
-                        } else {
-                            Color.black.opacity(0.001).frame(maxWidth: .infinity, maxHeight: .infinity)
-                        }
+                            Spacer()
 
-                        if hasNavigation {
                             Button(intent: AdvanceImageIntent(
                                 widgetID: entry.configuration.id.uuidString, forward: true)) {
-                                Color.black.opacity(0.001)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.black)
+                                    .padding(6)
+                                    .background(Color.black.opacity(0.12))
+                                    .clipShape(Circle())
                             }
                             .buttonStyle(.plain)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .contentShape(Rectangle())
-                        } else {
-                            Color.black.opacity(0.001).frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .opacity(0.5)
+                            .padding(.trailing, 6)
+                            .padding(.bottom, 6)
                         }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }

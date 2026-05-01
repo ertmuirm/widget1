@@ -217,6 +217,7 @@ enum CustomIcons {
         ("wi_palette",      "Palette"),
         ("wi_scissors",     "Scissors"),
         ("wi_wrench",       "Wrench"),
+        ("wi_watch",        "Watch"),
     ]
 
     static func isCustom(_ name: String) -> Bool { name.hasPrefix("wi_") }

@@ -20,8 +20,8 @@ struct WidgetEditorView: View {
 
     // QR / barcode slide editing
     @State private var editingSlideIndex: EditingItemIndex?
-    @State private var barcodePickerItems: [PhotosPickerItem] = []
     @State private var showBarcodeFileImporter = false
+    @State private var showQRFileImporter = false
     @State private var barcodeScanError: String?
 
     private var isImageWidget: Bool { configuration.widgetKind == .imageSlideshow }
@@ -91,21 +91,20 @@ struct WidgetEditorView: View {
                 SlideEditorView(slide: bindingForSlide(sel.id))
             }
         }
-        // Barcode scan from Photos
-        .photosPicker(isPresented: .constant(false),
-                      selection: $barcodePickerItems,
-                      maxSelectionCount: 1,
-                      matching: .images)
-        .onChange(of: barcodePickerItems) { items in
-            if let first = items.first { scanBarcodeFromPhoto(first) }
-            barcodePickerItems = []
-        }
         // Barcode scan from Files
         .fileImporter(isPresented: $showBarcodeFileImporter,
                       allowedContentTypes: [.image],
                       allowsMultipleSelection: false) { result in
             if case .success(let urls) = result, let url = urls.first {
                 scanBarcodeFromFile(url)
+            }
+        }
+        // QR scan from Files
+        .fileImporter(isPresented: $showQRFileImporter,
+                      allowedContentTypes: [.image],
+                      allowsMultipleSelection: false) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                scanQRFromFile(url)
             }
         }
     }
@@ -122,23 +121,36 @@ struct WidgetEditorView: View {
                 .contentShape(Rectangle())
                 .onTapGesture { editingSlideIndex = EditingItemIndex(id: index) }
             }
+            .onMove { from, to in
+                configuration.slides?.move(fromOffsets: from, toOffset: to)
+            }
         } header: {
-            Text("Slides (\(configuration.slides?.count ?? 0))")
+            HStack {
+                Text("Codes (\(configuration.slides?.count ?? 0))")
+                    .textCase(nil)
+                Spacer()
+                if !(configuration.slides ?? []).isEmpty {
+                    EditButton()
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .textCase(nil)
+                }
+            }
         }
 
-        Section("Add Slide") {
+        Section("Add Code") {
             Button { addQRSlide() } label: {
                 Label("Add QR Code", systemImage: "qrcode")
             }
             .foregroundStyle(.white)
 
-            PhotosPicker(selection: $barcodePickerItems, maxSelectionCount: 1, matching: .images) {
-                Label("Scan Barcode from Photos", systemImage: "barcode.viewfinder")
+            Button { showBarcodeFileImporter = true } label: {
+                Label("Add Barcode from Files", systemImage: "barcode")
             }
             .foregroundStyle(.white)
 
-            Button { showBarcodeFileImporter = true } label: {
-                Label("Scan Barcode from Files", systemImage: "barcode")
+            Button { showQRFileImporter = true } label: {
+                Label("Add QR Code from Files", systemImage: "qrcode.viewfinder")
             }
             .foregroundStyle(.white)
 
@@ -375,6 +387,21 @@ struct WidgetEditorView: View {
         configuration.slides?.append(slide)
         let newIndex = (configuration.slides?.count ?? 1) - 1
         editingSlideIndex = EditingItemIndex(id: newIndex)
+    }
+
+    private func scanQRFromFile(_ url: URL) {
+        barcodeScanError = nil
+        guard url.startAccessingSecurityScopedResource() else {
+            barcodeScanError = "Could not access file."
+            return
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+        guard let data = try? Data(contentsOf: url),
+              let ciImage = CIImage(data: data) else {
+            barcodeScanError = "Could not load image."
+            return
+        }
+        performBarcodeScan(on: ciImage)
     }
 
     private func scanBarcodeFromPhoto(_ item: PhotosPickerItem) {

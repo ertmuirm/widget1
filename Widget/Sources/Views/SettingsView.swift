@@ -53,7 +53,7 @@ struct SettingsView: View {
 
                 Stepper(value: $defaultQRLabelSize, in: 6...24, step: 1) {
                     HStack {
-                        Text("Default QR Label Size")
+                        Text("Default Code Label Size")
                         Spacer()
                         Text("\(Int(defaultQRLabelSize)) pt")
                             .foregroundStyle(.secondary)

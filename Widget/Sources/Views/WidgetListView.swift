@@ -149,7 +149,7 @@ struct WidgetRowView: View {
                 let itemCount = configuration.widgetKind == .imageSlideshow
                     ? (configuration.slides?.count ?? 0)
                     : configuration.items.count
-                let unit = configuration.widgetKind == .imageSlideshow ? "image" : "item"
+                let unit = configuration.widgetKind == .imageSlideshow ? "code" : "item"
                 Text("\(itemCount) \(unit)\(itemCount == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -185,45 +185,27 @@ struct WidgetPreviewView: View {
                     .opacity(configuration.backgroundOpacity)
 
                 if configuration.widgetKind == .imageSlideshow {
+                    // White background for Code widget (same as the real widget)
+                    Color.white
                     let slides = configuration.slides ?? []
                     let idx = min(configuration.currentSlideIndex ?? 0, max(0, slides.count - 1))
                     if slides.isEmpty {
-                        Image(systemName: "photo.on.rectangle.angled")
+                        Image(systemName: "qrcode")
                             .font(.title2)
                             .foregroundStyle(.secondary)
                     } else {
                         let slide = slides[idx]
-                        if slide.isQRCode, let content = slide.qrCodeContent, !content.isEmpty,
-                           let qr = UIImage.qrCode(from: content, size: 120) {
-                            ZStack {
-                                Image(uiImage: qr)
-                                    .interpolation(.none)
-                                    .resizable()
-                                    .scaledToFit()
-                                if let label = slide.qrCodeLabel, !label.isEmpty {
-                                    Text(label)
-                                        .font(.system(size: 7, weight: .bold))
-                                        .foregroundStyle(.white)
-                                        .lineLimit(1)
-                                        .padding(.horizontal, 2)
-                                        .padding(.vertical, 1)
-                                        .background(Color.black)
-                                        .clipShape(RoundedRectangle(cornerRadius: 2))
-                                }
-                            }
+                        if let content = slide.qrCodeContent, !content.isEmpty {
+                            QRCodeCanvasView(content: content)
+                        } else if let content = slide.barcodeContent, !content.isEmpty {
+                            BarcodeCanvasView(content: content)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: geometry.size.height * 0.5)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else {
-                            let img = slide.imageData.flatMap { UIImage(data: $0) }
-                                ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
-                            if let img {
-                                Image(uiImage: img)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .scaleEffect(CGFloat(slide.scale))
-                            } else {
-                                Image(systemName: "photo")
-                                    .font(.title2)
-                                    .foregroundStyle(.secondary)
-                            }
+                            Image(systemName: "qrcode")
+                                .font(.title2)
+                                .foregroundStyle(.secondary)
                         }
                     }
                 } else if configuration.items.isEmpty {
