@@ -149,8 +149,12 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     // Apply slide index written by AdvanceImageIntent as a lightweight override.
     // This fires when saveConfigurations didn't cross the process boundary so the
     // config we just loaded still has the old slide index.
+    // Use the UUID from the entity ID parameter (not config.id) so that even when
+    // SharedStorage is unavailable and config falls back to .defaultConfiguration
+    // (which has a fresh random UUID), we still look up the key AdvanceImageIntent wrote.
     var finalConfig = config
-    let idxKey = "slideIdx_\(config.id.uuidString)"
+    let entityUUID = configID.map { uuidFromEntityID($0) } ?? config.id.uuidString
+    let idxKey = "slideIdx_\(entityUUID)"
     var slideOverride: Int? = nil
     for id in SharedStorage.appGroupCandidates {
         if let v = UserDefaults(suiteName: id)?.object(forKey: idxKey) as? Int {
@@ -598,15 +602,11 @@ struct AdvanceImageIntent: AppIntent {
         // (e.g. on SideStore where the shared keychain entitlement is stripped).
         let idxKey = "slideIdx_\(widgetID)"
         for id in SharedStorage.appGroupCandidates {
-            if let ud = UserDefaults(suiteName: id) {
-                ud.set(nextIndex, forKey: idxKey)
-                ud.synchronize()
-            }
+            UserDefaults(suiteName: id)?.set(nextIndex, forKey: idxKey)
         }
         UserDefaults.standard.set(nextIndex, forKey: idxKey)
-        UserDefaults.standard.synchronize()
 
-        WidgetCenter.shared.reloadAllTimelines()
+        WidgetCenter.shared.reloadTimelines(ofKind: "BroadcastImage")
         return .result()
     }
 }

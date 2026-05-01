@@ -130,11 +130,7 @@ struct WidgetEntryView: View {
         let slides = entry.configuration.slides ?? []
         let rawIndex = entry.configuration.currentSlideIndex ?? 0
         let index = slides.isEmpty ? 0 : min(rawIndex, slides.count - 1)
-        let slideAction = slides.isEmpty ? nil : slides[index].action
-        let actionURL = slideAction.flatMap { resolveURL(for: $0) }
-            ?? entry.configuration.items.first.flatMap { resolveItemURL($0) }
         let hasNavigation = slides.count > 1
-        let hasAction = actionURL != nil
 
         ZStack {
             // Solid white base — visible in iOS 26 Clear/Liquid Glass mode where the
@@ -201,43 +197,44 @@ struct WidgetEntryView: View {
                     }
                 }
 
-                // Corner navigation arrows — visible at 50% opacity in bottom corners.
-                // Solid-color label ensures WidgetKit registers the tap target.
+                // Corner navigation chevrons — bottom-left and bottom-right.
+                // systemSmall only allows 1 interactive element; show forward-only there.
                 if hasNavigation {
                     VStack {
                         Spacer()
                         HStack {
-                            Button(intent: AdvanceImageIntent(
-                                widgetID: entry.configuration.id.uuidString, forward: false)) {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(.black)
-                                    .padding(6)
-                                    .background(Color.black.opacity(0.12))
-                                    .clipShape(Circle())
+                            if widgetFamily != .systemSmall {
+                                Button(intent: AdvanceImageIntent(
+                                    widgetID: entry.configuration.id.uuidString, forward: false)) {
+                                    Image(systemName: "chevron.left")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(Color(white: 0.5))
+                                        .padding(5)
+                                        .background(Color(white: 0.5).opacity(0.15))
+                                        .clipShape(Circle())
+                                }
+                                .buttonStyle(.plain)
+                                .padding(.leading, 3)
+                                .padding(.bottom, 3)
                             }
-                            .buttonStyle(.plain)
-                            .opacity(0.5)
-                            .padding(.leading, 6)
-                            .padding(.bottom, 6)
 
                             Spacer()
 
                             Button(intent: AdvanceImageIntent(
                                 widgetID: entry.configuration.id.uuidString, forward: true)) {
                                 Image(systemName: "chevron.right")
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .foregroundStyle(.black)
-                                    .padding(6)
-                                    .background(Color.black.opacity(0.12))
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(Color(white: 0.5))
+                                    .padding(5)
+                                    .background(Color(white: 0.5).opacity(0.15))
                                     .clipShape(Circle())
                             }
                             .buttonStyle(.plain)
-                            .opacity(0.5)
-                            .padding(.trailing, 6)
-                            .padding(.bottom, 6)
+                            .padding(.trailing, 3)
+                            .padding(.bottom, 3)
                         }
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
