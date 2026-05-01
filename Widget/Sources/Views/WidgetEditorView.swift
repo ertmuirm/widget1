@@ -307,60 +307,77 @@ struct WidgetEditorView: View {
         let slides = configuration.slides ?? []
         let index = min(configuration.currentSlideIndex ?? 0, max(0, slides.count - 1))
 
-        ZStack {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white)
-                .frame(height: 200)
+        GeometryReader { geo in
+            let side = geo.size.width
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white)
 
-            if slides.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "qrcode")
-                        .font(.title)
-                        .foregroundStyle(.secondary)
-                    Text("No QR codes added yet")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            } else if index < slides.count {
-                let slide = slides[index]
-                if let content = slide.qrCodeContent, !content.isEmpty {
-                    ZStack {
-                        QRCodeCanvasView(content: content)
-                            .frame(maxHeight: 200)
-                            .frame(maxWidth: .infinity)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        if let label = slide.qrCodeLabel, !label.isEmpty {
-                            Text(label)
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 3)
-                                .background(Color.black)
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                if slides.isEmpty {
+                    VStack(spacing: 8) {
+                        Image(systemName: "qrcode")
+                            .font(.title)
+                            .foregroundStyle(.secondary)
+                        Text("No codes added yet")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } else if index < slides.count {
+                    let slide = slides[index]
+                    if let content = slide.qrCodeContent, !content.isEmpty {
+                        ZStack {
+                            QRCodeCanvasView(content: content)
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                            if let label = slide.qrCodeLabel, !label.isEmpty {
+                                Text(label)
+                                    .font(.system(size: slide.qrCodeLabelSize, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 3)
+                                    .background(Color.black)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                            }
+                        }
+                    } else if let content = slide.barcodeContent, !content.isEmpty {
+                        ZStack {
+                            BarcodeCanvasView(content: content)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: side * 0.45)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            if let label = slide.qrCodeLabel, !label.isEmpty {
+                                VStack {
+                                    Spacer()
+                                    Text(label)
+                                        .font(.system(size: slide.qrCodeLabelSize))
+                                        .foregroundStyle(.black)
+                                        .lineLimit(1)
+                                        .padding(.bottom, side * 0.1)
+                                }
+                            }
                         }
                     }
                 }
-            }
 
-            // Page indicator
-            if slides.count > 1 {
-                VStack {
-                    Spacer()
-                    HStack(spacing: 4) {
-                        ForEach(0..<slides.count, id: \.self) { i in
-                            Circle()
-                                .fill(i == index ? Color.white : Color.white.opacity(0.4))
-                                .frame(width: 6, height: 6)
+                if slides.count > 1 {
+                    VStack {
+                        Spacer()
+                        HStack(spacing: 4) {
+                            ForEach(0..<slides.count, id: \.self) { i in
+                                Circle()
+                                    .fill(i == index ? Color.black.opacity(0.5) : Color.black.opacity(0.2))
+                                    .frame(width: 6, height: 6)
+                            }
                         }
+                        .padding(.bottom, 8)
                     }
-                    .padding(.bottom, 8)
                 }
             }
+            .frame(width: side, height: side)
         }
-        .frame(height: 200)
-        .frame(maxWidth: .infinity)
+        .aspectRatio(1, contentMode: .fit)
         .listRowInsets(EdgeInsets())
+        .padding(.horizontal, 16)
     }
 
     // MARK: - Helpers
@@ -382,7 +399,7 @@ struct WidgetEditorView: View {
     }
 
     private func addQRSlide() {
-        let slide = ImageSlide(filename: "", qrCodeContent: "")
+        let slide = ImageSlide(filename: "", qrCodeContent: "", qrCodeLabelSize: CGFloat(defaultQRLabelSize))
         if configuration.slides == nil { configuration.slides = [] }
         configuration.slides?.append(slide)
         let newIndex = (configuration.slides?.count ?? 1) - 1
@@ -566,6 +583,8 @@ struct SlideEditorView: View {
     @Environment(\.dismiss) private var dismiss
     @Binding var slide: ImageSlide
 
+    @AppStorage("defaultQRLabelSize") private var defaultQRLabelSize = 8.0
+
     @State private var showActionPicker = false
     @State private var showAppActionPicker = false
     @State private var qrScanPickerItems: [PhotosPickerItem] = []
@@ -650,6 +669,18 @@ struct SlideEditorView: View {
                         set: { slide.qrCodeLabel = $0.isEmpty ? nil : $0 }
                     ))
                     .foregroundStyle(.white)
+
+                    Stepper(value: Binding(
+                        get: { Double(slide.qrCodeLabelSize) },
+                        set: { slide.qrCodeLabelSize = CGFloat($0) }
+                    ), in: 6...24, step: 1) {
+                        HStack {
+                            Text("Label Size")
+                            Spacer()
+                            Text("\(Int(slide.qrCodeLabelSize)) pt")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
 
             } else if slide.isBarcode {
@@ -681,6 +712,18 @@ struct SlideEditorView: View {
                         set: { slide.qrCodeLabel = $0.isEmpty ? nil : $0 }
                     ))
                     .foregroundStyle(.white)
+
+                    Stepper(value: Binding(
+                        get: { Double(slide.qrCodeLabelSize) },
+                        set: { slide.qrCodeLabelSize = CGFloat($0) }
+                    ), in: 6...24, step: 1) {
+                        HStack {
+                            Text("Label Size")
+                            Spacer()
+                            Text("\(Int(slide.qrCodeLabelSize)) pt")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             } else {
                 Section("Preview") {

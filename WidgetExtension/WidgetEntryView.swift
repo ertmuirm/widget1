@@ -131,12 +131,25 @@ struct WidgetEntryView: View {
         let rawIndex = entry.configuration.currentSlideIndex ?? 0
         let index = slides.isEmpty ? 0 : min(rawIndex, slides.count - 1)
         let hasNavigation = slides.count > 1
+        let actionURL: URL? = slides.isEmpty ? nil
+            : (slides[index].action.flatMap { resolveURL(for: $0) }
+               ?? entry.configuration.items.first.flatMap { resolveItemURL($0) })
 
         ZStack {
             // Solid white base — visible in iOS 26 Clear/Liquid Glass mode where the
             // container background is replaced with a glass material. This ensures
             // the QR code always has a white surface to render on.
             Color.white
+
+            // NoOpIntent background: prevents opening the host app when no action
+            // is configured and the user taps a non-chevron area.
+            // On systemSmall this consumes the 1 interactive-element slot, so the
+            // chevron is suppressed when there's no navigation need anyway.
+            if actionURL == nil {
+                Button(intent: NoOpIntent()) { Color.clear }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .buttonStyle(.plain)
+            }
 
             if slides.isEmpty {
                 VStack(spacing: 8) {
@@ -156,7 +169,7 @@ struct WidgetEntryView: View {
                                 .frame(width: geo.size.width, height: geo.size.height)
                             if let label = slide.qrCodeLabel, !label.isEmpty {
                                 Text(label)
-                                    .font(.system(size: 9, weight: .bold))
+                                    .font(.system(size: max(slide.qrCodeLabelSize, 7), weight: .bold))
                                     .foregroundStyle(.white)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.5)
@@ -177,7 +190,7 @@ struct WidgetEntryView: View {
                                 .frame(width: geo.size.width, height: geo.size.height)
                             if let label = slide.qrCodeLabel, !label.isEmpty {
                                 Text(label)
-                                    .font(.system(size: 8, weight: .medium))
+                                    .font(.system(size: max(slide.qrCodeLabelSize, 7), weight: .medium))
                                     .foregroundStyle(.black)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.5)
@@ -237,8 +250,48 @@ struct WidgetEntryView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
+
+            // Debug overlay — compile out of release builds
+            #if DEBUG
+            debugOverlay
+            #endif
         }
+        .widgetURL(actionURL)
     }
+
+    #if DEBUG
+    private var debugOverlay: some View {
+        let slides = entry.configuration.slides ?? []
+        let idx = entry.configuration.currentSlideIndex ?? 0
+        let widgetID = entry.configuration.id.uuidString
+        let shortID = String(widgetID.suffix(8))
+        let idxKey = "slideIdx_\(widgetID)"
+        let storedIdx = UserDefaults.standard.object(forKey: idxKey) as? Int
+
+        return VStack {
+            HStack {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("id:\(shortID)")
+                        .font(.system(size: 6, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.red)
+                    Text("slide:\(idx)/\(max(slides.count-1,0))")
+                        .font(.system(size: 6, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.red)
+                    Text("ud:\(storedIdx.map { "\($0)" } ?? "nil")")
+                        .font(.system(size: 6, weight: .bold, design: .monospaced))
+                        .foregroundStyle(storedIdx != nil ? .green : .orange)
+                }
+                .padding(2)
+                .background(Color.black.opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+                Spacer()
+            }
+            Spacer()
+        }
+        .padding(4)
+        .allowsHitTesting(false)
+    }
+    #endif
 
     // MARK: - Lock Screen
 

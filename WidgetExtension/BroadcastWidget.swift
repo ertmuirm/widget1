@@ -107,7 +107,7 @@ struct BroadcastImageWidget: Widget {
         }
         .configurationDisplayName("Code Widget")
         .description("Display QR codes on your home screen")
-        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+        .supportedFamilies([.systemSmall])
         // Prevent iOS 26 Clear/Liquid Glass mode from stripping the white background,
         // which would make the black-on-white QR code invisible.
         .containerBackgroundRemovable(false)

@@ -109,15 +109,17 @@ struct ImageSlide: Codable, Identifiable, Equatable {
     var action: WidgetAction?
     /// QR code content — when non-nil this slide shows a QR code instead of a photo.
     var qrCodeContent: String?
-    /// Optional label shown below the QR/barcode.
+    /// Optional label shown on the QR/barcode.
     var qrCodeLabel: String?
+    /// Font size for the label.
+    var qrCodeLabelSize: CGFloat
     /// Barcode content — when non-nil this slide shows a Code-128 barcode.
     var barcodeContent: String?
     /// In-memory JPEG data.
     var imageData: Data?
 
     enum CodingKeys: CodingKey {
-        case id, filename, offsetX, offsetY, scale, action, qrCodeContent, qrCodeLabel, barcodeContent, imageData
+        case id, filename, offsetX, offsetY, scale, action, qrCodeContent, qrCodeLabel, qrCodeLabelSize, barcodeContent, imageData
     }
 
     var isQRCode: Bool { qrCodeContent != nil }
@@ -126,8 +128,8 @@ struct ImageSlide: Codable, Identifiable, Equatable {
     init(id: UUID = UUID(), filename: String,
          offsetX: Double = 0, offsetY: Double = 0, scale: Double = 1.0,
          action: WidgetAction? = nil, qrCodeContent: String? = nil,
-         qrCodeLabel: String? = nil, barcodeContent: String? = nil,
-         imageData: Data? = nil) {
+         qrCodeLabel: String? = nil, qrCodeLabelSize: CGFloat = 8,
+         barcodeContent: String? = nil, imageData: Data? = nil) {
         self.id = id
         self.filename = filename
         self.offsetX = offsetX
@@ -136,6 +138,7 @@ struct ImageSlide: Codable, Identifiable, Equatable {
         self.action = action
         self.qrCodeContent = qrCodeContent
         self.qrCodeLabel = qrCodeLabel
+        self.qrCodeLabelSize = qrCodeLabelSize
         self.barcodeContent = barcodeContent
         self.imageData = imageData
     }

@@ -1,7 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Thick key: round bow (head) on left, shaft with jagged teeth on right, centered -->
-  <circle cx="7" cy="12" r="4.5"/>
-  <circle cx="7" cy="12" r="1.75"/>
-  <!-- Shaft + teeth as one closed path -->
-  <path d="M11.5 11 L21 11 L21 13 L19.5 13 L19.5 15 L18 15 L18 13 L16 13 L16 15.5 L14.5 15.5 L14.5 13 L11.5 13 Z"/>
+  <!-- Key bow (round head with hole), centered horizontally -->
+  <circle cx="6.5" cy="11.5" r="3.5"/>
+  <circle cx="6.5" cy="11.5" r="1.5"/>
+  <!-- Shaft top edge -->
+  <line x1="10" y1="10.5" x2="22" y2="10.5"/>
+  <!-- Shaft right cap -->
+  <line x1="22" y1="10.5" x2="22" y2="12.5"/>
+  <!-- Shaft bottom + teeth (jagged steps going down) -->
+  <path d="M22 12.5 L19 12.5 L19 15 L17 15 L17 12.5 L14.5 12.5 L14.5 16 L12.5 16 L12.5 12.5 L10 12.5"/>
 </svg>
