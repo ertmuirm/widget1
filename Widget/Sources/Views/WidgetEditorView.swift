@@ -11,6 +11,9 @@ struct WidgetEditorView: View {
     @State var configuration: WidgetConfig
     var isNew: Bool = false
 
+    @AppStorage("defaultTextFontSize") private var defaultTextFontSize = 10.0
+    @AppStorage("defaultQRLabelSize") private var defaultQRLabelSize = 8.0
+
     // Grid item editing
     @State private var editingItemIndex: EditingItemIndex?
     @State private var isReordering = false
@@ -368,7 +371,10 @@ struct WidgetEditorView: View {
 
     private func addItem() {
         guard configuration.items.count < configuration.maxItems else { return }
-        configuration.items.append(WidgetItem())
+        configuration.items.append(WidgetItem(
+            fontSize: CGFloat(defaultTextFontSize),
+            qrCodeLabelSize: CGFloat(defaultQRLabelSize)
+        ))
         editingItemIndex = EditingItemIndex(id: configuration.items.count - 1)
     }
 

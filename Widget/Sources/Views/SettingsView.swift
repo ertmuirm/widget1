@@ -25,6 +25,8 @@ struct SettingsView: View {
     }
 
     @AppStorage("defaultWidgetSize") private var defaultWidgetSize = "systemMedium"
+    @AppStorage("defaultTextFontSize") private var defaultTextFontSize = 10.0
+    @AppStorage("defaultQRLabelSize") private var defaultQRLabelSize = 8.0
 
     @State private var backupAlertMessage = ""
     @State private var showBackupAlert = false
@@ -37,6 +39,24 @@ struct SettingsView: View {
                 Picker("Default Widget Size", selection: $defaultWidgetSize) {
                     ForEach(WidgetSize.homeScreenCases, id: \.rawValue) { size in
                         Text(size.displayName).tag(size.rawValue)
+                    }
+                }
+
+                Stepper(value: $defaultTextFontSize, in: 6...30, step: 1) {
+                    HStack {
+                        Text("Default Text Font Size")
+                        Spacer()
+                        Text("\(Int(defaultTextFontSize)) pt")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Stepper(value: $defaultQRLabelSize, in: 6...24, step: 1) {
+                    HStack {
+                        Text("Default QR Label Size")
+                        Spacer()
+                        Text("\(Int(defaultQRLabelSize)) pt")
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
