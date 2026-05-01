@@ -150,11 +150,12 @@ struct WidgetEntryView: View {
             } else {
                 let slide = slides[index]
                 if slide.isQRCode {
-                    if let content = slide.qrCodeContent, !content.isEmpty,
-                       let qr = UIImage.qrCode(from: content) {
+                    if let content = slide.qrCodeContent, !content.isEmpty {
                         GeometryReader { geo in
                             ZStack {
-                                qrImageView(qr)
+                                // QRCodeCanvasView renders via SwiftUI Canvas — no UIImage,
+                                // no colour-space issues, immune to iOS 18 Tinted mode.
+                                QRCodeCanvasView(content: content)
                                     .frame(width: geo.size.width, height: geo.size.height)
                                 if let label = slide.qrCodeLabel, !label.isEmpty {
                                     Text(label)
@@ -203,7 +204,8 @@ struct WidgetEntryView: View {
                     let image = slide.imageData.flatMap { UIImage(data: $0) }
                     if let image {
                         GeometryReader { geo in
-                            widgetImageView(image)
+                            Image(uiImage: image)
+                                .resizable()
                                 .scaledToFill()
                                 .scaleEffect(CGFloat(slide.scale))
                                 .offset(
@@ -283,41 +285,6 @@ struct WidgetEntryView: View {
         }
     }
 
-    // MARK: - Rendering helpers (iOS 16+ tinted-widget fix)
-    //
-    // widgetAccentedRenderingMode(_:) is an extension on Image, not View.
-    // It MUST be called directly on Image before any modifiers that change the
-    // type to some View (resizable / scaledToFit). In iOS 16+ Tinted widget mode
-    // WidgetKit replaces any UIImage with a solid accent colour unless .fullColor
-    // is set here.
-
-    @ViewBuilder
-    private func qrImageView(_ uiImage: UIImage) -> some View {
-        if #available(iOS 16.0, *) {
-            Image(uiImage: uiImage)
-                .widgetAccentedRenderingMode(.fullColor)
-                .interpolation(.none)
-                .resizable()
-                .scaledToFit()
-        } else {
-            Image(uiImage: uiImage)
-                .interpolation(.none)
-                .resizable()
-                .scaledToFit()
-        }
-    }
-
-    @ViewBuilder
-    private func widgetImageView(_ uiImage: UIImage) -> some View {
-        if #available(iOS 16.0, *) {
-            Image(uiImage: uiImage)
-                .widgetAccentedRenderingMode(.fullColor)
-                .resizable()
-        } else {
-            Image(uiImage: uiImage).resizable()
-        }
-    }
-
     @ViewBuilder
     private func slideDebugOverlay(slide: ImageSlide, index: Int, total: Int) -> some View {
         VStack(alignment: .leading, spacing: 1) {
@@ -357,9 +324,8 @@ struct WidgetEntryView: View {
     @ViewBuilder
     private var accessoryCircularWidget: some View {
         if let item = entry.configuration.items.first {
-            if item.displayType == .qrCode, let content = item.qrCodeContent,
-                      let qr = UIImage.qrCode(from: content, size: 60) {
-                qrImageView(qr)
+            if item.displayType == .qrCode, let content = item.qrCodeContent, !content.isEmpty {
+                QRCodeCanvasView(content: content)
             } else if item.displayType == .icon, let symbol = item.sfSymbolName {
                 if symbol.hasPrefix("wi_") {
                     Image(symbol).resizable().renderingMode(.template).scaledToFit()
@@ -421,11 +387,9 @@ struct ItemView: View {
             item.backgroundColor.swiftUIColor
                 .opacity(item.backgroundOpacity)
 
-            if item.displayType == .qrCode, let content = item.qrCodeContent, !content.isEmpty,
-               let qr = UIImage.qrCode(from: content) {
+            if item.displayType == .qrCode, let content = item.qrCodeContent, !content.isEmpty {
                 ZStack {
-                    itemQRImageView(qr)
-                        .padding(2)
+                    QRCodeCanvasView(content: content).padding(2)
                     if let label = item.qrCodeLabel, !label.isEmpty {
                         Text(label)
                             .font(.system(size: item.qrCodeLabelSize, weight: .bold))
@@ -474,18 +438,6 @@ struct ItemView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    @ViewBuilder
-    private func itemQRImageView(_ uiImage: UIImage) -> some View {
-        if #available(iOS 16.0, *) {
-            Image(uiImage: uiImage)
-                .widgetAccentedRenderingMode(.fullColor)
-                .interpolation(.none)
-                .resizable()
-                .scaledToFit()
-        } else {
-            Image(uiImage: uiImage).interpolation(.none).resizable().scaledToFit()
-        }
-    }
 }
 
 // MARK: - Lock Screen Item View
@@ -495,9 +447,8 @@ struct LockScreenItemView: View {
 
     var body: some View {
         ZStack {
-            if item.displayType == .qrCode, let content = item.qrCodeContent,
-                      let qr = UIImage.qrCode(from: content, size: 32) {
-                lockQRImageView(qr).frame(width: 16, height: 16)
+            if item.displayType == .qrCode, let content = item.qrCodeContent, !content.isEmpty {
+                QRCodeCanvasView(content: content).frame(width: 16, height: 16)
             } else if item.displayType == .icon, let symbol = item.sfSymbolName {
                 if symbol.hasPrefix("wi_") {
                     Image(symbol).resizable().renderingMode(.template).scaledToFit()
@@ -508,18 +459,6 @@ struct LockScreenItemView: View {
             } else {
                 Text(item.customText?.prefix(1) ?? "").font(.system(size: 10))
             }
-        }
-    }
-
-    @ViewBuilder
-    private func lockQRImageView(_ uiImage: UIImage) -> some View {
-        if #available(iOS 16.0, *) {
-            Image(uiImage: uiImage)
-                .widgetAccentedRenderingMode(.fullColor)
-                .resizable()
-                .scaledToFit()
-        } else {
-            Image(uiImage: uiImage).resizable().scaledToFit()
         }
     }
 }
