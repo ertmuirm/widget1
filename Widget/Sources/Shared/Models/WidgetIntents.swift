@@ -146,8 +146,24 @@ private func makeEntry(configID: String?) -> WidgetEntry {
         config = .defaultConfiguration
     }
 
-    let showLabels = config.showItemLabels ?? storage.showItemLabels
-    return WidgetEntry(date: Date(), configuration: config, showItemLabels: showLabels)
+    // Apply slide index written by AdvanceImageIntent as a lightweight override.
+    // This fires when saveConfigurations didn't cross the process boundary so the
+    // config we just loaded still has the old slide index.
+    var finalConfig = config
+    let idxKey = "slideIdx_\(config.id.uuidString)"
+    var slideOverride: Int? = nil
+    for id in SharedStorage.appGroupCandidates {
+        if let v = UserDefaults(suiteName: id)?.object(forKey: idxKey) as? Int {
+            slideOverride = v; break
+        }
+    }
+    if slideOverride == nil {
+        slideOverride = UserDefaults.standard.object(forKey: idxKey) as? Int
+    }
+    if let v = slideOverride { finalConfig.currentSlideIndex = v }
+
+    let showLabels = finalConfig.showItemLabels ?? storage.showItemLabels
+    return WidgetEntry(date: Date(), configuration: finalConfig, showItemLabels: showLabels)
 }
 
 private func makeTimeline(configID: String?) -> Timeline<WidgetEntry> {
@@ -552,10 +568,25 @@ struct AdvanceImageIntent: AppIntent {
         let count = configs[idx].slides?.count ?? 0
         guard count > 1 else { return .result() }
         let current = configs[idx].currentSlideIndex ?? 0
-        configs[idx].currentSlideIndex = forward
+        let nextIndex = forward
             ? (current + 1) % count
             : (current - 1 + count) % count
+        configs[idx].currentSlideIndex = nextIndex
         try? SharedStorage.shared.saveConfigurations(configs)
+
+        // Write the new index to a dedicated lightweight key so makeEntry() can
+        // apply it even if saveConfigurations doesn't cross the process boundary
+        // (e.g. on SideStore where the shared keychain entitlement is stripped).
+        let idxKey = "slideIdx_\(widgetID)"
+        for id in SharedStorage.appGroupCandidates {
+            if let ud = UserDefaults(suiteName: id) {
+                ud.set(nextIndex, forKey: idxKey)
+                ud.synchronize()
+            }
+        }
+        UserDefaults.standard.set(nextIndex, forKey: idxKey)
+        UserDefaults.standard.synchronize()
+
         WidgetCenter.shared.reloadAllTimelines()
         return .result()
     }

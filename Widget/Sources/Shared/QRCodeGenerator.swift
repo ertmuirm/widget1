@@ -13,32 +13,20 @@ extension UIImage {
         let scale = size / raw.extent.width
         let scaled = raw.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
 
-        // Manually rasterize to an RGBA bitmap. Earlier attempts via
-        // UIGraphicsImageRenderer / CIFalseColor / createCGImage(_:from:) all
-        // produced an all-white square in the widget extension because the output
-        // CGImage carried the grayscale color space from CIQRCodeGenerator and
-        // WidgetKit's render path discarded the dark modules. Drawing into a
-        // CGContext we own with explicit DeviceRGB + premultipliedLast alpha
-        // forces real RGBA output that renders correctly everywhere.
-        let ctx = CIContext()
-        guard let cg = ctx.createCGImage(scaled, from: scaled.extent) else { return nil }
-        let pixelSize = Int(size.rounded())
-        guard let bitmap = CGContext(
-            data: nil,
-            width: pixelSize,
-            height: pixelSize,
-            bitsPerComponent: 8,
-            bytesPerRow: pixelSize * 4,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return nil }
-        // White background first, then draw the QR (grayscale → renders black modules).
-        bitmap.setFillColor(red: 1, green: 1, blue: 1, alpha: 1)
-        bitmap.fill(CGRect(x: 0, y: 0, width: pixelSize, height: pixelSize))
-        bitmap.interpolationQuality = .none
-        bitmap.draw(cg, in: CGRect(x: 0, y: 0, width: pixelSize, height: pixelSize))
-        guard let outCG = bitmap.makeImage() else { return nil }
-        return UIImage(cgImage: outCG)
+        // CIQRCodeGenerator emits a grayscale CIImage. All downstream paths that
+        // produce a CGImage in the native grayscale color space result in an
+        // all-white square when WidgetKit composites the image — it silently drops
+        // the dark modules. Requesting RGBA8 + DeviceRGB from createCGImage forces
+        // the color-space conversion inside CIContext so the output CGImage is
+        // unambiguously RGBA and renders correctly in the widget extension.
+        let rgbSpace = CGColorSpaceCreateDeviceRGB()
+        let ctx = CIContext(options: [.workingColorSpace: rgbSpace as Any,
+                                      .outputColorSpace: rgbSpace as Any])
+        guard let cg = ctx.createCGImage(scaled,
+                                         from: scaled.extent,
+                                         format: .RGBA8,
+                                         colorSpace: rgbSpace) else { return nil }
+        return UIImage(cgImage: cg)
     }
 }
 

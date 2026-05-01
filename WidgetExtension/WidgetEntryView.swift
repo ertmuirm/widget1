@@ -327,13 +327,7 @@ struct WidgetEntryView: View {
     @ViewBuilder
     private var accessoryCircularWidget: some View {
         if let item = entry.configuration.items.first {
-            if item.displayType == .image, let filename = item.customImageFilename,
-               let image = SharedStorage.shared.loadWidgetImage(filename: filename) {
-                Image(uiImage: image)
-                    .resizable()
-                    .renderingMode(.original)
-                    .scaledToFit()
-            } else if item.displayType == .qrCode, let content = item.qrCodeContent,
+            if item.displayType == .qrCode, let content = item.qrCodeContent,
                       let qr = UIImage.qrCode(from: content, size: 60) {
                 Image(uiImage: qr).resizable().scaledToFit()
             } else if item.displayType == .icon, let symbol = item.sfSymbolName {
@@ -417,14 +411,6 @@ struct ItemView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 2))
                     }
                 }
-            } else if item.displayType == .image, let filename = item.customImageFilename,
-               let image = (item.imageData.flatMap(UIImage.init)
-                            ?? SharedStorage.shared.loadWidgetImage(filename: filename)) {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
             } else if item.displayType == .icon {
                 VStack(spacing: 2) {
                     if let symbol = item.sfSymbolName {
@@ -469,12 +455,7 @@ struct LockScreenItemView: View {
 
     var body: some View {
         ZStack {
-            if item.displayType == .image, let filename = item.customImageFilename,
-               let image = SharedStorage.shared.loadWidgetImage(filename: filename) {
-                Image(uiImage: image)
-                    .resizable().renderingMode(.original).scaledToFit()
-                    .frame(width: 16, height: 16)
-            } else if item.displayType == .qrCode, let content = item.qrCodeContent,
+            if item.displayType == .qrCode, let content = item.qrCodeContent,
                       let qr = UIImage.qrCode(from: content, size: 32) {
                 Image(uiImage: qr).resizable().scaledToFit().frame(width: 16, height: 16)
             } else if item.displayType == .icon, let symbol = item.sfSymbolName {

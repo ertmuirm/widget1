@@ -26,7 +26,9 @@ struct ItemEditorView: View {
         if widgetKind == .imageSlideshow {
             return DisplayType.allCases
         }
-        return DisplayType.allCases.filter { $0 != .qrCode }
+        // Grid and lock screen widgets: remove image upload (causes entire widget
+        // to fail to render) and QR code (only supported in image slideshow).
+        return DisplayType.allCases.filter { $0 != .qrCode && $0 != .image }
     }
 
     var body: some View {
