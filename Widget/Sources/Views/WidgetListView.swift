@@ -16,7 +16,9 @@ struct WidgetListView: View {
                 emptyView
             } else {
                 ForEach(viewModel.configurations) { config in
-                    NavigationLink(value: config.id) {
+                    ZStack {
+                        // Invisible NavigationLink drives navigation without intercepting swipes
+                        NavigationLink(value: config.id) { EmptyView() }.opacity(0)
                         WidgetRowView(configuration: config)
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -186,17 +188,25 @@ struct WidgetPreviewView: View {
                             .foregroundStyle(.secondary)
                     } else {
                         let slide = slides[idx]
-                        let img = slide.imageData.flatMap { UIImage(data: $0) }
-                            ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
-                        if let img {
-                            Image(uiImage: img)
+                        if slide.isQRCode, let content = slide.qrCodeContent, !content.isEmpty,
+                           let qr = UIImage.qrCode(from: content, size: 120) {
+                            Image(uiImage: qr)
+                                .interpolation(.none)
                                 .resizable()
-                                .scaledToFill()
-                                .scaleEffect(CGFloat(slide.scale))
+                                .scaledToFit()
                         } else {
-                            Image(systemName: "photo")
-                                .font(.title2)
-                                .foregroundStyle(.secondary)
+                            let img = slide.imageData.flatMap { UIImage(data: $0) }
+                                ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
+                            if let img {
+                                Image(uiImage: img)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .scaleEffect(CGFloat(slide.scale))
+                            } else {
+                                Image(systemName: "photo")
+                                    .font(.title2)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 } else if configuration.items.isEmpty {

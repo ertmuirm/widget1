@@ -181,6 +181,7 @@ class InstalledAppsManager: ObservableObject {
     @Published var scannedApps: [AppActionGroup] = []
     @Published var isScanning = false
     @Published var hasCompletedScan = false
+    @Published var isWorkspaceAccessible = false
     @Published var installedBundleIDs: Set<String> = []
     @Published var installedURLSchemes: Set<String> = []
 
@@ -200,38 +201,38 @@ class InstalledAppsManager: ObservableObject {
         guard !isScanning else { return }
         isScanning = true
         DispatchQueue.global(qos: .userInitiated).async {
-            let (apps, bundleIDs, urlSchemes) = self.fetchUserApps()
+            let (apps, bundleIDs, urlSchemes, workspaceOK) = self.fetchUserApps()
             DispatchQueue.main.async {
                 self.scannedApps = apps
                 self.installedBundleIDs = bundleIDs
                 self.installedURLSchemes = urlSchemes
-                self.hasCompletedScan = !bundleIDs.isEmpty
+                self.isWorkspaceAccessible = workspaceOK
+                self.hasCompletedScan = workspaceOK
                 self.isScanning = false
             }
         }
     }
 
     func isInstalled(_ app: AppActionGroup) -> Bool {
-        guard hasCompletedScan else { return true }
-
         let url = app.openURL
 
         if url.hasPrefix("openapp://launch?bundle="),
            let comps = URLComponents(string: url),
            let bundleID = comps.queryItems?.first(where: { $0.name == "bundle" })?.value {
-            // Check scan results first, then fall back to direct workspace query
-            return installedBundleIDs.contains(bundleID) || Self.workspaceIsInstalled(bundleID: bundleID)
+            if isWorkspaceAccessible {
+                // Scan found it, or direct applicationIsInstalled: check confirms it
+                return installedBundleIDs.contains(bundleID) || Self.workspaceIsInstalled(bundleID: bundleID)
+            }
+            return true  // workspace unavailable — show all bundle-ID apps
         }
 
+        guard hasCompletedScan else { return true }
         if url.hasPrefix("http://") || url.hasPrefix("https://") { return true }
-
-        if let scheme = URL(string: url)?.scheme {
-            return installedURLSchemes.contains(scheme)
-        }
+        if let scheme = URL(string: url)?.scheme { return installedURLSchemes.contains(scheme) }
         return true
     }
 
-    private static func workspaceIsInstalled(bundleID: String) -> Bool {
+    static func workspaceIsInstalled(bundleID: String) -> Bool {
         guard let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
               let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject
         else { return false }
@@ -240,13 +241,21 @@ class InstalledAppsManager: ObservableObject {
         return ws.perform(sel, with: bundleID)?.takeUnretainedValue() as? Bool ?? false
     }
 
-    private func fetchUserApps() -> ([AppActionGroup], Set<String>, Set<String>) {
+    private func fetchUserApps() -> ([AppActionGroup], Set<String>, Set<String>, Bool) {
         guard
             let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
-            let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject,
-            let raw = ws.perform(NSSelectorFromString("allApplications"))?.takeUnretainedValue(),
-            let nsArray = raw as? NSArray
-        else { return ([], [], []) }
+            let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject
+        else { return ([], [], [], false) }
+
+        // Workspace class is accessible — try to enumerate all apps
+        let allAppsSel = NSSelectorFromString("allApplications")
+        guard ws.responds(to: allAppsSel),
+              let raw = ws.perform(allAppsSel)?.takeUnretainedValue(),
+              let nsArray = raw as? NSArray
+        else {
+            // allApplications failed but workspace is accessible — still useful for per-app checks
+            return ([], [], [], true)
+        }
 
         var result: [AppActionGroup] = []
         var bundleIDs = Set<String>()
@@ -277,7 +286,7 @@ class InstalledAppsManager: ObservableObject {
             ))
         }
         let sorted = result.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        return (sorted, bundleIDs, urlSchemes)
+        return (sorted, bundleIDs, urlSchemes, true)
     }
 }
 

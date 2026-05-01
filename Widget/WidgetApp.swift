@@ -42,21 +42,38 @@ private func dialPhoneNumber(url: URL) {
 // MARK: - Bundle-ID app launch via LSApplicationWorkspace (private API)
 
 private func openAppByBundleID(_ bundleID: String, fallbackURLString: String? = nil) {
-    // Try LSApplicationWorkspace first (works without URL scheme registration).
-    // Fall back to URL scheme only if the workspace call is unavailable.
-    if openViaWorkspace(bundleID) { return }
-    if let str = fallbackURLString, let url = URL(string: str) {
-        Task { await UIApplication.shared.open(url) }
+    guard let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
+          let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject
+    else {
+        // Workspace not accessible — go straight to URL fallback
+        openFallbackURL(fallbackURLString)
+        return
+    }
+
+    // Check if the app is actually installed before trying to launch
+    let isInstalledSel = NSSelectorFromString("applicationIsInstalled:")
+    let appInstalled: Bool
+    if ws.responds(to: isInstalledSel) {
+        appInstalled = ws.perform(isInstalledSel, with: bundleID)?.takeUnretainedValue() as? Bool ?? false
+    } else {
+        appInstalled = true  // can't check — assume installed and try
+    }
+
+    guard appInstalled else {
+        // App not installed by this bundle ID — try URL fallback (might be a different scheme)
+        openFallbackURL(fallbackURLString)
+        return
+    }
+
+    let openSel = NSSelectorFromString("openApplicationWithBundleID:")
+    if ws.responds(to: openSel) {
+        ws.perform(openSel, with: bundleID)
+    } else {
+        openFallbackURL(fallbackURLString)
     }
 }
 
-@discardableResult
-private func openViaWorkspace(_ bundleID: String) -> Bool {
-    guard let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
-          let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject
-    else { return false }
-    let sel = NSSelectorFromString("openApplicationWithBundleID:")
-    guard ws.responds(to: sel) else { return false }
-    ws.perform(sel, with: bundleID)
-    return true
+private func openFallbackURL(_ urlString: String?) {
+    guard let str = urlString, let url = URL(string: str) else { return }
+    Task { await UIApplication.shared.open(url) }
 }

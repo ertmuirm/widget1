@@ -100,11 +100,14 @@ struct ImageSlide: Codable, Identifiable, Equatable {
     var qrCodeContent: String?
     /// Optional label shown below the QR code.
     var qrCodeLabel: String?
-    /// In-memory JPEG data. Never serialized — populated at load time from SharedStorage.
+    /// In-memory JPEG data. Serialized in config JSON so it crosses process boundaries
+    /// via the same keychain/UserDefaults channel configs use. Stripped from entity IDs
+    /// (see encodeEntityID in WidgetIntents) to keep those compact.
     var imageData: Data?
 
-    // imageData is intentionally excluded from JSON to keep config sizes small.
-    enum CodingKeys: CodingKey { case id, filename, offsetX, offsetY, scale, action, qrCodeContent, qrCodeLabel }
+    enum CodingKeys: CodingKey {
+        case id, filename, offsetX, offsetY, scale, action, qrCodeContent, qrCodeLabel, imageData
+    }
 
     var isQRCode: Bool { qrCodeContent != nil }
 

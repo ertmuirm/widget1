@@ -113,19 +113,17 @@ struct WidgetEditorView: View {
     private var slidesSection: some View {
         Section {
             ForEach(Array((configuration.slides ?? []).enumerated()), id: \.element.id) { index, slide in
-                Button {
-                    editingSlideIndex = EditingItemIndex(id: index)
-                } label: {
-                    SlideRowView(slide: slide, index: index)
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        SharedStorage.shared.deleteWidgetImage(filename: slide.filename)
-                        configuration.slides?.remove(at: index)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                SlideRowView(slide: slide, index: index)
+                    .contentShape(Rectangle())
+                    .onTapGesture { editingSlideIndex = EditingItemIndex(id: index) }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            SharedStorage.shared.deleteWidgetImage(filename: slide.filename)
+                            configuration.slides?.remove(at: index)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
-                }
             }
         } header: {
             Text("Images (\(configuration.slides?.count ?? 0))")
@@ -230,21 +228,21 @@ struct WidgetEditorView: View {
                 .foregroundStyle(.gray)
             } else {
                 ForEach($configuration.items) { $item in
-                    Button {
-                        if !isReordering,
-                           let idx = configuration.items.firstIndex(where: { $0.id == item.id }) {
-                            editingItemIndex = EditingItemIndex(id: idx)
+                    ItemRowView(item: item)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if !isReordering,
+                               let idx = configuration.items.firstIndex(where: { $0.id == item.id }) {
+                                editingItemIndex = EditingItemIndex(id: idx)
+                            }
                         }
-                    } label: {
-                        ItemRowView(item: item)
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            configuration.items.removeAll { $0.id == item.id }
-                        } label: {
-                            Label("Delete", systemImage: "trash")
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                configuration.items.removeAll { $0.id == item.id }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
                         }
-                    }
                 }
                 .onMove { from, to in
                     configuration.items.move(fromOffsets: from, toOffset: to)
@@ -463,21 +461,20 @@ struct SlideRowView: View {
                 Text(slide.isQRCode ? "QR Code \(index + 1)" : "Image \(index + 1)")
                     .font(.headline)
                     .foregroundStyle(.white)
-                HStack(spacing: 6) {
-                    if slide.isQRCode {
-                        Text(slide.qrCodeContent.map { $0.prefix(20) + ($0.count > 20 ? "…" : "") } ?? "No content")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("Scale \(String(format: "%.1f", slide.scale))×")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    if slide.action != nil {
-                        Image(systemName: "hand.tap.fill")
-                            .font(.caption2)
-                            .foregroundStyle(.blue)
-                    }
+                if slide.isQRCode {
+                    Text(slide.qrCodeContent.map { s in s.isEmpty ? "No content" : (s.count > 24 ? String(s.prefix(24)) + "…" : s) } ?? "No content")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if let action = slide.action {
+                    let detail = action.displayName ?? (action.payload.isEmpty ? nil : action.payload)
+                    Text(detail.map { "\(action.type.displayName): \($0)" } ?? action.type.displayName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                } else {
+                    Text("No action")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
                 }
             }
 

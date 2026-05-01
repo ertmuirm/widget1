@@ -287,7 +287,10 @@ final class SharedStorage {
             guard configs[i].slides != nil else { continue }
             for j in configs[i].slides!.indices {
                 let fn = configs[i].slides![j].filename
-                configs[i].slides![j].imageData = loadWidgetImageData(filename: fn)
+                // Storage takes priority; if unavailable (cross-process) keep data from JSON
+                if let d = loadWidgetImageData(filename: fn) {
+                    configs[i].slides![j].imageData = d
+                }
             }
         }
         if !configs.isEmpty && keychainRead(forKey: Self.configKey) == nil {

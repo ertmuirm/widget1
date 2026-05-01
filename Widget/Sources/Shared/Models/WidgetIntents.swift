@@ -10,8 +10,15 @@ import WidgetKit
 // selectedWidget becomes nil. Embedding the config in the ID prevents that.
 
 private func encodeEntityID(_ config: WidgetConfig) -> String {
+    // Strip imageData from slides to keep entity IDs compact. The widget extension
+    // reads imageData from the full config JSON in shared storage instead.
+    var lite = config
+    if var slides = lite.slides {
+        for i in slides.indices { slides[i].imageData = nil }
+        lite.slides = slides
+    }
     guard let data = try? {
-        let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601; return try enc.encode(config)
+        let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601; return try enc.encode(lite)
     }() else { return config.id.uuidString }
     return "\(config.id.uuidString)|\(data.base64EncodedString())"
 }

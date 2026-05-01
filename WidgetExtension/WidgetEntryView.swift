@@ -142,23 +142,29 @@ struct WidgetEntryView: View {
                 }
             } else {
                 let slide = slides[index]
-                if slide.isQRCode, let content = slide.qrCodeContent,
+                if slide.isQRCode, let content = slide.qrCodeContent, !content.isEmpty,
                    let qr = UIImage.qrCode(from: content) {
-                    VStack(spacing: 4) {
-                        Image(uiImage: qr)
-                            .interpolation(.none)
-                            .resizable()
-                            .scaledToFit()
-                            .padding(8)
-                        if let label = slide.qrCodeLabel, !label.isEmpty {
-                            Text(label)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.5)
-                                .padding(.bottom, 4)
+                    GeometryReader { geo in
+                        ZStack(alignment: .bottom) {
+                            Image(uiImage: qr)
+                                .interpolation(.none)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: geo.size.width, height: geo.size.height)
+                            if let label = slide.qrCodeLabel, !label.isEmpty {
+                                Text(label)
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(.white)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.5)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 2)
+                                    .background(.black.opacity(0.6))
+                                    .padding(.bottom, -8)
+                            }
                         }
                     }
+                    .padding(-10)
                 } else {
                     let image = slide.imageData.flatMap { UIImage(data: $0) }
                         ?? SharedStorage.shared.loadWidgetImage(filename: slide.filename)
