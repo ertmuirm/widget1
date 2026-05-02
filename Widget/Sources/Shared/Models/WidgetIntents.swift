@@ -140,12 +140,9 @@ private func makeEntry(configID: String?) -> WidgetEntry {
                     }
                 }
             }
-            for j in embedded.items.indices where embedded.items[j].imageData == nil {
-                if embedded.items[j].displayType == .image,
-                   let fn = embedded.items[j].customImageFilename, !fn.isEmpty {
-                    embedded.items[j].imageData = storage.loadWidgetImageData(filename: fn)
-                }
-            }
+            // Note: do NOT load imageData for grid items here. The extension's ItemView
+            // has no image-rendering path for grid cells, and loading full-res images
+            // for 7+ items exceeds the 30 MB WidgetKit memory limit.
             config = embedded
         } else {
             config = .defaultConfiguration
@@ -191,6 +188,13 @@ private func makeEntry(configID: String?) -> WidgetEntry {
             }
         }
         finalConfig.slides = slides
+    }
+
+    // Grid items: strip imageData entirely. The extension's ItemView has no .image
+    // rendering path; keeping full-res image blobs for 7+ items easily exceeds the
+    // 30 MB WidgetKit process memory limit and causes a silent blank-widget kill.
+    for j in finalConfig.items.indices where finalConfig.items[j].imageData != nil {
+        finalConfig.items[j].imageData = nil
     }
 
     let showLabels = finalConfig.showItemLabels ?? storage.showItemLabels

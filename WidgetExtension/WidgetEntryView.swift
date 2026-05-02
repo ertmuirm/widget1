@@ -27,17 +27,18 @@ struct WidgetEntryView: View {
     @ViewBuilder
     private var homeScreenWidget: some View {
         ZStack {
-            // Background NoOp covers padding and gap areas so they never open the app
-            Button(intent: NoOpIntent()) { Color.clear }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .buttonStyle(.plain)
-
             if entry.configuration.items.isEmpty {
                 emptyView
             } else {
                 itemsGrid
             }
         }
+        // widgetURL fires for taps on areas not covered by a Link (gaps, empty cells).
+        // The app's Page 0 is a black screen, so this tap silently opens and immediately
+        // shows nothing — same UX as the old NoOpIntent approach, without consuming an
+        // AppIntent interactive-element slot that would block Link rendering for grids
+        // with many items.
+        .widgetURL(URL(string: "widgetar://noop"))
     }
 
     @ViewBuilder

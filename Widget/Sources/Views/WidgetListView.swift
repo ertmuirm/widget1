@@ -153,13 +153,21 @@ struct WidgetRowView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
-                let itemCount = configuration.widgetKind == .imageSlideshow
-                    ? (configuration.slides?.count ?? 0)
-                    : configuration.items.count
-                let unit = configuration.widgetKind == .imageSlideshow ? "code" : "item"
-                Text("\(itemCount) \(unit)\(itemCount == 1 ? "" : "s")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if configuration.widgetKind == .lockScreen,
+                   let action = configuration.items.first?.action {
+                    Text(action.displayName ?? action.payload)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                } else {
+                    let itemCount = configuration.widgetKind == .imageSlideshow
+                        ? (configuration.slides?.count ?? 0)
+                        : configuration.items.count
+                    let unit = configuration.widgetKind == .imageSlideshow ? "code" : "item"
+                    Text("\(itemCount) \(unit)\(itemCount == 1 ? "" : "s")")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Spacer()
