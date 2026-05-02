@@ -4,50 +4,18 @@ import UIKit
 
 // MARK: - Entity ID encoding
 //
-// Entity IDs have the format "<uuid>|<base64-json>" where the base64 portion is
-// the full WidgetConfig JSON. This lets entities(for:) reconstruct a config from
-// just the stored ID — no cross-process data sharing required. iOS re-resolves
-// entities on every timeline refresh; if the query returns an empty array the
-// selectedWidget becomes nil. Embedding the config in the ID prevents that.
-
-/// Downsample image data to a small thumbnail for embedding in entity IDs.
-/// Keeps entity IDs compact (~2-4 KB/image) while still providing a fallback
-/// when the app-group / keychain channel is unavailable (e.g. SideStore free accounts).
-private func thumbnailData(from data: Data, maxDimension: CGFloat = 80) -> Data? {
-    guard let src = UIImage(data: data) else { return nil }
-    let s = src.size
-    guard s.width > 0, s.height > 0 else { return nil }
-    let factor = min(maxDimension / s.width, maxDimension / s.height, 1.0)
-    if factor >= 1.0 { return data }
-    let newSize = CGSize(width: (s.width * factor).rounded(), height: (s.height * factor).rounded())
-    let thumb = UIGraphicsImageRenderer(size: newSize).image { _ in
-        src.draw(in: CGRect(origin: .zero, size: newSize))
-    }
-    return thumb.jpegData(compressionQuality: 0.5)
-}
+// Entity IDs are plain UUIDs. An older format used "<uuid>|<base64-json>" to embed
+// the full config, but WidgetKit silently corrupts entity IDs above a certain size,
+// causing 7+-item configs to fall back to .defaultConfiguration at render time.
+// decodeConfigFromID() is kept so existing placed widgets with old fat IDs still work.
 
 private func encodeEntityID(_ config: WidgetConfig) -> String {
-    // Downsample imageData to small thumbnails before embedding in the entity ID.
-    // This keeps entity IDs manageable (~2-4 KB/image) while still providing a
-    // fallback path when app-group / keychain storage is inaccessible in the extension.
-    var lite = config
-    if var slides = lite.slides {
-        for i in slides.indices {
-            if let d = slides[i].imageData {
-                slides[i].imageData = thumbnailData(from: d) ?? d
-            }
-        }
-        lite.slides = slides
-    }
-    for i in lite.items.indices {
-        if let d = lite.items[i].imageData {
-            lite.items[i].imageData = thumbnailData(from: d) ?? d
-        }
-    }
-    guard let data = try? {
-        let enc = JSONEncoder(); enc.dateEncodingStrategy = .iso8601; return try enc.encode(lite)
-    }() else { return config.id.uuidString }
-    return "\(config.id.uuidString)|\(data.base64EncodedString())"
+    // Entity IDs are UUID-only. WidgetKit has an undocumented size limit on entity ID
+    // strings; embedding the full base64-JSON config caused IDs for 7+ item configs to
+    // exceed that limit and be silently corrupted, causing makeEntry() to fall back to
+    // .defaultConfiguration. loadConfigurations() already writes to UserDefaults.standard
+    // as a fallback path available to the extension, so UUID lookup is sufficient.
+    config.id.uuidString
 }
 
 private func uuidFromEntityID(_ entityID: String) -> String {
