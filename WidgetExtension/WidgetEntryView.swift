@@ -32,6 +32,7 @@ struct WidgetEntryView: View {
             } else {
                 itemsGrid
             }
+            debugOverlay
         }
         // widgetURL fires for taps on areas not covered by a Link (gaps, empty cells).
         // The app's Page 0 is a black screen, so this tap silently opens and immediately
@@ -39,6 +40,34 @@ struct WidgetEntryView: View {
         // AppIntent interactive-element slot that would block Link rendering for grids
         // with many items.
         .widgetURL(URL(string: "widgetar://noop"))
+    }
+
+    @ViewBuilder
+    private var debugOverlay: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 0) {
+                Text("DBG \(entry.configuration.items.count)i \(debugFamilyName)")
+                    .font(.system(size: 7, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 3)
+                    .padding(.vertical, 2)
+                    .background(Color.black.opacity(0.75))
+                    .clipShape(RoundedRectangle(cornerRadius: 2))
+                Spacer()
+            }
+            Spacer()
+        }
+        .padding(4)
+    }
+
+    private var debugFamilyName: String {
+        switch widgetFamily {
+        case .systemSmall:      return "sm"
+        case .systemMedium:     return "md"
+        case .systemLarge:      return "lg"
+        case .systemExtraLarge: return "xl"
+        default:                return "??"
+        }
     }
 
     @ViewBuilder

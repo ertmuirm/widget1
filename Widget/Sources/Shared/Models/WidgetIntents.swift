@@ -198,6 +198,16 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     }
 
     let showLabels = finalConfig.showItemLabels ?? storage.showItemLabels
+
+    // Debug: record what the extension is about to render so the main app's
+    // DebugLogView → "Extension Log" button can surface it cross-process.
+    let dbgKind = finalConfig.widgetKind?.rawValue ?? "grid"
+    let dbgItems = finalConfig.items.count
+    let dbgSlides = finalConfig.slides?.count ?? 0
+    storage.appendExtensionLog(
+        "makeEntry: uuid=\(entityUUID.prefix(8)) name=\"\(finalConfig.name)\" kind=\(dbgKind) items=\(dbgItems) slides=\(dbgSlides)"
+    )
+
     return WidgetEntry(date: Date(), configuration: finalConfig,
                        showItemLabels: showLabels, entityUUID: entityUUID)
 }
