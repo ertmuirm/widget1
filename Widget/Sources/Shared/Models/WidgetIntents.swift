@@ -90,7 +90,7 @@ func resolveItemURL(_ item: WidgetItem) -> URL? {
 
 private func filteredConfigs(size: WidgetSize) -> [WidgetConfig] {
     ((try? SharedStorage.shared.loadConfigurations()) ?? [])
-        .filter { $0.size == size && $0.widgetKind != .imageSlideshow }
+        .filter { $0.size == size && $0.widgetKind != .imageSlideshow && $0.widgetKind != .lockScreen }
 }
 
 private func allConfigs() -> [WidgetConfig] {

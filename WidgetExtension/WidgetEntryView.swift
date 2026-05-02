@@ -82,28 +82,25 @@ struct WidgetEntryView: View {
     private var extraLargeGrid: some View { largeGrid }
 
     private func itemGrid(items: [WidgetItem], cols: Int, rows: Int, size: WidgetSize) -> some View {
-        GeometryReader { geo in
-            let spacing: CGFloat = 1
-            let cellW = (geo.size.width - spacing * CGFloat(cols - 1)) / CGFloat(cols)
-            let cellH = (geo.size.height - spacing * CGFloat(rows - 1)) / CGFloat(rows)
-            VStack(spacing: spacing) {
-                ForEach(0..<rows, id: \.self) { row in
-                    HStack(spacing: spacing) {
-                        ForEach(0..<cols, id: \.self) { col in
-                            let idx = row * cols + col
-                            Group {
-                                if idx < items.count {
-                                    itemCell(items[idx], size: size)
-                                } else {
-                                    Color.clear
-                                }
+        VStack(spacing: 1) {
+            ForEach(0..<rows, id: \.self) { row in
+                HStack(spacing: 1) {
+                    ForEach(0..<cols, id: \.self) { col in
+                        let idx = row * cols + col
+                        Group {
+                            if idx < items.count {
+                                itemCell(items[idx], size: size)
+                            } else {
+                                Color.clear
                             }
-                            .frame(width: cellW, height: cellH)
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(-10)
     }
 

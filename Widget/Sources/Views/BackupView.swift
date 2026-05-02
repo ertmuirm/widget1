@@ -12,6 +12,9 @@ struct BackupView: View {
     @State private var showError = false
     @State private var showSuccess = false
     @State private var successMessage = ""
+    @State private var autoBackups: [URL] = []
+    @State private var showRestoreConfirm = false
+    @State private var pendingRestoreURL: URL?
 
     var body: some View {
         List {
@@ -53,6 +56,47 @@ struct BackupView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            if !autoBackups.isEmpty {
+                Section {
+                    ForEach(autoBackups, id: \.lastPathComponent) { url in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(backupDisplayName(url))
+                                    .foregroundStyle(.white)
+                                Text(url.lastPathComponent)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Button("Restore") {
+                                pendingRestoreURL = url
+                                showRestoreConfirm = true
+                            }
+                            .foregroundStyle(.blue)
+                            .buttonStyle(.plain)
+                        }
+                    }
+                } header: {
+                    Text("Auto-Backups")
+                } footer: {
+                    Text("Auto-backups are created each time you open the app. Up to 5 are kept.")
+                }
+            }
+        }
+        .onAppear { autoBackups = viewModel.listAutoBackups() }
+        .confirmationDialog("Restore Backup", isPresented: $showRestoreConfirm, titleVisibility: .visible) {
+            Button("Restore", role: .destructive) {
+                if let url = pendingRestoreURL {
+                    viewModel.restoreFromAutoBackup(url: url)
+                    successMessage = "Backup restored successfully."
+                    showSuccess = true
+                    autoBackups = viewModel.listAutoBackups()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will replace your current widgets with the selected backup.")
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Backup")
@@ -139,6 +183,14 @@ struct BackupView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter.string(from: Date())
+    }
+
+    private func backupDisplayName(_ url: URL) -> String {
+        let name = url.deletingPathExtension().lastPathComponent
+            .replacingOccurrences(of: "widget_backup_", with: "")
+        let parts = name.split(separator: "_")
+        guard parts.count == 2 else { return name }
+        return "\(parts[0]) at \(parts[1].replacingOccurrences(of: "-", with: ":"))"
     }
 }
 

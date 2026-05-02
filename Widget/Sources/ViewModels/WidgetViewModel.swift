@@ -24,6 +24,7 @@ final class WidgetViewModel: ObservableObject {
 
     init() {
         loadConfigurations()
+        Task { try? storage.createAutoBackup() }
     }
 
     // MARK: - Configuration Management
@@ -84,6 +85,12 @@ final class WidgetViewModel: ObservableObject {
         triggerHaptic(.rigid)
     }
 
+    func moveConfiguration(from source: IndexSet, to destination: Int) {
+        configurations.move(fromOffsets: source, toOffset: destination)
+        saveConfigurations()
+        triggerHaptic(.light)
+    }
+
     func deleteAllConfigurations() {
         do {
             try storage.deleteAllConfigurations()
@@ -135,6 +142,21 @@ final class WidgetViewModel: ObservableObject {
         } catch {
             handleError(error)
             return false
+        }
+    }
+
+    func listAutoBackups() -> [URL] {
+        (try? storage.listAutoBackups()) ?? []
+    }
+
+    func restoreFromAutoBackup(url: URL) {
+        do {
+            try storage.restoreFromAutoBackup(url: url)
+            loadConfigurations()
+            WidgetCenter.shared.reloadAllTimelines()
+            triggerHaptic(.medium)
+        } catch {
+            handleError(error)
         }
     }
 

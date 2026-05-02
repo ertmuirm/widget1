@@ -26,6 +26,9 @@ struct WidgetListView: View {
                         }
                     }
                 }
+                .onMove { from, to in
+                    viewModel.moveConfiguration(from: from, to: to)
+                }
             }
         }
         .listStyle(.insetGrouped)
@@ -43,6 +46,10 @@ struct WidgetListView: View {
                     Image(systemName: "gear")
                         .font(.title3)
                 }
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                EditButton()
             }
 
             ToolbarItem(placement: .primaryAction) {
@@ -207,6 +214,27 @@ struct WidgetPreviewView: View {
                                 .font(.title2)
                                 .foregroundStyle(.secondary)
                         }
+                    }
+                } else if configuration.widgetKind == .lockScreen {
+                    // Lock screen preview: selected icon centered on the canvas
+                    if let item = configuration.items.first,
+                       item.displayType == .icon, let symbolName = item.sfSymbolName {
+                        if symbolName.hasPrefix("wi_") {
+                            Image(symbolName)
+                                .resizable()
+                                .renderingMode(.template)
+                                .scaledToFit()
+                                .frame(width: geometry.size.width * 0.5, height: geometry.size.height * 0.5)
+                                .foregroundStyle(item.foregroundColor.swiftUIColor)
+                        } else {
+                            Image(systemName: symbolName)
+                                .font(.system(size: geometry.size.width * 0.4))
+                                .foregroundStyle(item.foregroundColor.swiftUIColor)
+                        }
+                    } else {
+                        Image(systemName: "lock.display")
+                            .font(.title2)
+                            .foregroundStyle(.secondary)
                     }
                 } else if configuration.items.isEmpty {
                     Image(systemName: "plus")

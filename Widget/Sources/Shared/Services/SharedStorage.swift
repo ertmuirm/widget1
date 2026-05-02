@@ -537,6 +537,52 @@ final class SharedStorage {
         try decoder.decode([WidgetConfig].self, from: data)
     }
 
+    // MARK: - Auto-backup (timestamped, non-overwriting)
+
+    /// Creates a timestamped backup in Documents/Backups/. Never overwrites an existing file.
+    /// Keeps only the 5 most recent auto-backups.
+    func createAutoBackup() throws {
+        let configs = try loadConfigurations()
+        guard !configs.isEmpty else { return }
+
+        let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let backupDir = docsURL.appendingPathComponent("Backups", isDirectory: true)
+        try FileManager.default.createDirectory(at: backupDir, withIntermediateDirectories: true)
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd_HHmm"
+        let filename = "widget_backup_\(formatter.string(from: Date())).json"
+        let backupURL = backupDir.appendingPathComponent(filename)
+        guard !FileManager.default.fileExists(atPath: backupURL.path) else { return }
+
+        let json = try encoder.encode(configs)
+        try json.write(to: backupURL, options: .atomicWrite)
+
+        let existing = (try? listAutoBackups()) ?? []
+        if existing.count > 5 {
+            for old in existing.dropFirst(5) { try? FileManager.default.removeItem(at: old) }
+        }
+    }
+
+    /// Returns auto-backup URLs sorted newest-first.
+    func listAutoBackups() throws -> [URL] {
+        let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let backupDir = docsURL.appendingPathComponent("Backups", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: backupDir.path) else { return [] }
+        let files = try FileManager.default.contentsOfDirectory(
+            at: backupDir, includingPropertiesForKeys: [.creationDateKey])
+        return files
+            .filter { $0.pathExtension == "json" && $0.lastPathComponent.hasPrefix("widget_backup_") }
+            .sorted { $0.lastPathComponent > $1.lastPathComponent }
+    }
+
+    /// Restores configurations from a specific auto-backup URL.
+    func restoreFromAutoBackup(url: URL) throws {
+        let data = try Data(contentsOf: url)
+        let configs = try decoder.decode([WidgetConfig].self, from: data)
+        try saveConfigurations(configs)
+    }
+
     func getStorageInfo() throws -> StorageInfo {
         let configs = try loadConfigurations()
         return StorageInfo(appGroupID: activeAppGroupID,
