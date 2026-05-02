@@ -83,25 +83,15 @@ struct WidgetEntryView: View {
     private var extraLargeGrid: some View { largeGrid }
 
     private func itemGrid(items: [WidgetItem], cols: Int, rows: Int, size: WidgetSize) -> some View {
-        VStack(spacing: 1) {
-            ForEach(0..<rows, id: \.self) { row in
-                HStack(spacing: 1) {
-                    ForEach(0..<cols, id: \.self) { col in
-                        let idx = row * cols + col
-                        Group {
-                            if idx < items.count {
-                                itemCell(items[idx], size: size)
-                            } else {
-                                Color.clear
-                            }
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: 1), count: cols),
+            spacing: 1
+        ) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { _, item in
+                itemCell(item, size: size)
+                    .aspectRatio(1, contentMode: .fit)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(-10)
     }
 
@@ -114,9 +104,6 @@ struct WidgetEntryView: View {
                 ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
             }
         } else {
-            // No action — plain view. The background NoOpIntent button (in homeScreenWidget)
-            // handles dead-area taps. Wrapping every no-action item in Button(intent:) would
-            // exceed WidgetKit's interactive-element budget and break rendering for multi-row grids.
             ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
         }
     }
