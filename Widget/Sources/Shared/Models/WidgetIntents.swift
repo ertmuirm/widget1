@@ -4,18 +4,177 @@ import UIKit
 
 // MARK: - Entity ID encoding
 //
-// Entity IDs are plain UUIDs. An older format used "<uuid>|<base64-json>" to embed
-// the full config, but WidgetKit silently corrupts entity IDs above a certain size,
-// causing 7+-item configs to fall back to .defaultConfiguration at render time.
-// decodeConfigFromID() is kept so existing placed widgets with old fat IDs still work.
+// Entity IDs use the format "<uuid>|<base64-slim-json>". The config is encoded with
+// short single-char keys and nil-for-default values so that even a fully-populated
+// 36-item large-widget config fits well under WidgetKit's undocumented entity-ID size
+// limit (~2 KB). This embedded config is the only reliable cross-process channel on
+// SideStore/AltStore where app-group entitlements and keychain sharing may be stripped.
+
+// MARK: - Color packing
+
+private func packColor(_ c: CodableColor) -> Int {
+    let r = Int((max(0.0, min(1.0, c.red))   * 255).rounded())
+    let g = Int((max(0.0, min(1.0, c.green)) * 255).rounded())
+    let b = Int((max(0.0, min(1.0, c.blue))  * 255).rounded())
+    let a = Int((max(0.0, min(1.0, c.alpha)) * 255).rounded())
+    return (r << 24) | (g << 16) | (b << 8) | a
+}
+
+private func unpackColor(_ v: Int) -> CodableColor {
+    CodableColor(
+        red:   Double((v >> 24) & 0xFF) / 255,
+        green: Double((v >> 16) & 0xFF) / 255,
+        blue:  Double((v >> 8)  & 0xFF) / 255,
+        alpha: Double(v & 0xFF) / 255
+    )
+}
+
+// Default packed values used to omit fields that equal the WidgetItem/WidgetConfig init defaults
+private let kSlimWhite: Int = (255 << 24) | (255 << 16) | (255 << 8) | 255  // CodableColor.white
+private let kSlimClear: Int = 0                                                // CodableColor.clear
+private let kSlimBlack: Int = 255                                              // CodableColor.black (config bg)
+
+// MARK: - Slim Codable structs
+
+private struct SlimAction: Codable {
+    var t: String    // ActionType.rawValue
+    var p: String    // payload
+    var n: String?   // displayName
+}
+
+private struct SlimItem: Codable {
+    var d: String      // DisplayType.rawValue
+    var s: String?     // sfSymbolName        (nil = none)
+    var t: String?     // customText           (nil = none)
+    var fc: Int?       // packed foregroundColor (nil = white default)
+    var bc: Int?       // packed backgroundColor (nil = clear/0 default)
+    var bo: Double?    // backgroundOpacity    (nil = 1.0 default)
+    var z: Double?     // fontSize             (nil = 10.0 default)
+    var qc: String?    // qrCodeContent        (nil = none)
+    var ql: String?    // qrCodeLabel          (nil = none)
+    var qs: Double?    // qrCodeLabelSize      (nil = 8.0 default)
+    var a: SlimAction? // action               (nil = none)
+}
+
+private extension SlimItem {
+    init(_ item: WidgetItem) {
+        d  = item.displayType.rawValue
+        s  = item.sfSymbolName
+        t  = item.customText
+        let fg = packColor(item.foregroundColor)
+        fc = fg == kSlimWhite ? nil : fg
+        let bg = packColor(item.backgroundColor)
+        bc = bg == kSlimClear ? nil : bg
+        bo = item.backgroundOpacity == 1.0 ? nil : item.backgroundOpacity
+        z  = Double(item.fontSize) == 10.0 ? nil : Double(item.fontSize)
+        qc = item.qrCodeContent
+        ql = item.qrCodeLabel
+        qs = Double(item.qrCodeLabelSize) == 8.0 ? nil : Double(item.qrCodeLabelSize)
+        a  = item.action.map { SlimAction(t: $0.type.rawValue, p: $0.payload, n: $0.displayName) }
+    }
+    func toWidgetItem() -> WidgetItem {
+        WidgetItem(
+            id: UUID(),
+            displayType: DisplayType(rawValue: d) ?? .icon,
+            sfSymbolName: s,
+            customText: t,
+            qrCodeContent: qc,
+            qrCodeLabel: ql,
+            qrCodeLabelSize: CGFloat(qs ?? 8.0),
+            fontSize: CGFloat(z ?? 10.0),
+            foregroundColor: unpackColor(fc ?? kSlimWhite),
+            backgroundColor: unpackColor(bc ?? kSlimClear),
+            backgroundOpacity: bo ?? 1.0,
+            action: a.map { WidgetAction(type: ActionType(rawValue: $0.t) ?? .urlScheme,
+                                         payload: $0.p, displayName: $0.n) }
+        )
+    }
+}
+
+private struct SlimSlide: Codable {
+    var fn: String?    // filename             (nil = QR/barcode slide)
+    var qc: String?    // qrCodeContent
+    var ql: String?    // qrCodeLabel
+    var qs: Double?    // qrCodeLabelSize      (nil = 8.0 default)
+    var ba: String?    // barcodeContent
+    var a: SlimAction? // action
+}
+
+private struct SlimConfig: Codable {
+    var i: String      // id.uuidString
+    var n: String      // name
+    var sz: String     // WidgetSize.rawValue
+    var k: String?     // WidgetKind.rawValue  (nil = .grid / nil)
+    var bc: Int?       // packed backgroundColor (nil = black default)
+    var bo: Double?    // backgroundOpacity    (nil = 1.0 default)
+    var sil: Bool?     // showItemLabels
+    var it: [SlimItem] // items
+    var sl: [SlimSlide]? // slides             (nil = no slides)
+    var ci: Int?       // currentSlideIndex
+}
+
+private extension SlimConfig {
+    init(_ config: WidgetConfig) {
+        i   = config.id.uuidString
+        n   = config.name
+        sz  = config.size.rawValue
+        k   = config.widgetKind?.rawValue
+        let bgc = packColor(config.backgroundColor)
+        bc  = bgc == kSlimBlack ? nil : bgc
+        bo  = config.backgroundOpacity == 1.0 ? nil : config.backgroundOpacity
+        sil = config.showItemLabels
+        it  = config.items.map { SlimItem($0) }
+        sl  = config.slides.map { slides in
+            slides.map { ss in
+                SlimSlide(
+                    fn: ss.filename.isEmpty ? nil : ss.filename,
+                    qc: ss.qrCodeContent,
+                    ql: ss.qrCodeLabel,
+                    qs: Double(ss.qrCodeLabelSize) == 8.0 ? nil : Double(ss.qrCodeLabelSize),
+                    ba: ss.barcodeContent,
+                    a:  ss.action.map { SlimAction(t: $0.type.rawValue, p: $0.payload, n: $0.displayName) }
+                )
+            }
+        }
+        ci = config.currentSlideIndex
+    }
+    func toWidgetConfig() -> WidgetConfig {
+        let slides: [ImageSlide]? = sl.map { slimSlides in
+            slimSlides.map { ss in
+                ImageSlide(
+                    id: UUID(),
+                    filename: ss.fn ?? "",
+                    action: ss.a.map { WidgetAction(type: ActionType(rawValue: $0.t) ?? .urlScheme,
+                                                    payload: $0.p, displayName: $0.n) },
+                    qrCodeContent: ss.qc,
+                    qrCodeLabel: ss.ql,
+                    qrCodeLabelSize: CGFloat(ss.qs ?? 8.0),
+                    barcodeContent: ss.ba
+                )
+            }
+        }
+        return WidgetConfig(
+            id: UUID(uuidString: i) ?? UUID(),
+            name: n,
+            size: WidgetSize(rawValue: sz) ?? .systemSmall,
+            items: it.map { $0.toWidgetItem() },
+            backgroundColor: unpackColor(bc ?? kSlimBlack),
+            backgroundOpacity: bo ?? 1.0,
+            showItemLabels: sil,
+            widgetKind: k.flatMap { WidgetKind(rawValue: $0) },
+            slides: slides,
+            currentSlideIndex: ci
+        )
+    }
+}
+
+// MARK: - Encode / decode helpers
 
 private func encodeEntityID(_ config: WidgetConfig) -> String {
-    // Entity IDs are UUID-only. WidgetKit has an undocumented size limit on entity ID
-    // strings; embedding the full base64-JSON config caused IDs for 7+ item configs to
-    // exceed that limit and be silently corrupted, causing makeEntry() to fall back to
-    // .defaultConfiguration. loadConfigurations() already writes to UserDefaults.standard
-    // as a fallback path available to the extension, so UUID lookup is sufficient.
-    config.id.uuidString
+    guard let data = try? JSONEncoder().encode(SlimConfig(config)) else {
+        return config.id.uuidString
+    }
+    return "\(config.id.uuidString)|\(data.base64EncodedString())"
 }
 
 private func uuidFromEntityID(_ entityID: String) -> String {
@@ -25,6 +184,10 @@ private func uuidFromEntityID(_ entityID: String) -> String {
 private func decodeConfigFromID(_ entityID: String) -> WidgetConfig? {
     let parts = entityID.split(separator: "|", maxSplits: 1)
     guard parts.count == 2, let data = Data(base64Encoded: String(parts[1])) else { return nil }
+    // Try compact slim format first (current), then legacy full WidgetConfig JSON.
+    if let slim = try? JSONDecoder().decode(SlimConfig.self, from: data) {
+        return slim.toWidgetConfig()
+    }
     let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
     return try? dec.decode(WidgetConfig.self, from: data)
 }
