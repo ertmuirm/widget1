@@ -1,9 +1,7 @@
 import Foundation
 
 /// Parses and generates Shortcuts .shortcut binary plist files.
-/// Format: binary plist with WFWorkflowActions array.
-/// A "Choose from Menu" shortcut uses is.workflow.actions.choosefrommenu with
-/// WFControlFlowMode 0 (start), 1 (item), 2 (end).
+/// Based on the iOS 26 / Shortcuts 4610 "Choose from Menu" format.
 enum ShortcutFileService {
 
     enum ShortcutError: LocalizedError {
@@ -22,22 +20,21 @@ enum ShortcutFileService {
 
     // MARK: - Import
 
-    /// Parses a binary-plist .shortcut file and returns LauncherItems derived from
-    /// its "Choose from Menu" structure.
-    /// Handles both flat format (iOS ≤15) and wrapped format (iOS 16+: root has WFWorkflow key).
+    /// Parses a binary-plist .shortcut file and returns LauncherItems from its
+    /// "Choose from Menu" structure.  Handles both flat root and WFWorkflow-wrapped formats.
     static func importItems(from data: Data) throws -> [LauncherItem] {
         guard let plist = try? PropertyListSerialization.propertyList(from: data, format: nil)
         else { throw ShortcutError.invalidFile }
 
-        // iOS 16+ wraps everything under a "WFWorkflow" key with a separate signature
-        let workflow: [String: Any]?
-        if let root = plist as? [String: Any] {
-            workflow = (root["WFWorkflow"] as? [String: Any]) ?? root
+        let root: [String: Any]
+        if let r = plist as? [String: Any] {
+            // Prefer unwrapped root; fall back to WFWorkflow envelope
+            root = (r["WFWorkflow"] as? [String: Any]) ?? r
         } else {
-            workflow = nil
+            throw ShortcutError.invalidFile
         }
-        guard let wf = workflow,
-              let actions = wf["WFWorkflowActions"] as? [[String: Any]]
+
+        guard let actions = root["WFWorkflowActions"] as? [[String: Any]]
         else { throw ShortcutError.invalidFile }
 
         return try parseMenuItems(from: actions)
@@ -45,31 +42,37 @@ enum ShortcutFileService {
 
     // MARK: - Export
 
-    /// Builds a binary-plist .shortcut compatible with iOS 16+.
+    /// Builds a binary-plist .shortcut using the iOS 26 / Shortcuts 4610 flat format.
     static func exportData(from config: LauncherConfig) throws -> Data {
         let actions = buildMenuActions(for: config)
 
-        // iOS 16+ requires WFWorkflow wrapper and specific icon/type fields.
-        // WFWorkflowTypes must be empty (NCWidget/WatchKit are deprecated and cause import errors).
-        let workflow: [String: Any] = [
-            "WFWorkflowMinimumClientVersion": NSNumber(value: 900),
-            "WFWorkflowMinimumClientVersionString": "900",
-            "WFWorkflowClientVersion": "1268.0.1",
-            "WFWorkflowHasShortcutInputVariables": NSNumber(value: false),
-            "WFWorkflowIcon": [
-                "WFWorkflowIconStartColor": NSNumber(value: 463140863),
-                "WFWorkflowIconGlyphNumber": NSNumber(value: 59511),
-                "WFWorkflowIconImageData": Data()
-            ] as [String: Any],
-            "WFWorkflowImportQuestions": [] as NSArray,
-            "WFWorkflowInputContentItemClasses": [] as NSArray,
-            "WFWorkflowOutputContentItemClasses": [] as NSArray,
-            "WFWorkflowTypes": [] as NSArray,
-            "WFWorkflowActions": actions
+        let inputClasses: [String] = [
+            "WFAppContentItem", "WFAppStoreAppContentItem", "WFArticleContentItem",
+            "WFContactContentItem", "WFDateContentItem", "WFEmailAddressContentItem",
+            "WFFolderContentItem", "WFGenericFileContentItem", "WFImageContentItem",
+            "WFiTunesProductContentItem", "WFLocationContentItem",
+            "WFDCMapsLinkContentItem", "WFAVAssetContentItem", "WFPDFContentItem",
+            "WFPhoneNumberContentItem", "WFRichTextContentItem",
+            "WFSafariWebPageContentItem", "WFStringContentItem", "WFURLContentItem"
         ]
 
-        // Wrap in the iOS 16+ envelope (Shortcuts reads either flat or wrapped)
-        let root: [String: Any] = ["WFWorkflow": workflow]
+        let root: [String: Any] = [
+            "WFQuickActionSurfaces":              [] as NSArray,
+            "WFWorkflowActions":                  actions,
+            "WFWorkflowClientVersion":            "4610",
+            "WFWorkflowHasOutputFallback":        false,
+            "WFWorkflowHasShortcutInputVariables": false,
+            "WFWorkflowIcon": [
+                "WFWorkflowIconGlyphNumber": NSNumber(value: 62214),
+                "WFWorkflowIconStartColor":  NSNumber(value: 255)
+            ] as [String: Any],
+            "WFWorkflowImportQuestions":           [] as NSArray,
+            "WFWorkflowInputContentItemClasses":  inputClasses,
+            "WFWorkflowMinimumClientVersion":     NSNumber(value: 900),
+            "WFWorkflowMinimumClientVersionString": "900",
+            "WFWorkflowOutputContentItemClasses": [] as NSArray,
+            "WFWorkflowTypes": ["Watch", "WFWorkflowTypeShowInSearch"]
+        ]
 
         guard let data = try? PropertyListSerialization.data(
             fromPropertyList: root,
@@ -82,45 +85,41 @@ enum ShortcutFileService {
     // MARK: - Private helpers
 
     private static func parseMenuItems(from actions: [[String: Any]]) throws -> [LauncherItem] {
-        // Locate the choosefrommenu start block (WFControlFlowMode == 0)
         guard let startIdx = actions.firstIndex(where: {
-            ($0["WFWorkflowActionIdentifier"] as? String) == "is.workflow.actions.choosefrommenu"
-            && controlFlowMode($0) == 0
+            actionID($0) == "is.workflow.actions.choosefrommenu" && controlFlowMode($0) == 0
         }) else { throw ShortcutError.noMenuFound }
 
-        let startAction = actions[startIdx]
-        let startParams = startAction["WFWorkflowActionParameters"] as? [String: Any]
+        let startParams = actions[startIdx]["WFWorkflowActionParameters"] as? [String: Any]
         let groupID = startParams?["GroupingIdentifier"] as? String ?? ""
 
-        // Collect item-block actions (WFControlFlowMode == 1) matching the same groupID,
-        // paired with the next sub-action (the actual command).
         var items: [LauncherItem] = []
         var i = startIdx + 1
         while i < actions.count {
             let a = actions[i]
-            guard (a["WFWorkflowActionIdentifier"] as? String) == "is.workflow.actions.choosefrommenu",
+            // End block — stop
+            if actionID(a) == "is.workflow.actions.choosefrommenu", controlFlowMode(a) == 2 { break }
+            // Item block
+            guard actionID(a) == "is.workflow.actions.choosefrommenu",
                   controlFlowMode(a) == 1,
                   let params = a["WFWorkflowActionParameters"] as? [String: Any],
                   (params["GroupingIdentifier"] as? String) == groupID
-            else {
-                if (a["WFWorkflowActionIdentifier"] as? String) == "is.workflow.actions.choosefrommenu",
-                   controlFlowMode(a) == 2 { break }
-                i += 1
-                continue
-            }
+            else { i += 1; continue }
+
             let title = params["WFMenuItemTitle"] as? String ?? "Item \(items.count + 1)"
-            // Sub-action immediately follows
             let subAction = i + 1 < actions.count ? actions[i + 1] : nil
-            let action = widgetAction(from: subAction)
-            items.append(LauncherItem(name: title, action: action))
+            items.append(LauncherItem(name: title, action: widgetAction(from: subAction)))
             i += 2
         }
         return items
     }
 
+    private static func actionID(_ action: [String: Any]) -> String? {
+        action["WFWorkflowActionIdentifier"] as? String
+    }
+
     private static func controlFlowMode(_ action: [String: Any]) -> Int? {
-        guard let params = action["WFWorkflowActionParameters"] as? [String: Any] else { return nil }
-        return params["WFControlFlowMode"] as? Int
+        let params = action["WFWorkflowActionParameters"] as? [String: Any]
+        return (params?["WFControlFlowMode"] as? NSNumber)?.intValue
     }
 
     private static func widgetAction(from action: [String: Any]?) -> WidgetAction {
@@ -128,21 +127,34 @@ enum ShortcutFileService {
               let params = action["WFWorkflowActionParameters"] as? [String: Any]
         else { return WidgetAction(type: .urlScheme, payload: "") }
 
-        let id = action["WFWorkflowActionIdentifier"] as? String ?? ""
-        switch id {
+        switch actionID(action) {
         case "is.workflow.actions.openurl":
-            let url = wfTextValue(params["WFURLActionURL"]) ?? ""
+            // iOS 26 uses WFInput; older exports used WFURLActionURL (WFTextTokenString)
+            let url = (params["WFInput"] as? String)
+                ?? wfStringValue(params["WFURLActionURL"])
+                ?? ""
             return WidgetAction(type: .urlScheme, payload: url)
+
+        case "is.workflow.actions.openapp":
+            let bundle = (params["WFAppIdentifier"] as? String)
+                ?? (params["WFSelectedApp"] as? [String: Any])?["BundleIdentifier"] as? String
+                ?? ""
+            let name   = (params["WFSelectedApp"] as? [String: Any])?["Name"] as? String
+            return WidgetAction(type: .appIntent, payload: bundle, displayName: name)
+
         case "is.workflow.actions.runworkflow":
-            let name = wfTextValue(params["WFWorkflowName"]) ?? ""
+            let name = (params["WFWorkflowName"] as? String)
+                ?? wfStringValue(params["WFWorkflowName"])
+                ?? ""
             return WidgetAction(type: .shortcut, payload: name)
+
         default:
             return WidgetAction(type: .urlScheme, payload: "")
         }
     }
 
-    /// Extracts the string value from a WFTextTokenString dict or raw String.
-    private static func wfTextValue(_ v: Any?) -> String? {
+    /// Extracts a plain string from either a bare String or a WFTextTokenString dict.
+    private static func wfStringValue(_ v: Any?) -> String? {
         if let s = v as? String { return s }
         if let d = v as? [String: Any] {
             return d["Value"] as? String
@@ -155,14 +167,12 @@ enum ShortcutFileService {
         let groupID = config.id.uuidString
         var actions: [[String: Any]] = []
 
-        // Start of menu block
+        // Start block — no WFMenuPrompt / WFMenuItemTitles in iOS 26 format
         actions.append([
             "WFWorkflowActionIdentifier": "is.workflow.actions.choosefrommenu",
             "WFWorkflowActionParameters": [
-                "WFControlFlowMode": 0,
                 "GroupingIdentifier": groupID,
-                "WFMenuPrompt": config.name,
-                "WFMenuItemTitles": config.items.map(\.name)
+                "WFControlFlowMode":  NSNumber(value: 0)
             ]
         ])
 
@@ -171,21 +181,22 @@ enum ShortcutFileService {
             actions.append([
                 "WFWorkflowActionIdentifier": "is.workflow.actions.choosefrommenu",
                 "WFWorkflowActionParameters": [
-                    "WFControlFlowMode": 1,
                     "GroupingIdentifier": groupID,
-                    "WFMenuItemTitle": item.name
+                    "WFControlFlowMode":  NSNumber(value: 1),
+                    "WFMenuItemTitle":    item.name
                 ]
             ])
-            // Item action
+            // Item sub-action
             actions.append(actionDict(for: item.action))
         }
 
-        // End of menu block
+        // End block
         actions.append([
             "WFWorkflowActionIdentifier": "is.workflow.actions.choosefrommenu",
             "WFWorkflowActionParameters": [
-                "WFControlFlowMode": 2,
-                "GroupingIdentifier": groupID
+                "GroupingIdentifier": groupID,
+                "UUID":              UUID().uuidString,
+                "WFControlFlowMode": NSNumber(value: 2)
             ]
         ])
 
@@ -193,34 +204,39 @@ enum ShortcutFileService {
     }
 
     private static func actionDict(for action: WidgetAction) -> [String: Any] {
+        let uuid = UUID().uuidString
         switch action.type {
+        case .urlScheme:
+            return [
+                "WFWorkflowActionIdentifier": "is.workflow.actions.openurl",
+                "WFWorkflowActionParameters": [
+                    "UUID":    uuid,
+                    "WFInput": action.payload
+                ]
+            ]
+
+        case .appIntent:
+            return [
+                "WFWorkflowActionIdentifier": "is.workflow.actions.openapp",
+                "WFWorkflowActionParameters": [
+                    "UUID":           uuid,
+                    "WFAppIdentifier": action.payload,
+                    "WFSelectedApp": [
+                        "BundleIdentifier": action.payload,
+                        "Name": action.displayName ?? action.payload,
+                        "TeamIdentifier": ""
+                    ] as [String: Any]
+                ]
+            ]
+
         case .shortcut:
             return [
                 "WFWorkflowActionIdentifier": "is.workflow.actions.runworkflow",
                 "WFWorkflowActionParameters": [
-                    "WFWorkflowName": wfTextTokenString(action.payload)
-                ]
-            ]
-        case .urlScheme, .appIntent:
-            let url = action.type == .appIntent
-                ? "openapp://launch?bundle=\(action.payload)"
-                : action.payload
-            return [
-                "WFWorkflowActionIdentifier": "is.workflow.actions.openurl",
-                "WFWorkflowActionParameters": [
-                    "WFURLActionURL": wfTextTokenString(url)
+                    "UUID":            uuid,
+                    "WFWorkflowName":  action.payload
                 ]
             ]
         }
-    }
-
-    private static func wfTextTokenString(_ value: String) -> [String: Any] {
-        [
-            "Value": [
-                "attachmentsByRange": [:] as [String: Any],
-                "string": value
-            ],
-            "WFSerializationType": "WFTextTokenString"
-        ]
     }
 }

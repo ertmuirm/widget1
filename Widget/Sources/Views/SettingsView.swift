@@ -101,7 +101,7 @@ struct SettingsView: View {
                         }
                     }
 
-                    Stepper(value: $launcherRowHeight, in: 32...80, step: 2) {
+                    Stepper(value: $launcherRowHeight, in: 20...80, step: 2) {
                         HStack {
                             Text("Row Height")
                             Spacer()
