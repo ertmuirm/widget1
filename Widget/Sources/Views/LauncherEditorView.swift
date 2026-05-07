@@ -196,7 +196,7 @@ private struct LauncherItemRow: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.name.isEmpty ? "Unnamed" : item.name)
-                    .foregroundStyle(item.name.isEmpty ? .tertiary : .white)
+                    .foregroundStyle(item.name.isEmpty ? Color.secondary : Color.white)
 
                 Text(actionDescription)
                     .font(.caption)
@@ -236,7 +236,7 @@ struct LauncherItemEditorView: View {
                     .autocorrectionDisabled()
             }
 
-            Section("Action") {
+            Section {
                 Picker("Type", selection: $item.action.type) {
                     ForEach(ActionType.allCases, id: \.self) { type in
                         Text(type.displayName).tag(type)
@@ -278,6 +278,8 @@ struct LauncherItemEditorView: View {
                     }
                     .foregroundStyle(.white)
                 }
+            } header: {
+                Text("Action")
             } footer: {
                 Text(item.action.type.description)
             }

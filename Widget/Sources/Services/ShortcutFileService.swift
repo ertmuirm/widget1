@@ -69,8 +69,8 @@ enum ShortcutFileService {
         }) else { throw ShortcutError.noMenuFound }
 
         let startAction = actions[startIdx]
-        let groupID = (startAction["WFWorkflowActionParameters"] as? [String: Any])?
-            ["GroupingIdentifier"] as? String ?? ""
+        let startParams = startAction["WFWorkflowActionParameters"] as? [String: Any]
+        let groupID = startParams?["GroupingIdentifier"] as? String ?? ""
 
         // Collect item-block actions (WFControlFlowMode == 1) matching the same groupID,
         // paired with the next sub-action (the actual command).
