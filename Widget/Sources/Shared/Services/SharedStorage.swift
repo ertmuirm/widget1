@@ -500,30 +500,38 @@ final class SharedStorage {
 
     // MARK: - Backup / Restore
 
-    func createBackup() throws -> URL? {
-        let configs = try loadConfigurations()
-        guard !configs.isEmpty else { return nil }
+    /// Combined backup format. The launcherConfigs field is optional so old backup
+    /// files (plain [WidgetConfig] array or CombinedBackup without launchers) still load.
+    struct CombinedBackup: Codable {
+        var widgetConfigs: [WidgetConfig]
+        var launcherConfigs: [LauncherConfig]?
+    }
 
-        let json = try encoder.encode(configs)
-        let docsURL = FileManager.default.urls(
-            for: .documentDirectory, in: .userDomainMask).first!
+    func createBackup() throws -> URL? {
+        let widgetConfigs   = try loadConfigurations()
+        let launcherConfigs = (try? loadLauncherConfigs()) ?? []
+        guard !widgetConfigs.isEmpty || !launcherConfigs.isEmpty else { return nil }
+
+        let payload = CombinedBackup(widgetConfigs: widgetConfigs, launcherConfigs: launcherConfigs)
+        let json = try encoder.encode(payload)
+        let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let backupURL = docsURL.appendingPathComponent("widget_backup.json")
         try json.write(to: backupURL, options: .atomicWrite)
         lastBackupDate = Date()
         return backupURL
     }
 
+    /// Returns (restoredWidgetConfigs, restoredLauncherConfigs).
+    @discardableResult
     func restoreFromBackup() throws -> Bool {
-        let docsURL = FileManager.default.urls(
-            for: .documentDirectory, in: .userDomainMask).first!
+        let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let candidates = [
             docsURL.appendingPathComponent("widget_backup.json"),
             docsURL.appendingPathComponent("Start/widget_backup.json")
         ]
         for url in candidates where FileManager.default.fileExists(atPath: url.path) {
             let data = try Data(contentsOf: url)
-            let configs = try decoder.decode([WidgetConfig].self, from: data)
-            try saveConfigurations(configs)
+            try restoreBackupData(data)
             return true
         }
         return false
@@ -542,8 +550,9 @@ final class SharedStorage {
     /// Creates a timestamped backup in Documents/Backups/. Never overwrites an existing file.
     /// Keeps only the 5 most recent auto-backups.
     func createAutoBackup() throws {
-        let configs = try loadConfigurations()
-        guard !configs.isEmpty else { return }
+        let widgetConfigs   = try loadConfigurations()
+        let launcherConfigs = (try? loadLauncherConfigs()) ?? []
+        guard !widgetConfigs.isEmpty || !launcherConfigs.isEmpty else { return }
 
         let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let backupDir = docsURL.appendingPathComponent("Backups", isDirectory: true)
@@ -555,7 +564,8 @@ final class SharedStorage {
         let backupURL = backupDir.appendingPathComponent(filename)
         guard !FileManager.default.fileExists(atPath: backupURL.path) else { return }
 
-        let json = try encoder.encode(configs)
+        let payload = CombinedBackup(widgetConfigs: widgetConfigs, launcherConfigs: launcherConfigs)
+        let json = try encoder.encode(payload)
         try json.write(to: backupURL, options: .atomicWrite)
 
         let existing = (try? listAutoBackups()) ?? []
@@ -579,8 +589,22 @@ final class SharedStorage {
     /// Restores configurations from a specific auto-backup URL.
     func restoreFromAutoBackup(url: URL) throws {
         let data = try Data(contentsOf: url)
-        let configs = try decoder.decode([WidgetConfig].self, from: data)
-        try saveConfigurations(configs)
+        try restoreBackupData(data)
+    }
+
+    /// Decodes a backup file and saves both widget and launcher configs.
+    /// Handles three formats: CombinedBackup, legacy [WidgetConfig] array.
+    private func restoreBackupData(_ data: Data) throws {
+        if let combined = try? decoder.decode(CombinedBackup.self, from: data) {
+            try saveConfigurations(combined.widgetConfigs)
+            if let launchers = combined.launcherConfigs {
+                try saveLauncherConfigs(launchers)
+            }
+        } else {
+            // Legacy format: plain array of WidgetConfig
+            let configs = try decoder.decode([WidgetConfig].self, from: data)
+            try saveConfigurations(configs)
+        }
     }
 
     func getStorageInfo() throws -> StorageInfo {

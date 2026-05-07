@@ -181,6 +181,7 @@ final class WidgetViewModel: ObservableObject {
             let restored = try storage.restoreFromBackup()
             if restored {
                 loadConfigurations()
+                loadLauncherConfigs()
                 WidgetCenter.shared.reloadAllTimelines()
             }
             return restored
@@ -198,6 +199,7 @@ final class WidgetViewModel: ObservableObject {
         do {
             try storage.restoreFromAutoBackup(url: url)
             loadConfigurations()
+            loadLauncherConfigs()
             WidgetCenter.shared.reloadAllTimelines()
             triggerHaptic(.medium)
         } catch {

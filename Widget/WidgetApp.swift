@@ -35,15 +35,14 @@ private func dialPhoneNumber(url: URL) {
     UIApplication.shared.open(url)
 }
 
-// MARK: - Instant URL open (no foreground-open delay)
+// MARK: - Instant URL open
 
-/// Backgrounds the app first so iOS handles the open without the
-/// multi-second foreground→background resignation stall.
+/// Opens a URL without the multi-second delay caused by awaiting UIApplication.open
+/// from a foreground app.  The callback form (non-async, nil completion) is
+/// fire-and-forget: it submits the open request immediately and returns.
+/// iOS naturally backgrounds this app when the target app comes to the foreground.
 private func openURLImmediately(_ url: URL) {
-    UIApplication.shared.perform(NSSelectorFromString("suspend"))
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-        UIApplication.shared.open(url, options: [:], completionHandler: nil)
-    }
+    UIApplication.shared.open(url, options: [:], completionHandler: nil)
 }
 
 // MARK: - Bundle-ID app launch via LSApplicationWorkspace (private API)
@@ -66,5 +65,5 @@ private func openAppByBundleID(_ bundleID: String, fallbackURLString: String? = 
 
 private func openFallbackURL(_ urlString: String?) {
     guard let str = urlString, let url = URL(string: str) else { return }
-    openURLImmediately(url)
+    UIApplication.shared.open(url, options: [:], completionHandler: nil)
 }

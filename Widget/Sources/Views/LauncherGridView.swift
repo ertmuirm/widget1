@@ -65,10 +65,6 @@ struct LauncherGridView: View {
 
     // MARK: - Action
 
-    /// Backgrounds the app first, then opens the URL.
-    /// Avoids the multi-second delay that occurs when UIApplication.open is called
-    /// from a foreground app (iOS makes the transition from foreground → target app
-    /// wait for the active app to resign, which takes several seconds).
     private func openAction(_ action: WidgetAction) {
         let url: URL?
         switch action.type {
@@ -82,10 +78,8 @@ struct LauncherGridView: View {
             url = URL(string: "openapp://launch?bundle=\(action.payload)")
         }
         guard let url else { return }
-        // Suspend first so iOS treats the open as coming from a background app.
-        UIApplication.shared.perform(NSSelectorFromString("suspend"))
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            UIApplication.shared.open(url, options: [:], completionHandler: nil)
-        }
+        // Use the non-async callback form — fire-and-forget, no waiting for the app-switch
+        // animation to complete. iOS backgrounds this app naturally when the target opens.
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
     }
 }
