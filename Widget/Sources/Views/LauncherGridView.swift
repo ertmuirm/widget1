@@ -21,8 +21,8 @@ struct LauncherGridView: View {
                 ) {
                     ForEach(config.items) { item in
                         Button {
-                            executeAction(item.action)
                             onDismiss()
+                            openAction(item.action)
                         } label: {
                             Text(item.name)
                                 .font(.system(size: fontSize))
@@ -41,7 +41,7 @@ struct LauncherGridView: View {
             }
 
             // Invisible dismiss target in the top-right corner (44×44 tap area, no visual).
-            Button(action: onDismiss) {
+            Button(action: dismissAndSuspend) {
                 Color.clear
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -52,24 +52,40 @@ struct LauncherGridView: View {
         // Dismiss on any swipe with at least 60 pt travel in any direction.
         .gesture(
             DragGesture(minimumDistance: 60, coordinateSpace: .local)
-                .onEnded { _ in onDismiss() }
+                .onEnded { _ in dismissAndSuspend() }
         )
     }
 
-    private func executeAction(_ action: WidgetAction) {
+    // MARK: - Dismiss
+
+    private func dismissAndSuspend() {
+        onDismiss()
+        UIApplication.shared.perform(NSSelectorFromString("suspend"))
+    }
+
+    // MARK: - Action
+
+    /// Backgrounds the app first, then opens the URL.
+    /// Avoids the multi-second delay that occurs when UIApplication.open is called
+    /// from a foreground app (iOS makes the transition from foreground → target app
+    /// wait for the active app to resign, which takes several seconds).
+    private func openAction(_ action: WidgetAction) {
+        let url: URL?
         switch action.type {
         case .urlScheme:
-            guard let url = URL(string: action.payload) else { return }
-            Task { await UIApplication.shared.open(url) }
-
+            url = URL(string: action.payload)
         case .shortcut:
-            let name = action.payload.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? action.payload
-            guard let url = URL(string: "shortcuts://run-shortcut?name=\(name)") else { return }
-            Task { await UIApplication.shared.open(url) }
-
+            let enc = action.payload
+                .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? action.payload
+            url = URL(string: "shortcuts://run-shortcut?name=\(enc)")
         case .appIntent:
-            guard let url = URL(string: "openapp://launch?bundle=\(action.payload)") else { return }
-            Task { await UIApplication.shared.open(url) }
+            url = URL(string: "openapp://launch?bundle=\(action.payload)")
+        }
+        guard let url else { return }
+        // Suspend first so iOS treats the open as coming from a background app.
+        UIApplication.shared.perform(NSSelectorFromString("suspend"))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
         }
     }
 }

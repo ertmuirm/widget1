@@ -7,21 +7,19 @@ struct WidgetApp: App {
         WindowGroup {
             ContentView()
                 .onOpenURL { url in
-                    Task { @MainActor in
-                        if url.scheme == "widgetar" {
-                            // Handled by ContentView's .onOpenURL
-                            return
-                        } else if url.scheme == "openapp" {
-                            let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
-                            if let bundleID = comps?.queryItems?.first(where: { $0.name == "bundle" })?.value {
-                                let fallback = comps?.queryItems?.first(where: { $0.name == "fallback" })?.value
-                                openAppByBundleID(bundleID, fallbackURLString: fallback)
-                            }
-                        } else if url.scheme == "tel" {
-                            dialPhoneNumber(url: url)
-                        } else {
-                            await UIApplication.shared.open(url)
+                    // onOpenURL fires on the main thread — no Task wrapper needed.
+                    if url.scheme == "widgetar" {
+                        // Handled by ContentView's .onOpenURL
+                    } else if url.scheme == "openapp" {
+                        let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+                        if let bundleID = comps?.queryItems?.first(where: { $0.name == "bundle" })?.value {
+                            let fallback = comps?.queryItems?.first(where: { $0.name == "fallback" })?.value
+                            openAppByBundleID(bundleID, fallbackURLString: fallback)
                         }
+                    } else if url.scheme == "tel" {
+                        dialPhoneNumber(url: url)
+                    } else {
+                        openURLImmediately(url)
                     }
                 }
                 .onAppear {
@@ -34,10 +32,18 @@ struct WidgetApp: App {
 // MARK: - Phone dialling
 
 private func dialPhoneNumber(url: URL) {
-    // Open tel: URL directly for a real cellular call.
-    // CXStartCallAction routes through our VoIP provider which has no carrier backend,
-    // so it would show the calling UI without actually connecting to the network.
     UIApplication.shared.open(url)
+}
+
+// MARK: - Instant URL open (no foreground-open delay)
+
+/// Backgrounds the app first so iOS handles the open without the
+/// multi-second foreground→background resignation stall.
+private func openURLImmediately(_ url: URL) {
+    UIApplication.shared.perform(NSSelectorFromString("suspend"))
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
+    }
 }
 
 // MARK: - Bundle-ID app launch via LSApplicationWorkspace (private API)
@@ -50,10 +56,6 @@ private func openAppByBundleID(_ bundleID: String, fallbackURLString: String? = 
         return
     }
 
-    // Skip applicationIsInstalled: — its BOOL return value cannot be reliably cast
-    // through NSInvocation's perform path, causing it to always appear false.
-    // Just attempt openApplicationWithBundleID: directly; it silently fails if the
-    // app is not installed, and the fallback URL covers that case where available.
     let openSel = NSSelectorFromString("openApplicationWithBundleID:")
     guard ws.responds(to: openSel) else {
         openFallbackURL(fallbackURLString)
@@ -64,5 +66,5 @@ private func openAppByBundleID(_ bundleID: String, fallbackURLString: String? = 
 
 private func openFallbackURL(_ urlString: String?) {
     guard let str = urlString, let url = URL(string: str) else { return }
-    Task { await UIApplication.shared.open(url) }
+    openURLImmediately(url)
 }
