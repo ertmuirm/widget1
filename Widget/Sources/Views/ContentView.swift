@@ -8,6 +8,7 @@ struct ContentView: View {
 
     @StateObject private var viewModel = WidgetViewModel()
     @State private var showOnboarding = !SharedStorage.shared.hasCompletedOnboarding
+    @State private var activeLauncher: LauncherConfig?
 
     var body: some View {
         TabView {
@@ -28,6 +29,30 @@ struct ContentView: View {
         .tabViewStyle(.page(indexDisplayMode: .never))
         .preferredColorScheme(.dark)
         .tint(.gray)
+        .fullScreenCover(item: $activeLauncher) { launcher in
+            LauncherGridView(config: launcher) {
+                activeLauncher = nil
+            }
+        }
+        .onOpenURL { url in
+            handleURL(url)
+        }
+    }
+
+    private func handleURL(_ url: URL) {
+        guard url.scheme == "widgetar" else { return }
+        let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        if url.host == "launcher" {
+            let idParam = comps?.queryItems?.first(where: { $0.name == "id" })?.value
+            if let idParam, let uuid = UUID(uuidString: idParam) {
+                activeLauncher = viewModel.launcherConfigs.first(where: { $0.id == uuid })
+            } else if let backTapID = SharedStorage.shared.backTapLauncherID,
+                      let uuid = UUID(uuidString: backTapID) {
+                activeLauncher = viewModel.launcherConfigs.first(where: { $0.id == uuid })
+            } else {
+                activeLauncher = viewModel.launcherConfigs.first
+            }
+        }
     }
 }
 

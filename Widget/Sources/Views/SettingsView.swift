@@ -6,6 +6,29 @@ struct SettingsView: View {
 
     @EnvironmentObject var viewModel: WidgetViewModel
 
+    // MARK: - Launcher Settings
+
+    private var launcherFontSize: Binding<Double> {
+        Binding(
+            get: { SharedStorage.shared.launcherFontSize },
+            set: { SharedStorage.shared.launcherFontSize = $0 }
+        )
+    }
+
+    private var launcherRowHeight: Binding<Double> {
+        Binding(
+            get: { SharedStorage.shared.launcherRowHeight },
+            set: { SharedStorage.shared.launcherRowHeight = $0 }
+        )
+    }
+
+    private var backTapLauncherID: Binding<String> {
+        Binding(
+            get: { SharedStorage.shared.backTapLauncherID ?? "" },
+            set: { SharedStorage.shared.backTapLauncherID = $0.isEmpty ? nil : $0 }
+        )
+    }
+
     // Bindings backed by SharedStorage so the widget extension can read them via the app group
     private var showItemLabels: Binding<Bool> {
         Binding(
@@ -75,6 +98,62 @@ struct SettingsView: View {
             } footer: {
                 Text("\"Show Item Labels\" is read by the widget extension via the shared app group. With SideStore (free account), this only takes effect once the app group container is properly shared between the app and the extension.")
                     .font(.caption)
+            }
+
+            // Launcher Grid
+            if !viewModel.launcherConfigs.isEmpty {
+                Section {
+                    Stepper(value: launcherFontSize, in: 10...30, step: 1) {
+                        HStack {
+                            Text("Font Size")
+                            Spacer()
+                            Text("\(Int(launcherFontSize.wrappedValue)) pt")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Stepper(value: launcherRowHeight, in: 32...80, step: 2) {
+                        HStack {
+                            Text("Row Height")
+                            Spacer()
+                            Text("\(Int(launcherRowHeight.wrappedValue)) pt")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Picker("Back Tap Grid", selection: backTapLauncherID) {
+                        Text("None").tag("")
+                        ForEach(viewModel.launcherConfigs) { launcher in
+                            Text(launcher.name).tag(launcher.id.uuidString)
+                        }
+                    }
+
+                    ForEach(viewModel.launcherConfigs) { launcher in
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(launcher.name)
+                                    .font(.subheadline)
+                                Text(launcher.triggerURL.absoluteString)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+                            Spacer()
+                            Button {
+                                UIPasteboard.general.string = launcher.triggerURL.absoluteString
+                            } label: {
+                                Image(systemName: "doc.on.doc")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                } header: {
+                    Text("Launcher Grids")
+                } footer: {
+                    Text("Copy a trigger URL to use it in a home screen Shortcut or Back Tap.")
+                        .font(.caption)
+                }
             }
 
             // Backup & Restore

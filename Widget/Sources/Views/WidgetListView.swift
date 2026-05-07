@@ -8,27 +8,45 @@ struct WidgetListView: View {
     @State private var showAddSheet = false
     @State private var showAddImageSheet = false
     @State private var showAddLockScreenSheet = false
+    @State private var showAddLauncherSheet = false
     @State private var showSettingsSheet = false
 
     var body: some View {
         List {
-            if viewModel.configurations.isEmpty {
-                emptyView
-            } else {
-                ForEach(viewModel.configurations) { config in
-                    ZStack {
-                        // Invisible NavigationLink drives navigation
-                        NavigationLink(value: config.id) { EmptyView() }.opacity(0)
-                        WidgetRowView(configuration: config) {
-                            if let idx = viewModel.configurations.firstIndex(where: { $0.id == config.id }) {
-                                viewModel.deleteConfiguration(at: IndexSet([idx]))
+            // Widget configurations
+            if !viewModel.configurations.isEmpty {
+                Section("Home & Lock Screen Widgets") {
+                    ForEach(viewModel.configurations) { config in
+                        ZStack {
+                            NavigationLink(value: config.id) { EmptyView() }.opacity(0)
+                            WidgetRowView(configuration: config) {
+                                if let idx = viewModel.configurations.firstIndex(where: { $0.id == config.id }) {
+                                    viewModel.deleteConfiguration(at: IndexSet([idx]))
+                                }
                             }
                         }
                     }
+                    .onMove { from, to in viewModel.moveConfiguration(from: from, to: to) }
                 }
-                .onMove { from, to in
-                    viewModel.moveConfiguration(from: from, to: to)
+            }
+
+            // Launcher grids
+            if !viewModel.launcherConfigs.isEmpty {
+                Section("Launcher Grids") {
+                    ForEach(viewModel.launcherConfigs) { launcher in
+                        ZStack {
+                            NavigationLink(value: launcher.id) { EmptyView() }.opacity(0)
+                            LauncherRowView(config: launcher) {
+                                viewModel.deleteLauncherConfig(launcher)
+                            }
+                        }
+                    }
+                    .onMove { from, to in viewModel.moveLauncherConfig(from: from, to: to) }
                 }
+            }
+
+            if viewModel.configurations.isEmpty && viewModel.launcherConfigs.isEmpty {
+                emptyView
             }
         }
         .listStyle(.insetGrouped)
@@ -36,6 +54,8 @@ struct WidgetListView: View {
         .navigationDestination(for: UUID.self) { id in
             if let config = viewModel.configurations.first(where: { $0.id == id }) {
                 WidgetEditorView(configuration: config)
+            } else if let launcher = viewModel.launcherConfigs.first(where: { $0.id == id }) {
+                LauncherEditorView(config: launcher)
             }
         }
         .toolbar {
@@ -68,6 +88,13 @@ struct WidgetListView: View {
                         showAddLockScreenSheet = true
                     } label: {
                         Label("Lock Screen Widget", systemImage: "lock.display")
+                    }
+                    if viewModel.launcherConfigs.count < LauncherConfig.maxConfigs {
+                        Button {
+                            showAddLauncherSheet = true
+                        } label: {
+                            Label("Launcher Grid", systemImage: "rectangle.grid.2x2")
+                        }
                     }
                 } label: {
                     Image(systemName: "plus.circle.fill")
@@ -104,6 +131,12 @@ struct WidgetListView: View {
                 WidgetEditorView(configuration: newConfig, isNew: true)
             }
         }
+        .sheet(isPresented: $showAddLauncherSheet) {
+            NavigationStack {
+                LauncherEditorView(config: LauncherConfig(), isNew: true)
+                    .environmentObject(viewModel)
+            }
+        }
         .sheet(isPresented: $showSettingsSheet) {
             NavigationStack {
                 SettingsView()
@@ -128,6 +161,50 @@ struct WidgetListView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
         .listRowBackground(Color.clear)
+    }
+}
+
+// MARK: - Launcher Row View
+
+struct LauncherRowView: View {
+    let config: LauncherConfig
+    var onDelete: (() -> Void)? = nil
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Color.white.opacity(0.08)
+                Image(systemName: "rectangle.grid.2x2")
+                    .font(.title2)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 60, height: 60)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(config.name)
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Text("Launcher Grid")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Text("\(config.items.count) item\(config.items.count == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if let onDelete {
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .foregroundStyle(.red)
+                        .padding(8)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
 

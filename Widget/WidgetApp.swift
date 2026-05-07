@@ -8,7 +8,10 @@ struct WidgetApp: App {
             ContentView()
                 .onOpenURL { url in
                     Task { @MainActor in
-                        if url.scheme == "openapp" {
+                        if url.scheme == "widgetar" {
+                            // Handled by ContentView's .onOpenURL
+                            return
+                        } else if url.scheme == "openapp" {
                             let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
                             if let bundleID = comps?.queryItems?.first(where: { $0.name == "bundle" })?.value {
                                 let fallback = comps?.queryItems?.first(where: { $0.name == "fallback" })?.value

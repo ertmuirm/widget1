@@ -661,6 +661,55 @@ final class SharedStorage {
             }
         }
     }
+
+    // MARK: - Launcher Config Storage
+
+    private static let launcherKey = "launcherConfigurations"
+
+    func saveLauncherConfigs(_ configs: [LauncherConfig]) throws {
+        let data = try encoder.encode(configs)
+        keychainWrite(data, forKey: Self.launcherKey)
+        for id in Self.appGroupCandidates {
+            if let ud = UserDefaults(suiteName: id) {
+                ud.set(data, forKey: Self.launcherKey)
+                ud.synchronize()
+            }
+        }
+        UserDefaults.standard.set(data, forKey: Self.launcherKey)
+        UserDefaults.standard.synchronize()
+    }
+
+    func loadLauncherConfigs() throws -> [LauncherConfig] {
+        if let data = keychainRead(forKey: Self.launcherKey), !data.isEmpty {
+            return (try? decoder.decode([LauncherConfig].self, from: data)) ?? []
+        }
+        for id in Self.appGroupCandidates {
+            if let data = UserDefaults(suiteName: id)?.data(forKey: Self.launcherKey), !data.isEmpty {
+                return (try? decoder.decode([LauncherConfig].self, from: data)) ?? []
+            }
+        }
+        if let data = UserDefaults.standard.data(forKey: Self.launcherKey), !data.isEmpty {
+            return (try? decoder.decode([LauncherConfig].self, from: data)) ?? []
+        }
+        return []
+    }
+
+    // MARK: - Launcher Settings
+
+    var launcherFontSize: Double {
+        get { UserDefaults.standard.object(forKey: "launcherFontSize") as? Double ?? 16.0 }
+        set { UserDefaults.standard.set(newValue, forKey: "launcherFontSize") }
+    }
+
+    var launcherRowHeight: Double {
+        get { UserDefaults.standard.object(forKey: "launcherRowHeight") as? Double ?? 44.0 }
+        set { UserDefaults.standard.set(newValue, forKey: "launcherRowHeight") }
+    }
+
+    var backTapLauncherID: String? {
+        get { UserDefaults.standard.string(forKey: "backTapLauncherID") }
+        set { UserDefaults.standard.set(newValue, forKey: "backTapLauncherID") }
+    }
 }
 
 // MARK: - Supporting Types

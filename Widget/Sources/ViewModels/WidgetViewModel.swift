@@ -11,6 +11,7 @@ final class WidgetViewModel: ObservableObject {
     // MARK: - Published Properties
 
     @Published var configurations: [WidgetConfig] = []
+    @Published var launcherConfigs: [LauncherConfig] = []
     @Published var selectedConfiguration: WidgetConfig?
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -24,6 +25,7 @@ final class WidgetViewModel: ObservableObject {
 
     init() {
         loadConfigurations()
+        loadLauncherConfigs()
         Task { try? storage.createAutoBackup() }
     }
 
@@ -100,6 +102,49 @@ final class WidgetViewModel: ObservableObject {
         } catch {
             handleError(error)
         }
+    }
+
+    // MARK: - Launcher Config Management
+
+    func loadLauncherConfigs() {
+        launcherConfigs = (try? storage.loadLauncherConfigs()) ?? []
+    }
+
+    private func saveLauncherConfigs() {
+        try? storage.saveLauncherConfigs(launcherConfigs)
+    }
+
+    func addLauncherConfig(_ config: LauncherConfig) {
+        launcherConfigs.append(config)
+        saveLauncherConfigs()
+        triggerHaptic(.medium)
+    }
+
+    func updateLauncherConfig(_ config: LauncherConfig) {
+        guard let idx = launcherConfigs.firstIndex(where: { $0.id == config.id }) else { return }
+        var updated = config
+        updated.updatedAt = Date()
+        launcherConfigs[idx] = updated
+        saveLauncherConfigs()
+        triggerHaptic(.light)
+    }
+
+    func deleteLauncherConfig(_ config: LauncherConfig) {
+        launcherConfigs.removeAll { $0.id == config.id }
+        saveLauncherConfigs()
+        triggerHaptic(.rigid)
+    }
+
+    func deleteLauncherConfig(at offsets: IndexSet) {
+        launcherConfigs.remove(atOffsets: offsets)
+        saveLauncherConfigs()
+        triggerHaptic(.rigid)
+    }
+
+    func moveLauncherConfig(from source: IndexSet, to destination: Int) {
+        launcherConfigs.move(fromOffsets: source, toOffset: destination)
+        saveLauncherConfigs()
+        triggerHaptic(.light)
     }
 
     // MARK: - Item Management

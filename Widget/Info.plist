@@ -67,6 +67,14 @@
 				<string>openapp</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.ioswidget.widgetar</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>widgetar</string>
+			</array>
+		</dict>
 	</array>
 	<key>UIApplicationShortcutItems</key>
 	<array/>
