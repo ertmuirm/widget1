@@ -66,20 +66,17 @@ struct LauncherGridView: View {
     // MARK: - Action
 
     private func openAction(_ action: WidgetAction) {
-        let url: URL?
         switch action.type {
         case .urlScheme:
-            url = URL(string: action.payload)
+            guard let url = URL(string: action.payload) else { return }
+            openURLFast(url)
         case .shortcut:
             let enc = action.payload
                 .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? action.payload
-            url = URL(string: "shortcuts://run-shortcut?name=\(enc)")
+            guard let url = URL(string: "shortcuts://run-shortcut?name=\(enc)") else { return }
+            openURLFast(url)
         case .appIntent:
-            url = URL(string: "openapp://launch?bundle=\(action.payload)")
+            openAppFast(bundleID: action.payload)
         }
-        guard let url else { return }
-        // Use the non-async callback form — fire-and-forget, no waiting for the app-switch
-        // animation to complete. iOS backgrounds this app naturally when the target opens.
-        UIApplication.shared.open(url, options: [:], completionHandler: nil)
     }
 }
