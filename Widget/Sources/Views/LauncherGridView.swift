@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Full-screen launcher grid overlay.
-/// Presented as a fullScreenCover; dismisses after tapping any item.
+/// Dismissed by swiping in any direction (min 60 pt drag) or tapping the
+/// invisible hit-target in the top-right corner.
 struct LauncherGridView: View {
     let config: LauncherConfig
     var onDismiss: () -> Void
@@ -35,23 +36,24 @@ struct LauncherGridView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.top, 56)
+                .padding(.top, 16)
                 .padding(.bottom, 16)
             }
 
-            Button {
-                onDismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(10)
-                    .background(Color.white.opacity(0.15))
-                    .clipShape(Circle())
+            // Invisible dismiss target in the top-right corner (44×44 tap area, no visual).
+            Button(action: onDismiss) {
+                Color.clear
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
-            .padding(.top, 12)
-            .padding(.trailing, 16)
+            .padding(.top, 8)
+            .padding(.trailing, 8)
         }
+        // Dismiss on any swipe with at least 60 pt travel in any direction.
+        .gesture(
+            DragGesture(minimumDistance: 60, coordinateSpace: .local)
+                .onEnded { _ in onDismiss() }
+        )
     }
 
     private func executeAction(_ action: WidgetAction) {
@@ -70,19 +72,4 @@ struct LauncherGridView: View {
             Task { await UIApplication.shared.open(url) }
         }
     }
-}
-
-#Preview {
-    LauncherGridView(
-        config: LauncherConfig(
-            name: "Quick Launch",
-            items: (1...12).map { i in
-                LauncherItem(
-                    name: "Item \(i)",
-                    action: WidgetAction(type: .urlScheme, payload: "https://example.com")
-                )
-            }
-        ),
-        onDismiss: {}
-    )
 }
