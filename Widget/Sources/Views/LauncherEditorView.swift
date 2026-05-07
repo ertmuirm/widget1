@@ -35,16 +35,14 @@ struct LauncherEditorView: View {
 
             // Items
             Section {
-                ForEach($draft.items) { $item in
-                    Button {
+                ForEach(draft.items) { item in
+                    LauncherItemRow(item: item) {
                         editingItem = item
-                    } label: {
-                        LauncherItemRow(item: item)
+                    } onDelete: {
+                        draft.items.removeAll { $0.id == item.id }
                     }
-                    .buttonStyle(.plain)
                 }
                 .onMove { from, to in draft.items.move(fromOffsets: from, toOffset: to) }
-                .onDelete { offsets in draft.items.remove(atOffsets: offsets) }
 
                 if draft.items.count < LauncherConfig.maxItems {
                     Button {
@@ -191,22 +189,35 @@ struct LauncherEditorView: View {
 
 private struct LauncherItemRow: View {
     let item: LauncherItem
+    var onEdit: (() -> Void)? = nil
+    var onDelete: (() -> Void)? = nil
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.name.isEmpty ? "Unnamed" : item.name)
-                    .foregroundStyle(item.name.isEmpty ? Color.secondary : Color.white)
+        HStack(spacing: 12) {
+            Button {
+                onEdit?()
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.name.isEmpty ? "Unnamed" : item.name)
+                        .foregroundStyle(item.name.isEmpty ? Color.secondary : Color.white)
 
-                Text(actionDescription)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    Text(actionDescription)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+            .buttonStyle(.plain)
+
+            if let onDelete {
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .foregroundStyle(.red)
+                        .padding(8)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(.vertical, 2)
     }

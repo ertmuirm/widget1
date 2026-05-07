@@ -24,10 +24,20 @@ enum ShortcutFileService {
 
     /// Parses a binary-plist .shortcut file and returns LauncherItems derived from
     /// its "Choose from Menu" structure.
+    /// Handles both flat format (iOS ≤15) and wrapped format (iOS 16+: root has WFWorkflow key).
     static func importItems(from data: Data) throws -> [LauncherItem] {
-        guard let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
-              let root = plist as? [String: Any],
-              let actions = root["WFWorkflowActions"] as? [[String: Any]]
+        guard let plist = try? PropertyListSerialization.propertyList(from: data, format: nil)
+        else { throw ShortcutError.invalidFile }
+
+        // iOS 16+ wraps everything under a "WFWorkflow" key with a separate signature
+        let workflow: [String: Any]?
+        if let root = plist as? [String: Any] {
+            workflow = (root["WFWorkflow"] as? [String: Any]) ?? root
+        } else {
+            workflow = nil
+        }
+        guard let wf = workflow,
+              let actions = wf["WFWorkflowActions"] as? [[String: Any]]
         else { throw ShortcutError.invalidFile }
 
         return try parseMenuItems(from: actions)
@@ -35,22 +45,32 @@ enum ShortcutFileService {
 
     // MARK: - Export
 
-    /// Builds a binary-plist .shortcut that opens this app with the launcher URL for each item.
+    /// Builds a binary-plist .shortcut compatible with iOS 16+.
     static func exportData(from config: LauncherConfig) throws -> Data {
         let actions = buildMenuActions(for: config)
-        let root: [String: Any] = [
-            "WFWorkflowMinimumClientVersion": 900,
+
+        // iOS 16+ requires WFWorkflow wrapper and specific icon/type fields.
+        // WFWorkflowTypes must be empty (NCWidget/WatchKit are deprecated and cause import errors).
+        let workflow: [String: Any] = [
+            "WFWorkflowMinimumClientVersion": NSNumber(value: 900),
             "WFWorkflowMinimumClientVersionString": "900",
             "WFWorkflowClientVersion": "1268.0.1",
+            "WFWorkflowHasShortcutInputVariables": NSNumber(value: false),
             "WFWorkflowIcon": [
-                "WFWorkflowIconStartColor": 255,
-                "WFWorkflowIconGlyphNumber": 59511
-            ],
-            "WFWorkflowInputContentItemClasses": [] as [String],
-            "WFWorkflowTypes": ["NCWidget", "WatchKit"] as [String],
-            "WFWorkflowOutputContentItemClasses": [] as [String],
+                "WFWorkflowIconStartColor": NSNumber(value: 463140863),
+                "WFWorkflowIconGlyphNumber": NSNumber(value: 59511),
+                "WFWorkflowIconImageData": Data()
+            ] as [String: Any],
+            "WFWorkflowImportQuestions": [] as NSArray,
+            "WFWorkflowInputContentItemClasses": [] as NSArray,
+            "WFWorkflowOutputContentItemClasses": [] as NSArray,
+            "WFWorkflowTypes": [] as NSArray,
             "WFWorkflowActions": actions
         ]
+
+        // Wrap in the iOS 16+ envelope (Shortcuts reads either flat or wrapped)
+        let root: [String: Any] = ["WFWorkflow": workflow]
+
         guard let data = try? PropertyListSerialization.data(
             fromPropertyList: root,
             format: .binary,

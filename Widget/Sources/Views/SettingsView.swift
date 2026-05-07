@@ -6,21 +6,10 @@ struct SettingsView: View {
 
     @EnvironmentObject var viewModel: WidgetViewModel
 
-    // MARK: - Launcher Settings
+    // MARK: - Launcher Settings (AppStorage for live updates)
 
-    private var launcherFontSize: Binding<Double> {
-        Binding(
-            get: { SharedStorage.shared.launcherFontSize },
-            set: { SharedStorage.shared.launcherFontSize = $0 }
-        )
-    }
-
-    private var launcherRowHeight: Binding<Double> {
-        Binding(
-            get: { SharedStorage.shared.launcherRowHeight },
-            set: { SharedStorage.shared.launcherRowHeight = $0 }
-        )
-    }
+    @AppStorage("launcherFontSize")  private var launcherFontSize: Double = 16
+    @AppStorage("launcherRowHeight") private var launcherRowHeight: Double = 44
 
     private var backTapLauncherID: Binding<String> {
         Binding(
@@ -103,20 +92,20 @@ struct SettingsView: View {
             // Launcher Grid
             if !viewModel.launcherConfigs.isEmpty {
                 Section {
-                    Stepper(value: launcherFontSize, in: 10...30, step: 1) {
+                    Stepper(value: $launcherFontSize, in: 10...30, step: 1) {
                         HStack {
                             Text("Font Size")
                             Spacer()
-                            Text("\(Int(launcherFontSize.wrappedValue)) pt")
+                            Text("\(Int(launcherFontSize)) pt")
                                 .foregroundStyle(.secondary)
                         }
                     }
 
-                    Stepper(value: launcherRowHeight, in: 32...80, step: 2) {
+                    Stepper(value: $launcherRowHeight, in: 32...80, step: 2) {
                         HStack {
                             Text("Row Height")
                             Spacer()
-                            Text("\(Int(launcherRowHeight.wrappedValue)) pt")
+                            Text("\(Int(launcherRowHeight)) pt")
                                 .foregroundStyle(.secondary)
                         }
                     }
