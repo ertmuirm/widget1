@@ -7,20 +7,20 @@ struct WidgetApp: App {
         WindowGroup {
             ContentView()
                 .onOpenURL { url in
-                    // onOpenURL fires on the main thread — no Task wrapper needed.
-                    // Use the Direct variants (no suspend): the app may be launching
-                    // from background/terminated state when a widget is tapped.
-                    if url.scheme == "widgetar" {
-                        // Handled by ContentView's .onOpenURL
-                    } else if url.scheme == "openapp" {
-                        let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
-                        if let bundleID = comps?.queryItems?.first(where: { $0.name == "bundle" })?.value {
-                            let fallback = comps?.queryItems?.first(where: { $0.name == "fallback" })?.value
-                                .flatMap { URL(string: $0) }
-                            openAppDirect(bundleID: bundleID, fallbackURL: fallback)
+                    Task { @MainActor in
+                        if url.scheme == "widgetar" {
+                            // Handled by ContentView's .onOpenURL
+                        } else if url.scheme == "openapp" {
+                            let comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+                            if let bundleID = comps?.queryItems?.first(where: { $0.name == "bundle" })?.value {
+                                let fallback = comps?.queryItems?.first(where: { $0.name == "fallback" })?.value
+                                openAppByBundleID(bundleID, fallbackURLString: fallback)
+                            }
+                        } else if url.scheme == "tel" {
+                            dialPhoneNumber(url: url)
+                        } else {
+                            await UIApplication.shared.open(url)
                         }
-                    } else {
-                        openURLDirect(url)
                     }
                 }
                 .onAppear {
@@ -28,4 +28,33 @@ struct WidgetApp: App {
                 }
         }
     }
+}
+
+// MARK: - Phone dialling
+
+private func dialPhoneNumber(url: URL) {
+    UIApplication.shared.open(url)
+}
+
+// MARK: - Bundle-ID app launch via LSApplicationWorkspace (private API)
+
+private func openAppByBundleID(_ bundleID: String, fallbackURLString: String? = nil) {
+    guard let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
+          let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject
+    else {
+        openFallbackURL(fallbackURLString)
+        return
+    }
+
+    let openSel = NSSelectorFromString("openApplicationWithBundleID:")
+    guard ws.responds(to: openSel) else {
+        openFallbackURL(fallbackURLString)
+        return
+    }
+    ws.perform(openSel, with: bundleID)
+}
+
+private func openFallbackURL(_ urlString: String?) {
+    guard let str = urlString, let url = URL(string: str) else { return }
+    Task { await UIApplication.shared.open(url) }
 }
