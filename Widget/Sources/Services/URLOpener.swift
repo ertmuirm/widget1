@@ -1,31 +1,65 @@
 import UIKit
 
+// MARK: - Foreground-to-foreground opens (LauncherGridView)
+//
+// These variants call suspend after opening so iOS transitions cleanly
+// without a foreground→background animation.  Only safe to call when
+// the app is already in the foreground (user is actively using it).
+
 /// Opens a URL via LSApplicationWorkspace, then immediately suspends.
-///
-/// UIApplication.open(_:options:completionHandler:) is async even with a nil handler —
-/// iOS still runs the full foreground→background transition animation (~5s) before the
-/// target app appears.  LSApplicationWorkspace.openURL: talks directly to SpringBoard
-/// and is synchronous, so the switch is instant.  Calling suspend after it backgrounds
-/// our app cleanly without a visible animation.
 func openURLFast(_ url: URL) {
-    let openSel = NSSelectorFromString("openURL:")
-    if let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
-       let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject,
-       ws.responds(to: openSel) {
-        ws.perform(openSel, with: url)
-    } else {
-        UIApplication.shared.open(url, options: [:], completionHandler: nil)
-    }
+    openURLViaWorkspace(url)
     UIApplication.shared.perform(NSSelectorFromString("suspend"))
 }
 
 /// Opens an app by bundle ID via LSApplicationWorkspace, then immediately suspends.
 func openAppFast(bundleID: String) {
-    let openSel = NSSelectorFromString("openApplicationWithBundleID:")
+    openAppViaWorkspace(bundleID: bundleID)
+    UIApplication.shared.perform(NSSelectorFromString("suspend"))
+}
+
+// MARK: - Background-launched opens (onOpenURL / widget taps)
+//
+// These variants do NOT call suspend.  When a widget is tapped the app may be
+// launching from a terminated or suspended state; calling suspend immediately
+// after launch confuses iOS and causes a 5-10s deferral before the URL opens.
+
+/// Opens a URL via LSApplicationWorkspace without suspending afterward.
+func openURLDirect(_ url: URL) {
+    openURLViaWorkspace(url)
+}
+
+/// Opens an app by bundle ID via LSApplicationWorkspace without suspending.
+/// Falls back to the fallback URL if LSApplicationWorkspace is unavailable.
+func openAppDirect(bundleID: String, fallbackURL: URL? = nil) {
+    let sel = NSSelectorFromString("openApplicationWithBundleID:")
     if let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
        let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject,
-       ws.responds(to: openSel) {
-        ws.perform(openSel, with: bundleID)
+       ws.responds(to: sel) {
+        ws.perform(sel, with: bundleID)
+    } else if let url = fallbackURL {
+        openURLViaWorkspace(url)
     }
-    UIApplication.shared.perform(NSSelectorFromString("suspend"))
+}
+
+// MARK: - Shared workspace helper
+
+private func openURLViaWorkspace(_ url: URL) {
+    let sel = NSSelectorFromString("openURL:")
+    if let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
+       let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject,
+       ws.responds(to: sel) {
+        ws.perform(sel, with: url)
+    } else {
+        UIApplication.shared.open(url, options: [:], completionHandler: nil)
+    }
+}
+
+private func openAppViaWorkspace(bundleID: String) {
+    let sel = NSSelectorFromString("openApplicationWithBundleID:")
+    if let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
+       let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject,
+       ws.responds(to: sel) {
+        ws.perform(sel, with: bundleID)
+    }
 }
