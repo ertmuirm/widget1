@@ -18,17 +18,20 @@ func openAppFast(bundleID: String) {
     UIApplication.shared.perform(NSSelectorFromString("suspend"))
 }
 
-// MARK: - Background-launched opens (onOpenURL / widget taps)
+// MARK: - Widget-tap opens (onOpenURL — app state unknown)
 //
-// These variants do NOT call suspend.  When a widget is tapped the app may be
-// launching from a terminated or suspended state; calling suspend immediately
-// after launch confuses iOS and causes a 5-10s deferral before the URL opens.
+// LSApplicationWorkspace.openURL: is synchronous: SpringBoard receives the
+// request before the call returns.  We then suspend after 50ms so UIKit's
+// slow foreground→background animation never plays, but the launch transition
+// has had a moment to settle (immediate suspend during launch caused a 5-10s
+// deferral in earlier attempts).
 
-/// Opens a URL via UIApplication (fire-and-forget, no suspend).
-/// Used from onOpenURL where the app may be launching from background —
-/// LSApplicationWorkspace.openURL: misbehaves in that transition state.
+/// Opens a URL via LSApplicationWorkspace, then suspends after 50 ms.
 func openURLDirect(_ url: URL) {
-    UIApplication.shared.open(url, options: [:], completionHandler: nil)
+    openURLViaWorkspace(url)
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+        UIApplication.shared.perform(NSSelectorFromString("suspend"))
+    }
 }
 
 /// Opens an app by bundle ID via LSApplicationWorkspace without suspending.
