@@ -24,9 +24,11 @@ func openAppFast(bundleID: String) {
 // launching from a terminated or suspended state; calling suspend immediately
 // after launch confuses iOS and causes a 5-10s deferral before the URL opens.
 
-/// Opens a URL via LSApplicationWorkspace without suspending afterward.
+/// Opens a URL via UIApplication (fire-and-forget, no suspend).
+/// Used from onOpenURL where the app may be launching from background —
+/// LSApplicationWorkspace.openURL: misbehaves in that transition state.
 func openURLDirect(_ url: URL) {
-    openURLViaWorkspace(url)
+    UIApplication.shared.open(url, options: [:], completionHandler: nil)
 }
 
 /// Opens an app by bundle ID via LSApplicationWorkspace without suspending.
