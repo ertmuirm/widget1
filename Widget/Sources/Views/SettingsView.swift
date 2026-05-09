@@ -77,7 +77,7 @@ struct SettingsView: View {
             
             // Clock Widget
             Section("Clock Widget") {
-                Picker("Clock Font", selection: clockFontName) {
+                Picker("Clock Font", selection: $clockFontName) {
                     ForEach(ClockFont.predefinedFonts, id: \.self) { font in
                         Text(font).tag(font)
                     }
