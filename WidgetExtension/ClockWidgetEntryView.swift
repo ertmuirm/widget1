@@ -18,7 +18,6 @@ struct ClockWidgetEntryView: View {
     
     @ViewBuilder
     private var clockContent: some View {
-        let position = entry.configuration.clockDigitPosition ?? .hour
         let items = entry.configuration.items
         
         HStack(spacing: 0) {
@@ -39,17 +38,6 @@ struct ClockWidgetEntryView: View {
             .font(.custom(entry.configuration.clockFontName ?? "SF Pro", size: fontSize))
             .foregroundStyle(Color.white)
             .minimumScaleFactor(0.5)
-            .widgetURL(digitURL())
-    }
-    
-    private var digitURL: URL? {
-        let items = entry.configuration.items
-        let index = items.startIndex
-        guard index < items.count,
-              let action = items[index].action else {
-            return nil
-        }
-        return resolveURL(for: action)
     }
 }
 
