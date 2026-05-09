@@ -339,6 +339,29 @@ private func makeTimeline(configID: String?) -> Timeline<WidgetEntry> {
     return Timeline(entries: [entry], policy: .after(next))
 }
 
+private func makeClockEntry(position: ClockDigitPosition?) -> WidgetEntry {
+    let calendar = Calendar.current
+    let now = Date()
+    let hour = calendar.component(.hour, from: now)
+    let minute = calendar.component(.minute, from: now)
+    let displayHour = hour == 0 ? 12 : hour
+    
+    var config = WidgetConfig.defaultConfiguration
+    config.widgetKind = .clock
+    config.clockDigitPosition = position ?? .hour
+    config.clockFontSize = 48
+    config.backgroundOpacity = 0 // Transparent for iOS 26 clear mode
+    
+    return WidgetEntry(date: now, configuration: config)
+}
+
+private func makeClockTimeline(position: ClockDigitPosition?) -> Timeline<WidgetEntry> {
+    let entry = makeClockEntry(position: position)
+    // Update every minute
+    let next = Calendar.current.date(byAdding: .minute, value: 1, to: Date()) ?? Date()
+    return Timeline(entries: [entry], policy: .after(next))
+}
+
 // MARK: ─────────────────────────────────────────────────────────────────
 // MARK: SMALL WIDGET — home screen Small (3×3, systemSmall)
 // MARK: ─────────────────────────────────────────────────────────────────
@@ -699,6 +722,39 @@ struct ImageBroadcastProvider: AppIntentTimelineProvider {
     }
     func timeline(for configuration: SelectImageWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
         makeTimeline(configID: configuration.selectedWidget?.id)
+    }
+}
+
+// MARK: - Clock Widget Intent
+
+struct SelectClockWidgetIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource = "Clock Widget"
+    static var description = IntentDescription("Choose clock digits")
+    @Parameter(title: "Digits") var digitPosition: ClockDigitPositionEntity?
+    init() {}
+    init(digitPosition: ClockDigitPositionEntity?) { self.digitPosition = digitPosition }
+}
+
+enum ClockDigitPositionEntity: String, AppEnum {
+    case hour = "hour"
+    case minute = "minute"
+    static var typeDisplayRepresentation: TypeDisplayRepresentation { "Digits" }
+    static var caseDisplayRepresentations: [ClockDigitPositionEntity: DisplayRepresentation] {
+        [.hour: "Hour (12h)", .minute: "Minute"]
+    }
+}
+
+struct ClockBroadcastProvider: AppIntentTimelineProvider {
+    func placeholder(in context: Context) -> WidgetEntry {
+        WidgetEntry(date: Date(), configuration: .defaultConfiguration)
+    }
+    func snapshot(for configuration: SelectClockWidgetIntent, in context: Context) async -> WidgetEntry {
+        let position: ClockDigitPosition? = configuration.digitPosition == .minute ? .minute : .hour
+        return makeClockEntry(position: position)
+    }
+    func timeline(for configuration: SelectClockWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
+        let position: ClockDigitPosition? = configuration.digitPosition == .minute ? .minute : .hour
+        return makeClockTimeline(position: position)
     }
 }
 

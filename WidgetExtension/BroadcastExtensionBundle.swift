@@ -9,5 +9,6 @@ struct BroadcastExtensionBundle: WidgetBundle {
         BroadcastLargeWidget()
         BroadcastLockWidget()
         BroadcastImageWidget()
+        BroadcastClockWidget()
     }
 }

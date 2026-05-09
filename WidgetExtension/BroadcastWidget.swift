@@ -114,6 +114,26 @@ struct BroadcastImageWidget: Widget {
     }
 }
 
+// MARK: - Clock Widget
+
+struct BroadcastClockWidget: Widget {
+    let kind = "BroadcastClock"
+
+    var body: some WidgetConfiguration {
+        AppIntentConfiguration(
+            kind: kind,
+            intent: SelectClockWidgetIntent.self,
+            provider: ClockBroadcastProvider()
+        ) { entry in
+            WidgetEntryView(entry: entry)
+                .containerBackground(for: .widget) { Color.clear }
+        }
+        .configurationDisplayName("Clock Widget")
+        .description("Display hour or minute digits")
+        .supportedFamilies([.systemMedium])
+    }
+}
+
 // MARK: - Previews
 
 #Preview("Small", as: .systemSmall) {

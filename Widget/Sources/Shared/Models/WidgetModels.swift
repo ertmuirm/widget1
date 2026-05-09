@@ -86,13 +86,29 @@ enum DisplayType: String, Codable, CaseIterable {
 enum WidgetKind: String, Codable {
     case grid
     case imageSlideshow
+    case clock
     case lockScreen
 
     var displayName: String {
         switch self {
         case .grid:            return "Grid"
         case .imageSlideshow:  return "Code"
+        case .clock:          return "Clock"
         case .lockScreen:      return "Lock Screen"
+        }
+    }
+}
+
+// MARK: - Clock Digit Position
+
+enum ClockDigitPosition: String, Codable, CaseIterable {
+    case hour
+    case minute
+    
+    var displayName: String {
+        switch self {
+        case .hour:    return "Hour (12h)"
+        case .minute:  return "Minute"
         }
     }
 }
@@ -164,6 +180,10 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
     var slides: [ImageSlide]?
     /// Currently displayed slide index for .imageSlideshow widgets
     var currentSlideIndex: Int?
+    /// Clock digit position for .clock widgets
+    var clockDigitPosition: ClockDigitPosition?
+    /// Clock font size for .clock widgets
+    var clockFontSize: Double?
 
     init(
         id: UUID = UUID(),
@@ -177,7 +197,9 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         showItemLabels: Bool? = nil,
         widgetKind: WidgetKind? = nil,
         slides: [ImageSlide]? = nil,
-        currentSlideIndex: Int? = nil
+        currentSlideIndex: Int? = nil,
+        clockDigitPosition: ClockDigitPosition? = nil,
+        clockFontSize: Double? = nil
     ) {
         self.id = id
         self.name = name
@@ -191,6 +213,8 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         self.widgetKind = widgetKind
         self.slides = slides
         self.currentSlideIndex = currentSlideIndex
+        self.clockDigitPosition = clockDigitPosition
+        self.clockFontSize = clockFontSize
     }
     
     /// Default configuration for placeholder

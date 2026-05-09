@@ -12,6 +12,8 @@ struct WidgetEntryView: View {
         case .systemSmall, .systemMedium, .systemLarge, .systemExtraLarge:
             if entry.configuration.widgetKind == .imageSlideshow {
                 imageSlideshowWidget
+            } else if entry.configuration.widgetKind == .clock {
+                clockWidget
             } else {
                 homeScreenWidget
             }
@@ -19,6 +21,32 @@ struct WidgetEntryView: View {
             lockScreenWidget
         default:
             homeScreenWidget
+        }
+    }
+
+    // MARK: - Clock Widget
+
+    @ViewBuilder
+    private var clockWidget: some View {
+        let digit = digitString
+        Text(digit)
+            .font(.system(size: entry.configuration.clockFontSize ?? 48, weight: .bold))
+            .minimumScaleFactor(0.5)
+    }
+
+    private var digitString: String {
+        let position = entry.configuration.clockDigitPosition ?? .hour
+        let calendar = Calendar.current
+        let now = Date()
+        let hour = calendar.component(.hour, from: now)
+        let minute = calendar.component(.minute, from: now)
+        let displayHour = hour == 0 ? 12 : hour
+        
+        switch position {
+        case .hour:
+            return String(format: "%02d", displayHour)
+        case .minute:
+            return String(format: "%02d", minute)
         }
     }
 
