@@ -40,16 +40,12 @@ struct WidgetEntryView: View {
     private var clockWidget: some View {
         let digit = digitString
         let size = entry.configuration.clockFontSize ?? 48
-        let backgroundOpacity = entry.configuration.clockBackgroundOpacity ?? 1.0
-        let backgroundColor = Color.black.opacity(backgroundOpacity)
+        let backgroundOpacity = entry.configuration.backgroundOpacity
         
-        ZStack {
-            backgroundColor
-            Text(digit)
-                .font(.system(size: size, weight: .bold, design: clockFontDesign))
-                .minimumScaleFactor(0.5)
-                .foregroundColor(.white)
-        }
+        Text(digit)
+            .font(.system(size: size, weight: .bold, design: clockFontDesign))
+            .minimumScaleFactor(0.5)
+            .foregroundColor(.white)
     }
 
     private var digitString: String {

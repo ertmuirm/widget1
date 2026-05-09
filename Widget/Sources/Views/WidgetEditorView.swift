@@ -214,6 +214,7 @@ struct WidgetEditorView: View {
     @State private var clockFontStyle: ClockFontStyle = .default
     @State private var clockBackgroundOpacity: Double = 1.0
     @State private var clockActions: [WidgetItem] = []
+    @State private var clockActionIndex: Int = 0
 
     private var clockSettingsSection: some View {
         Group {
@@ -245,9 +246,14 @@ struct WidgetEditorView: View {
                     Text("No actions")
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(clockActions) { item in
-                        Text("Action")
-                            .foregroundStyle(.primary)
+                    ForEach(clockActions.indices, id: \.self) { index in
+                        HStack {
+                            Text(clockActions[index].sfSymbolName ?? "item")
+                            Spacer()
+                            Button { clockActionTapped(at: index) } label: {
+                                Text("Edit")
+                            }
+                        }
                     }
                 }
                 if clockActions.count < 2 {
@@ -267,7 +273,26 @@ struct WidgetEditorView: View {
                 action: nil
             )
             clockActions.append(newItem)
+            showActionPicker = true
+            clockActionIndex = clockActions.count - 1
         }
+    }
+    
+    private func clockActionTapped(at index: Int) {
+        clockActionIndex = index
+        showActionPicker = true
+    }
+    
+    private var clockActionItemBinding: Binding<WidgetItem> {
+        Binding(
+            get: {
+                guard clockActionIndex < clockActions.count else {
+                    return WidgetItem()
+                }
+                return clockActions[clockActionIndex]
+            },
+            set: { clockActions[clockActionIndex] = $0 }
+        )
     }
 
     // MARK: - Lock screen single-item section
@@ -939,7 +964,11 @@ struct SlideEditorView: View {
             }
         }
         .sheet(isPresented: $showActionPicker) {
-            ActionPickerView(item: actionItemBinding)
+            if isClockWidget {
+                ActionPickerView(item: clockActionItemBinding)
+            } else {
+                ActionPickerView(item: actionItemBinding)
+            }
         }
         .sheet(isPresented: $showAppActionPicker) {
             AppActionPickerView { urlString, displayLabel in
