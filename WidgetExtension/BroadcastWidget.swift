@@ -91,6 +91,29 @@ struct BroadcastLockWidget: Widget {
     }
 }
 
+// MARK: - Clock Widget (2x2 medium for time display)
+
+struct BroadcastClockWidget: Widget {
+    let kind = "BroadcastClock"
+
+    var body: some WidgetConfiguration {
+        AppIntentConfiguration(
+            kind: kind,
+            intent: SelectClockWidgetIntent.self,
+            provider: ClockBroadcastProvider()
+        ) { entry in
+            ClockWidgetEntryView(entry: entry)
+                .containerBackground(for: .widget) {
+                    Color.clear
+                }
+        }
+        .configurationDisplayName("Clock Widget")
+        .description("Displays time digits with configurable tap actions")
+        .supportedFamilies([.systemMedium])
+        .containerBackgroundRemovable(true)
+    }
+}
+
 // MARK: - Code Widget (QR slideshow)
 
 struct BroadcastImageWidget: Widget {

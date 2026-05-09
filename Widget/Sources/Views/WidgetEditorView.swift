@@ -29,6 +29,7 @@ struct WidgetEditorView: View {
 
     private var isImageWidget: Bool { configuration.widgetKind == .imageSlideshow }
     private var isLockScreenWidget: Bool { configuration.widgetKind == .lockScreen }
+    private var isClockWidget: Bool { configuration.widgetKind == .clock }
 
     var body: some View {
         List {
@@ -53,6 +54,8 @@ struct WidgetEditorView: View {
                 slideshowActionSection
             } else if isLockScreenWidget {
                 lockScreenItemSection
+            } else if isClockWidget {
+                clockWidgetSection
             } else {
                 gridItemsSection
                 backgroundSection
@@ -223,6 +226,57 @@ struct WidgetEditorView: View {
                 }
                 .foregroundStyle(.gray)
             }
+        }
+    }
+
+    // MARK: - Clock Widget Section
+
+    private var clockWidgetSection: some View {
+        Section {
+            // Digit position picker
+            Picker("Digit Position", selection: $configuration.clockDigitPosition) {
+                ForEach(ClockDigitPosition.allCases, id: \.self) { position in
+                    Text(position.displayName).tag(position)
+                }
+            }
+            
+            // Font name picker
+            Picker("Font", selection: $configuration.clockFontName) {
+                ForEach(ClockFont.predefinedFonts, id: \.self) { font in
+                    Text(font).tag(font)
+                }
+            }
+            
+            // Font size stepper
+            Stepper(value: Binding(
+                get: { configuration.clockFontSize ?? 48 },
+                set: { configuration.clockFontSize = $0 }
+            ), in: 24...96, step: 2) {
+                HStack {
+                    Text("Font Size")
+                    Spacer()
+                    Text("\(Int(configuration.clockFontSize ?? 48)) pt")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            
+            // Digit 1 action
+            if let digit1 = configuration.items.first {
+                NavigationLink(destination: ItemEditorView(configuration: $configuration, itemIndex: 0)) {
+                    Label("Digit 1 Action", systemImage: "1.circle")
+                }
+            }
+            
+            // Digit 2 action
+            if configuration.items.count > 1, let digit2 = configuration.items[safe: 1] {
+                NavigationLink(destination: ItemEditorView(configuration: $configuration, itemIndex: 1)) {
+                    Label("Digit 2 Action", systemImage: "2.circle")
+                }
+            }
+        } header: {
+            Text("Clock Settings")
+        } footer: {
+            Text("Configure which digits to display (hour or minute) and their tap actions.")
         }
     }
 

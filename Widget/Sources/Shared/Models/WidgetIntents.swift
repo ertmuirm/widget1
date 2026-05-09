@@ -111,6 +111,9 @@ private struct SlimConfig: Codable {
     var it: [SlimItem] // items
     var sl: [SlimSlide]? // slides             (nil = no slides)
     var ci: Int?       // currentSlideIndex
+    var cdp: String?   // clockDigitPosition   (nil = .hour)
+    var cf: String?    // clockFontName      (nil = SF Pro)
+    var cs: Double?    // clockFontSize    (nil = 48)
 }
 
 private extension SlimConfig {
@@ -137,6 +140,10 @@ private extension SlimConfig {
             }
         }
         ci = config.currentSlideIndex
+        // Clock-specific fields
+        cdp = config.clockDigitPosition?.rawValue
+        cf  = config.clockFontName
+        cs  = config.clockFontSize.map { Double($0) }
     }
     func toWidgetConfig() -> WidgetConfig {
         let slides: [ImageSlide]? = sl.map { slimSlides in
@@ -163,7 +170,10 @@ private extension SlimConfig {
             showItemLabels: sil,
             widgetKind: k.flatMap { WidgetKind(rawValue: $0) },
             slides: slides,
-            currentSlideIndex: ci
+            currentSlideIndex: ci,
+            clockDigitPosition: cdp.flatMap { ClockDigitPosition(rawValue: $0) },
+            clockFontName: cf,
+            clockFontSize: cs.map { CGFloat($0) }
         )
     }
 }
@@ -772,4 +782,200 @@ struct AdvanceImageIntent: AppIntent {
         WidgetCenter.shared.reloadTimelines(ofKind: "BroadcastImage")
         return .result()
     }
+}
+// MARK: ─────────────────────────────────────────────────────────────────
+// MARK: CLOCK WIDGET — home screen Medium (2×2, systemMedium)
+// MARK: ─────────────────────────────────────────────────────────────────
+
+struct ClockWidgetEntity: AppEntity, Hashable {
+    static var typeDisplayRepresentation: TypeDisplayRepresentation {
+        TypeDisplayRepresentation(name: "Clock Widget")
+    }
+    static var defaultQuery = ClockWidgetQuery()
+    var id: String
+    var name: String
+    var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(name)") }
+    init(id: String, name: String) { self.id = id; self.name = name }
+}
+
+struct ClockWidgetQuery: EntityQuery {
+    func entities(for identifiers: [String]) async throws -> [ClockWidgetEntity] {
+        let configs = filteredConfigs(size: .systemMedium)
+        return identifiers.map { storedID in
+            let uuid = uuidFromEntityID(storedID)
+            if let c = configs.first(where: { $0.id.uuidString == uuid && $0.widgetKind == .clock }) {
+                return ClockWidgetEntity(id: encodeEntityID(c), name: c.name)
+            }
+            if let c = decodeConfigFromID(storedID), c.widgetKind == .clock {
+                return ClockWidgetEntity(id: storedID, name: c.name)
+            }
+            return ClockWidgetEntity(id: storedID, name: "Clock")
+        }
+    }
+    func suggestedEntities() async throws -> [ClockWidgetEntity] {
+        let list = filteredConfigs(size: .systemMedium).filter { $0.widgetKind == .clock }
+        if list.isEmpty { return [ClockWidgetEntity(id: "none", name: "No Clock Widgets")] }
+        return list.map { ClockWidgetEntity(id: encodeEntityID($0), name: $0.name) }
+    }
+    func defaultResult() async -> ClockWidgetEntity? {
+        filteredConfigs(size: .systemMedium).filter { $0.widgetKind == .clock }.first.map { ClockWidgetEntity(id: encodeEntityID($0), name: $0.name) }
+    }
+}
+
+struct SelectClockWidgetIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource = "Select Clock Widget"
+    static var description = IntentDescription("Choose a clock widget configuration")
+    @Parameter(title: "Widget") var selectedWidget: ClockWidgetEntity?
+    init() {}
+    init(selectedWidget: ClockWidgetEntity?) { self.selectedWidget = selectedWidget }
+}
+
+struct ClockBroadcastProvider: AppIntentTimelineProvider {
+    func placeholder(in context: Context) -> WidgetEntry {
+        WidgetEntry(date: Date(), configuration: .defaultConfiguration)
+    }
+    func snapshot(for configuration: SelectClockWidgetIntent, in context: Context) async -> WidgetEntry {
+        makeClockEntry(configID: configuration.selectedWidget?.id)
+    }
+    func timeline(for configuration: SelectClockWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
+        makeClockTimeline(configID: configuration.selectedWidget?.id)
+    }
+}
+
+// MARK: - Clock helper functions
+
+private func filteredClockConfigs() -> [WidgetConfig] {
+    ((try? SharedStorage.shared.loadConfigurations()) ?? [])
+        .filter { $0.size == .systemMedium && $0.widgetKind == .clock }
+}
+
+private func makeClockEntry(configID: String?) -> WidgetEntry {
+    let storage = SharedStorage.shared
+    let liveConfigs = (try? storage.loadConfigurations()) ?? []
+
+    guard let id = configID, id != "none" else {
+        return WidgetEntry(date: Date(), configuration: .defaultClockConfiguration)
+    }
+
+    let uuid = uuidFromEntityID(id)
+    if let found = liveConfigs.first(where: { $0.id.uuidString == uuid && $0.widgetKind == .clock }) {
+        let config = found
+        return WidgetEntry(date: Date(), configuration: config, showItemLabels: config.showItemLabels ?? storage.showItemLabels, entityUUID: config.id.uuidString)
+    }
+
+    if let embedded = decodeConfigFromID(id), embedded.widgetKind == .clock {
+        return WidgetEntry(date: Date(), configuration: embedded, showItemLabels: embedded.showItemLabels ?? storage.showItemLabels, entityUUID: embedded.id.uuidString)
+    }
+
+    return WidgetEntry(date: Date(), configuration: .defaultClockConfiguration)
+}
+
+private func makeClockTimeline(configID: String?) -> Timeline<WidgetEntry> {
+    // Get current time digits
+    let now = Date()
+    let calendar = Calendar.current
+    let hour = calendar.component(.hour, from: now)
+    let minute = calendar.component(.minute, from: now)
+    
+    // 12-hour format: convert 13-23 to 1-11, keep 0-12 as is
+    let hour12 = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour)
+    
+    // Load config to get digit position
+    let storage = SharedStorage.shared
+    let liveConfigs = (try? storage.loadConfigurations()) ?? []
+    var config: WidgetConfig
+    
+    if let id = configID, id != "none" {
+        let uuid = uuidFromEntityID(id)
+        if let found = liveConfigs.first(where: { $0.id.uuidString == uuid && $0.widgetKind == .clock }) {
+            config = found
+        } else if let embedded = decodeConfigFromID(id), embedded.widgetKind == .clock {
+            config = embedded
+        } else {
+            config = .defaultClockConfiguration
+        }
+    } else {
+        config = .defaultClockConfiguration
+    }
+
+    // Determine which digits based on digit position setting
+    let digitPosition = config.clockDigitPosition ?? .hour
+    
+    // Update items with current time digits (items[0] = first digit, items[1] = second digit)
+    var updatedItems = config.items
+    switch digitPosition {
+    case .hour:
+        if updatedItems.count >= 2 {
+            let digit1 = hour12 / 10
+            let digit2 = hour12 % 10
+            updatedItems[0] = WidgetItem(
+                id: updatedItems[0].id,
+                displayType: .text,
+                customText: "\(digit1)",
+                fontSize: config.clockFontSize ?? 48,
+                foregroundColor: updatedItems[0].foregroundColor,
+                backgroundColor: updatedItems[0].backgroundColor,
+                backgroundOpacity: updatedItems[0].backgroundOpacity,
+                action: updatedItems[0].action
+            )
+            updatedItems[1] = WidgetItem(
+                id: updatedItems[1].id,
+                displayType: .text,
+                customText: "\(digit2)",
+                fontSize: config.clockFontSize ?? 48,
+                foregroundColor: updatedItems[1].foregroundColor,
+                backgroundColor: updatedItems[1].backgroundColor,
+                backgroundOpacity: updatedItems[1].backgroundOpacity,
+                action: updatedItems[1].action
+            )
+        }
+    case .minute:
+        if updatedItems.count >= 2 {
+            let digit1 = minute / 10
+            let digit2 = minute % 10
+            updatedItems[0] = WidgetItem(
+                id: updatedItems[0].id,
+                displayType: .text,
+                customText: "\(digit1)",
+                fontSize: config.clockFontSize ?? 48,
+                foregroundColor: updatedItems[0].foregroundColor,
+                backgroundColor: updatedItems[0].backgroundColor,
+                backgroundOpacity: updatedItems[0].backgroundOpacity,
+                action: updatedItems[0].action
+            )
+            updatedItems[1] = WidgetItem(
+                id: updatedItems[1].id,
+                displayType: .text,
+                customText: "\(digit2)",
+                fontSize: config.clockFontSize ?? 48,
+                foregroundColor: updatedItems[1].foregroundColor,
+                backgroundColor: updatedItems[1].backgroundColor,
+                backgroundOpacity: updatedItems[1].backgroundOpacity,
+                action: updatedItems[1].action
+            )
+        }
+    }
+
+    // Update config with new items
+    var finalConfig = config
+    finalConfig.items = updatedItems
+
+    // Create entries: one at now, one at next minute boundary
+    let nextMinute = calendar.date(byAdding: .minute, value: 1, to: now) ?? now
+    
+    let entry = WidgetEntry(
+        date: now,
+        configuration: finalConfig,
+        showItemLabels: config.showItemLabels ?? storage.showItemLabels,
+        entityUUID: config.id.uuidString
+    )
+    
+    let nextEntry = WidgetEntry(
+        date: nextMinute,
+        configuration: finalConfig,
+        showItemLabels: config.showItemLabels ?? storage.showItemLabels,
+        entityUUID: config.id.uuidString
+    )
+    
+    return Timeline(entries: [entry, nextEntry], policy: .atEnd)
 }
