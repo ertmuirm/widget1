@@ -40,7 +40,6 @@ struct WidgetEntryView: View {
     private var clockWidget: some View {
         let digit = digitString
         let size = entry.configuration.clockFontSize ?? 48
-        let backgroundOpacity = entry.configuration.backgroundOpacity
         
         Text(digit)
             .font(.system(size: size, weight: .bold, design: clockFontDesign))

@@ -79,7 +79,6 @@ struct WidgetEditorView: View {
                 clockDigitPosition = configuration.clockDigitPosition ?? .hour
                 clockFontSize = configuration.clockFontSize ?? 48
                 clockFontStyle = configuration.clockFontStyle ?? .default
-                clockBackgroundOpacity = configuration.clockBackgroundOpacity ?? 1.0
                 clockActions = configuration.clockActions ?? []
             }
         }
@@ -212,7 +211,6 @@ struct WidgetEditorView: View {
     @State private var clockDigitPosition: ClockDigitPosition = .hour
     @State private var clockFontSize: Double = 48
     @State private var clockFontStyle: ClockFontStyle = .default
-    @State private var clockBackgroundOpacity: Double = 1.0
     @State private var clockActions: [WidgetItem] = []
     @State private var clockActionIndex: Int = 0
 
@@ -231,13 +229,6 @@ struct WidgetEditorView: View {
                 VStack(alignment: .leading) {
                     Text("Size: \(Int(clockFontSize))")
                     Slider(value: $clockFontSize, in: 20...80, step: 2)
-                }
-            }
-            
-            Section("Background") {
-                VStack(alignment: .leading) {
-                    Text("Opacity: \(Int(clockBackgroundOpacity * 100))%")
-                    Slider(value: $clockBackgroundOpacity, in: 0...1, step: 0.1)
                 }
             }
             
@@ -262,6 +253,45 @@ struct WidgetEditorView: View {
                     }
                 }
             }
+            
+            Section("Preview") {
+                clockPreviewWidget
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 80)
+                    .background(configuration.backgroundColor.swiftUIColor.opacity(configuration.backgroundOpacity))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+        }
+    }
+    
+    private var clockPreviewWidget: some View {
+        let digit = previewDigitString
+        let fontDesign: Font.Design
+        switch clockFontStyle {
+        case .default: fontDesign = .default
+        case .monospaced: fontDesign = .monospaced
+        case .rounded: fontDesign = .rounded
+        case .serif: fontDesign = .serif
+        }
+        
+        Text(digit)
+            .font(.system(size: clockFontSize, weight: .bold, design: fontDesign))
+            .minimumScaleFactor(0.5)
+            .foregroundColor(.white)
+    }
+    
+    private var previewDigitString: String {
+        let now = Date()
+        let calendar = Calendar.current
+        let hour12 = calendar.component(.hour, from: now)
+        let minute = calendar.component(.minute, from: now)
+        let displayHour = hour12 == 0 ? 12 : (hour12 > 12 ? hour12 - 12 : hour12)
+        
+        switch clockDigitPosition {
+        case .hour:
+            return String(format: "%02d", displayHour)
+        case .minute:
+            return String(format: "%02d", minute)
         }
     }
     
@@ -581,8 +611,8 @@ struct WidgetEditorView: View {
             configuration.clockDigitPosition = clockDigitPosition
             configuration.clockFontSize = clockFontSize
             configuration.clockFontStyle = clockFontStyle
-            configuration.clockBackgroundOpacity = clockBackgroundOpacity
             configuration.clockActions = clockActions
+            // Note: backgroundColor and backgroundOpacity use configuration's values
         }
         if isNew {
             viewModel.addConfiguration(configuration)
