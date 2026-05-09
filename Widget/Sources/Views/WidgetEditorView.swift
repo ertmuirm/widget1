@@ -233,22 +233,11 @@ struct WidgetEditorView: View {
     private var clockActionsSection: some View {
         Section("Actions") {
             ForEach(configuration.clockActions ?? []) { item in
-                clockActionRow(item: item)
+                Text("Action")
+                    .foregroundStyle(.secondary)
             }
             if (configuration.clockActions ?? []).count < 2 {
                 addClockButton
-            }
-        }
-    }
-    
-    private func clockActionRow(item: WidgetItem) -> some View {
-        NavigationLink(destination: ItemEditorView(item: item)) {
-            HStack {
-                if item.displayType == .icon {
-                    Image(systemName: item.sfSymbolName ?? "questionmark")
-                } else {
-                    Text(item.customText ?? "Text item")
-                }
             }
         }
     }
