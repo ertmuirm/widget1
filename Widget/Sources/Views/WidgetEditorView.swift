@@ -227,7 +227,11 @@ struct WidgetEditorView: View {
                 Text("Rounded").tag(ClockFontStyle.rounded as ClockFontStyle?)
                 Text("Serif").tag(ClockFontStyle.serif as ClockFontStyle?)
             }
-            Text("Font Size: \(configuration.clockFontSize.map { Int($0) } ?? 48)")
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Font Size: \(Int(configuration.clockFontSize ?? 48))")
+                Slider(value: $configuration.clockFontSize, in: 20...80, step: 2)
+                    .tint(.gray)
+            }
         }
         clockActionsSection
     }
