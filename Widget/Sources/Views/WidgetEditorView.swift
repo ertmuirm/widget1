@@ -199,19 +199,22 @@ struct WidgetEditorView: View {
 
     // MARK: - Clock Widget Settings
 
-    @ViewBuilder
     private var clockSettingsSection: some View {
         Section {
             Picker("Digits", selection: $configuration.clockDigitPosition) {
                 Text("Hour (12h)").tag(ClockDigitPosition.hour as ClockDigitPosition?)
                 Text("Minute").tag(ClockDigitPosition.minute as ClockDigitPosition?)
             }
-            HStack {
-                Text("Font Size")
-                Slider(value: $configuration.clockFontSize, in: 20...80, step: 2)
-                Text("\(Int(configuration.clockFontSize ?? 48))")
-                    .monospacedDigit()
-                    .frame(width: 30)
+            VStack(alignment: .leading) {
+                Text("Font Size: \(Int(configuration.clockFontSize ?? 48))")
+                Slider(
+                    value: Binding(
+                        get: { configuration.clockFontSize ?? 48 },
+                        set: { configuration.clockFontSize = $0 }
+                    ),
+                    in: 20...80,
+                    step: 2
+                )
             }
         }
     }
