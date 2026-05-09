@@ -30,25 +30,11 @@ struct WidgetEntryView: View {
     private var clockWidget: some View {
         let digit = digitString
         let size = entry.configuration.clockFontSize ?? 48
-        let style = entry.configuration.clockFontStyle ?? .system
         
         Text(digit)
-            .font(clockFont(style: style, size: size))
+            .font(.system(size: size, weight: .bold, design: .default))
             .minimumScaleFactor(0.5)
             .foregroundColor(.white)
-    }
-
-    private func clockFont(style: ClockFontStyle, size: Double) -> Font {
-        switch style {
-        case .system:
-            return .system(size: size, weight: .bold)
-        case .rounded:
-            return .system(size: size, weight: .bold).rounded()
-        case .serif:
-            return .serif(size: size, weight: .bold)
-        case .monospaced:
-            return .monospacedSystem(size: size, weight: .bold)
-        }
     }
 
     private var digitString: String {

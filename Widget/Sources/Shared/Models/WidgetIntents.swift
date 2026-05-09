@@ -750,7 +750,6 @@ struct ClockBroadcastProvider: AppIntentTimelineProvider {
         config.widgetKind = .clock
         config.clockDigitPosition = .hour
         config.clockFontSize = 48
-        config.clockFontStyle = .system
         return WidgetEntry(date: Date(), configuration: config)
     }
     func snapshot(for configuration: SelectClockWidgetIntent, in context: Context) async -> WidgetEntry {
@@ -769,7 +768,6 @@ struct ClockBroadcastProvider: AppIntentTimelineProvider {
         // Use intent's digit position, default to hour
         config.clockDigitPosition = selectConfig.digitPosition == .minute ? .minute : .hour
         config.clockFontSize = 48
-        config.clockFontStyle = .system
         return WidgetEntry(date: Date(), configuration: config)
     }
 }

@@ -206,12 +206,6 @@ struct WidgetEditorView: View {
                     Text("Hour (12h)").tag(ClockDigitPosition.hour as ClockDigitPosition?)
                     Text("Minute").tag(ClockDigitPosition.minute as ClockDigitPosition?)
                 }
-                Picker("Font", selection: $configuration.clockFontStyle) {
-                    Text("System").tag(ClockFontStyle.system as ClockFontStyle?)
-                    Text("Rounded").tag(ClockFontStyle.rounded as ClockFontStyle?)
-                    Text("Serif").tag(ClockFontStyle.serif as ClockFontStyle?)
-                    Text("Monospaced").tag(ClockFontStyle.monospaced as ClockFontStyle?)
-                }
                 VStack(alignment: .leading) {
                     Text("Size: \(Int(configuration.clockFontSize ?? 48))")
                     Slider(
