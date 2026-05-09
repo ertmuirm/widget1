@@ -224,6 +224,11 @@ private func filteredConfigs(size: WidgetSize) -> [WidgetConfig] {
         .filter { $0.size == size && $0.widgetKind != .imageSlideshow && $0.widgetKind != .lockScreen }
 }
 
+private func filteredConfigs(kind: WidgetKind) -> [WidgetConfig] {
+    ((try? SharedStorage.shared.loadConfigurations()) ?? [])
+        .filter { $0.widgetKind == kind }
+}
+
 private func allConfigs() -> [WidgetConfig] {
     (try? SharedStorage.shared.loadConfigurations()) ?? []
 }
@@ -727,12 +732,47 @@ struct ImageBroadcastProvider: AppIntentTimelineProvider {
 
 // MARK: - Clock Widget Intent
 
+struct ClockWidgetEntity: AppEntity, Hashable {
+    static var typeDisplayRepresentation: TypeDisplayRepresentation {
+        TypeDisplayRepresentation(name: "Clock Widget")
+    }
+    static var defaultQuery = ClockWidgetQuery()
+    var id: String
+    var name: String
+    var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(name)") }
+    init(id: String, name: String) { self.id = id; self.name = name }
+}
+
+struct ClockWidgetQuery: EntityQuery {
+    func entities(for identifiers: [String]) async throws -> [ClockWidgetEntity] {
+        let configs = filteredConfigs(kind: .clock)
+        return identifiers.map { storedID in
+            let uuid = uuidFromEntityID(storedID)
+            if let c = configs.first(where: { $0.id.uuidString == uuid }) {
+                return ClockWidgetEntity(id: encodeEntityID(c), name: c.name)
+            }
+            if let c = decodeConfigFromID(storedID) {
+                return ClockWidgetEntity(id: storedID, name: c.name)
+            }
+            return ClockWidgetEntity(id: storedID, name: "Clock")
+        }
+    }
+    func suggestedEntities() async throws -> [ClockWidgetEntity] {
+        let list = filteredConfigs(kind: .clock)
+        if list.isEmpty { return [ClockWidgetEntity(id: "none", name: "No Clock Widgets")] }
+        return list.map { ClockWidgetEntity(id: encodeEntityID($0), name: $0.name) }
+    }
+    func defaultResult() async -> ClockWidgetEntity? {
+        filteredConfigs(kind: .clock).first.map { ClockWidgetEntity(id: encodeEntityID($0), name: $0.name) }
+    }
+}
+
 struct SelectClockWidgetIntent: WidgetConfigurationIntent {
-    static var title: LocalizedStringResource = "Clock Widget"
-    static var description = IntentDescription("Choose clock digits")
-    @Parameter(title: "Digits") var digitPosition: ClockDigitPositionEntity?
+    static var title: LocalizedStringResource = "Select Clock Widget"
+    static var description = IntentDescription("Choose a clock widget configuration")
+    @Parameter(title: "Widget") var selectedWidget: ClockWidgetEntity?
     init() {}
-    init(digitPosition: ClockDigitPositionEntity?) { self.digitPosition = digitPosition }
+    init(selectedWidget: ClockWidgetEntity?) { self.selectedWidget = selectedWidget }
 }
 
 enum ClockDigitPositionEntity: String, AppEnum {
@@ -753,22 +793,13 @@ struct ClockBroadcastProvider: AppIntentTimelineProvider {
         return WidgetEntry(date: Date(), configuration: config)
     }
     func snapshot(for configuration: SelectClockWidgetIntent, in context: Context) async -> WidgetEntry {
-        makeClockEntry(config: configuration)
+        makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectClockWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        let entry = makeClockEntry(config: configuration)
+        let entry = makeEntry(configID: configuration.selectedWidget?.id)
         // Update every minute
         let next = Calendar.current.date(byAdding: .minute, value: 1, to: Date()) ?? Date()
         return Timeline(entries: [entry], policy: .after(next))
-    }
-    
-    private func makeClockEntry(config selectConfig: SelectClockWidgetIntent) -> WidgetEntry {
-        var config = WidgetConfig.defaultConfiguration
-        config.widgetKind = .clock
-        // Use intent's digit position, default to hour
-        config.clockDigitPosition = selectConfig.digitPosition == .minute ? .minute : .hour
-        config.clockFontSize = 48
-        return WidgetEntry(date: Date(), configuration: config)
     }
 }
 

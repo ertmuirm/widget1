@@ -126,10 +126,7 @@ struct BroadcastClockWidget: Widget {
             provider: ClockBroadcastProvider()
         ) { entry in
             WidgetEntryView(entry: entry)
-                .containerBackground(for: .widget) {
-                    entry.configuration.backgroundColor.swiftUIColor
-                        .opacity(entry.configuration.backgroundOpacity)
-                }
+                .containerBackground(.clear, for: .widget)
         }
         .configurationDisplayName("Clock Widget")
         .description("Display hour or minute digits")
