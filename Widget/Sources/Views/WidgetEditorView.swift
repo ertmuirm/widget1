@@ -74,6 +74,12 @@ struct WidgetEditorView: View {
                 }
             }
         }
+        .onAppear {
+            if configuration.widgetKind == .clock {
+                clockDigitPosition = configuration.clockDigitPosition ?? .hour
+                clockFontSize = configuration.clockFontSize ?? 48
+            }
+        }
         .listStyle(.insetGrouped)
         .navigationTitle(isNew ? "New Widget" : "Edit Widget")
         .navigationBarTitleDisplayMode(.inline)
@@ -199,6 +205,10 @@ struct WidgetEditorView: View {
 
     // MARK: - Clock Widget Settings
 
+    // Internal state for clock widget settings (for proper binding)
+    @State private var clockDigitPosition: ClockDigitPosition = .hour
+    @State private var clockFontSize: Double = 48
+
     private var clockSettingsSection: some View {
         List {
             clockDisplaySection
@@ -208,25 +218,14 @@ struct WidgetEditorView: View {
     
     private var clockDisplaySection: some View {
         Section("Display") {
-            Picker("Digits", selection: $configuration.clockDigitPosition) {
-                Text("Hour (12h)").tag(ClockDigitPosition.hour as ClockDigitPosition?)
-                Text("Minute").tag(ClockDigitPosition.minute as ClockDigitPosition?)
+            Picker("Digits", selection: $clockDigitPosition) {
+                Text("Hour (12h)").tag(ClockDigitPosition.hour)
+                Text("Minute").tag(ClockDigitPosition.minute)
             }
-            clockSizeSlider
-        }
-    }
-    
-    private var clockSizeSlider: some View {
-        VStack(alignment: .leading) {
-            Text("Size: \(Int(configuration.clockFontSize ?? 48))")
-            Slider(
-                value: Binding(
-                    get: { configuration.clockFontSize ?? 48 },
-                    set: { configuration.clockFontSize = $0 }
-                ),
-                in: 20...80,
-                step: 2
-            )
+            VStack(alignment: .leading) {
+                Text("Size: \(Int(clockFontSize))")
+                Slider(value: $clockFontSize, in: 20...80, step: 2)
+            }
         }
     }
     
@@ -538,6 +537,11 @@ struct WidgetEditorView: View {
     }
 
     private func saveConfiguration() {
+        // Copy clock settings to configuration
+        if isClockWidget {
+            configuration.clockDigitPosition = clockDigitPosition
+            configuration.clockFontSize = clockFontSize
+        }
         if isNew {
             viewModel.addConfiguration(configuration)
         } else {
