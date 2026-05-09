@@ -201,51 +201,61 @@ struct WidgetEditorView: View {
 
     private var clockSettingsSection: some View {
         List {
-            Section("Display") {
-                Picker("Digits", selection: $configuration.clockDigitPosition) {
-                    Text("Hour (12h)").tag(ClockDigitPosition.hour as ClockDigitPosition?)
-                    Text("Minute").tag(ClockDigitPosition.minute as ClockDigitPosition?)
-                }
-                VStack(alignment: .leading) {
-                    Text("Size: \(Int(configuration.clockFontSize ?? 48))")
-                    Slider(
-                        value: Binding(
-                            get: { configuration.clockFontSize ?? 48 },
-                            set: { configuration.clockFontSize = $0 }
-                        ),
-                        in: 20...80,
-                        step: 2
-                    )
+            clockDisplaySection
+            clockActionsSection
+        }
+    }
+    
+    private var clockDisplaySection: some View {
+        Section("Display") {
+            Picker("Digits", selection: $configuration.clockDigitPosition) {
+                Text("Hour (12h)").tag(ClockDigitPosition.hour as ClockDigitPosition?)
+                Text("Minute").tag(ClockDigitPosition.minute as ClockDigitPosition?)
+            }
+            clockSizeSlider
+        }
+    }
+    
+    private var clockSizeSlider: some View {
+        VStack(alignment: .leading) {
+            Text("Size: \(Int(configuration.clockFontSize ?? 48))")
+            Slider(
+                value: Binding(
+                    get: { configuration.clockFontSize ?? 48 },
+                    set: { configuration.clockFontSize = $0 }
+                ),
+                in: 20...80,
+                step: 2
+            )
+        }
+    }
+    
+    private var clockActionsSection: some View {
+        Section("Actions") {
+            ForEach(configuration.clockActions ?? []) { item in
+                clockActionRow(item: item)
+            }
+            if (configuration.clockActions ?? []).count < 2 {
+                addClockButton
+            }
+        }
+    }
+    
+    private func clockActionRow(item: WidgetItem) -> some View {
+        NavigationLink(destination: ItemEditorView(item: item)) {
+            HStack {
+                if item.displayType == .icon {
+                    Image(systemName: item.sfSymbolName ?? "questionmark")
+                } else {
+                    Text(item.customText ?? "Text item")
                 }
             }
-            
-            Section("Actions") {
-                if (configuration.clockActions ?? []).count < 2 {
-                    Button { addClockAction() } label: {
-                        Label("Add Action", systemImage: "plus")
-                    }
-                    .foregroundStyle(.gray)
-                }
-                ForEach(Array((configuration.clockActions ?? []).enumerated()), id: \.offset) { index, item in
-                    NavigationLink(destination: ItemEditorView(item: item)) {
-                        HStack {
-                            if item.displayType == .icon {
-                                Image(systemName: item.sfSymbolName ?? "questionmark")
-                            } else {
-                                Text(item.customText ?? "Text item")
-                            }
-                            Text(item.displayType.rawValue)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                .onDelete { indices in
-                    configuration.clockActions?.remove(atOffsets: IndexSet(indices))
-                }
-                .onMove { indices, offset in
-                    configuration.clockActions?.move(fromOffsets: indices, toOffset: offset)
-                }
-            }
+        }
+    }
+    
+    private var addClockButton: some View {
+        Button { addClockAction() } label: {
+            Label("Add Action", systemImage: "plus")
         }
     }
     
