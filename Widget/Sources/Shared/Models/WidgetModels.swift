@@ -113,23 +113,6 @@ enum ClockDigitPosition: String, Codable, CaseIterable {
     }
 }
 
-/// Font style for clock widget digits
-enum ClockFontStyle: String, Codable, CaseIterable {
-    case `default`
-    case monospaced
-    case rounded
-    case serif
-    
-    var displayName: String {
-        switch self {
-        case .default:   return "Default"
-        case .monospaced: return "Monospaced"
-        case .rounded:   return "Rounded"
-        case .serif:     return "Serif"
-        }
-    }
-}
-
 // MARK: - Image Slide
 
 /// One image (or QR code) in an Image Slideshow widget
@@ -199,16 +182,8 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
     var currentSlideIndex: Int?
     /// Clock digit position for .clock widgets
     var clockDigitPosition: ClockDigitPosition?
-    /// Clock font size for .clock widgets (default 48)
+    /// Clock font size for .clock widgets
     var clockFontSize: Double?
-    /// Clock font style for .clock widgets (default .default)
-    var clockFontStyle: ClockFontStyle?
-    /// Clock background color for .clock widgets (default .black)
-    var clockBackgroundColor: CodableColor?
-    /// Clock background opacity (default 1.0)
-    var clockBackgroundOpacity: Double?
-    /// Actions for clock widget (up to 2)
-    var clockActions: [WidgetItem]?
 
     init(
         id: UUID = UUID(),
@@ -224,11 +199,7 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         slides: [ImageSlide]? = nil,
         currentSlideIndex: Int? = nil,
         clockDigitPosition: ClockDigitPosition? = nil,
-        clockFontSize: Double? = nil,
-        clockFontStyle: ClockFontStyle? = nil,
-        clockBackgroundColor: CodableColor? = nil,
-        clockBackgroundOpacity: Double? = nil,
-        clockActions: [WidgetItem]? = nil
+        clockFontSize: Double? = nil
     ) {
         self.id = id
         self.name = name
@@ -244,10 +215,6 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         self.currentSlideIndex = currentSlideIndex
         self.clockDigitPosition = clockDigitPosition
         self.clockFontSize = clockFontSize
-        self.clockFontStyle = clockFontStyle
-        self.clockBackgroundColor = clockBackgroundColor
-        self.clockBackgroundOpacity = clockBackgroundOpacity
-        self.clockActions = clockActions
     }
     
     /// Default configuration for placeholder

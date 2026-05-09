@@ -38,7 +38,7 @@ struct WidgetEditorView: View {
                     .foregroundStyle(.white)
             }
 
-            if !isImageWidget && !isLockScreenWidget && !isClockWidget {
+            if !isImageWidget && !isLockScreenWidget {
                 Section("Widget Size") {
                     Picker("Size", selection: $configuration.size) {
                         ForEach(WidgetSize.homeScreenCases, id: \.self) { size in
@@ -72,14 +72,6 @@ struct WidgetEditorView: View {
                             .listRowInsets(EdgeInsets())
                     }
                 }
-            }
-        }
-        .onAppear {
-            if configuration.widgetKind == .clock {
-                clockDigitPosition = configuration.clockDigitPosition ?? .hour
-                clockFontSize = configuration.clockFontSize ?? 48
-                clockFontStyle = configuration.clockFontStyle ?? .default
-                clockActions = configuration.clockActions ?? []
             }
         }
         .listStyle(.insetGrouped)
@@ -207,122 +199,21 @@ struct WidgetEditorView: View {
 
     // MARK: - Clock Widget Settings
 
-    // Internal state for clock widget settings (for proper binding)
-    @State private var clockDigitPosition: ClockDigitPosition = .hour
-    @State private var clockFontSize: Double = 48
-    @State private var clockFontStyle: ClockFontStyle = .default
-    @State private var clockActions: [WidgetItem] = []
-    @State private var clockActionIndex: Int = 0
-
+    @ViewBuilder
     private var clockSettingsSection: some View {
-        Group {
-            Section("Display") {
-                Picker("Digits", selection: $clockDigitPosition) {
-                    Text("Hour (12h)").tag(ClockDigitPosition.hour)
-                    Text("Minute").tag(ClockDigitPosition.minute)
-                }
-                Picker("Font", selection: $clockFontStyle) {
-                    ForEach(ClockFontStyle.allCases, id: \.self) { style in
-                        Text(style.displayName).tag(style)
-                    }
-                }
-                VStack(alignment: .leading) {
-                    Text("Size: \(Int(clockFontSize))")
-                    Slider(value: $clockFontSize, in: 20...80, step: 2)
-                }
+        Section {
+            Picker("Digits", selection: $configuration.clockDigitPosition) {
+                Text("Hour (12h)").tag(ClockDigitPosition.hour as ClockDigitPosition?)
+                Text("Minute").tag(ClockDigitPosition.minute as ClockDigitPosition?)
             }
-            
-            Section("Actions") {
-                if clockActions.isEmpty {
-                    Text("No actions")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(clockActions.indices, id: \.self) { index in
-                        HStack {
-                            Text(clockActions[index].sfSymbolName ?? "item")
-                            Spacer()
-                            Button { clockActionTapped(at: index) } label: {
-                                Text("Edit")
-                            }
-                        }
-                    }
-                }
-                if clockActions.count < 2 {
-                    Button { addClockAction() } label: {
-                        Label("Add Action", systemImage: "plus")
-                    }
-                }
-            }
-            
-            Section("Preview") {
-                clockPreviewWidget
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 80)
-                    .background(configuration.backgroundColor.swiftUIColor.opacity(configuration.backgroundOpacity))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            HStack {
+                Text("Font Size")
+                Slider(value: $configuration.clockFontSize, in: 20...80, step: 2)
+                Text("\(Int(configuration.clockFontSize ?? 48))")
+                    .monospacedDigit()
+                    .frame(width: 30)
             }
         }
-    }
-    
-    private var clockPreviewWidget: some View {
-        let digit = previewDigitString
-        let fontDesign: Font.Design
-        switch clockFontStyle {
-        case .default: fontDesign = .default
-        case .monospaced: fontDesign = .monospaced
-        case .rounded: fontDesign = .rounded
-        case .serif: fontDesign = .serif
-        }
-        
-        Text(digit)
-            .font(.system(size: clockFontSize, weight: .bold, design: fontDesign))
-            .minimumScaleFactor(0.5)
-            .foregroundColor(.white)
-    }
-    
-    private var previewDigitString: String {
-        let now = Date()
-        let calendar = Calendar.current
-        let hour12 = calendar.component(.hour, from: now)
-        let minute = calendar.component(.minute, from: now)
-        let displayHour = hour12 == 0 ? 12 : (hour12 > 12 ? hour12 - 12 : hour12)
-        
-        switch clockDigitPosition {
-        case .hour:
-            return String(format: "%02d", displayHour)
-        case .minute:
-            return String(format: "%02d", minute)
-        }
-    }
-    
-    private func addClockAction() {
-        if clockActions.count < 2 {
-            let newItem = WidgetItem(
-                displayType: .icon,
-                sfSymbolName: "globe",
-                action: nil
-            )
-            clockActions.append(newItem)
-            showActionPicker = true
-            clockActionIndex = clockActions.count - 1
-        }
-    }
-    
-    private func clockActionTapped(at index: Int) {
-        clockActionIndex = index
-        showActionPicker = true
-    }
-    
-    private var clockActionItemBinding: Binding<WidgetItem> {
-        Binding(
-            get: {
-                guard clockActionIndex < clockActions.count else {
-                    return WidgetItem()
-                }
-                return clockActions[clockActionIndex]
-            },
-            set: { clockActions[clockActionIndex] = $0 }
-        )
     }
 
     // MARK: - Lock screen single-item section
@@ -606,14 +497,6 @@ struct WidgetEditorView: View {
     }
 
     private func saveConfiguration() {
-        // Copy clock settings to configuration
-        if isClockWidget {
-            configuration.clockDigitPosition = clockDigitPosition
-            configuration.clockFontSize = clockFontSize
-            configuration.clockFontStyle = clockFontStyle
-            configuration.clockActions = clockActions
-            // Note: backgroundColor and backgroundOpacity use configuration's values
-        }
         if isNew {
             viewModel.addConfiguration(configuration)
         } else {
@@ -994,11 +877,7 @@ struct SlideEditorView: View {
             }
         }
         .sheet(isPresented: $showActionPicker) {
-            if isClockWidget {
-                ActionPickerView(item: clockActionItemBinding)
-            } else {
-                ActionPickerView(item: actionItemBinding)
-            }
+            ActionPickerView(item: actionItemBinding)
         }
         .sheet(isPresented: $showAppActionPicker) {
             AppActionPickerView { urlString, displayLabel in
