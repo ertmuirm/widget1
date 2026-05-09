@@ -239,37 +239,60 @@ struct WidgetEditorView: View {
     }
     
     private var clockActionsSection: some View {
-        Section {
-            if configuration.clockActions?.isEmpty ?? true {
+        Group {
+            if (configuration.clockActions?.isEmpty ?? true) || (configuration.clockActions == nil) {
                 Button { addClockAction() } label: {
                     Label("Add Action", systemImage: "plus")
                 }
                 .foregroundStyle(.gray)
             } else {
-                ForEach(configuration.clockActions ?? []) { item in
-                    Button {
-                        if let idx = configuration.clockActions?.firstIndex(where: { $0.id == item.id }) {
-                            editingItemIndex = EditingItemIndex(id: idx, isClockAction: true)
-                        }
-                    } label: {
-                        ItemRowView(item: item) {
-                            configuration.clockActions?.removeAll { $0.id == item.id }
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(configuration.clockActions ?? []) { item in
+                        HStack {
+                            Button {
+                                if let idx = configuration.clockActions?.firstIndex(where: { $0.id == item.id }) {
+                                    editingItemIndex = EditingItemIndex(id: idx, isClockAction: true)
+                                }
+                            } label: {
+                                Text(clockActionDisplayName(item))
+                            }
+                            .buttonStyle(.plain)
+                            
+                            Button {
+                                deleteClockAction(at: configuration.clockActions?.firstIndex(where: { $0.id == item.id }) ?? 0)
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                            .foregroundStyle(.red)
                         }
                     }
-                }
-                .onDelete { indexSet in
-                    configuration.clockActions?.remove(atOffsets: indexSet)
-                }
-                
-                if (configuration.clockActions?.count ?? 0) < 2 {
-                    Button { addClockAction() } label: {
-                        Label("Add Action", systemImage: "plus")
+                    
+                    if (configuration.clockActions?.count ?? 0) < 2 {
+                        Button { addClockAction() } label: {
+                            Label("Add Action", systemImage: "plus")
+                        }
+                        .foregroundStyle(.gray)
                     }
-                    .foregroundStyle(.gray)
                 }
             }
         } header: {
             Text("Actions (\(configuration.clockActions?.count ?? 0)/2)")
+        }
+    }
+    
+    private func clockActionDisplayName(_ item: WidgetItem) -> String {
+        switch item.displayType {
+        case .icon: return item.sfSymbolName ?? "Icon"
+        case .text: return item.customText ?? "Text"
+        case .image: return item.customImageFilename ?? "Image"
+        case .qrCode: return item.qrCodeContent ?? "QR"
+        }
+    }
+    
+    private func deleteClockAction(at index: Int) {
+        if var actions = configuration.clockActions, index < actions.count {
+            actions.remove(at: index)
+            configuration.clockActions = actions
         }
     }
     
