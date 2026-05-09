@@ -38,7 +38,7 @@ struct WidgetEditorView: View {
                     .foregroundStyle(.white)
             }
 
-            if !isImageWidget && !isLockScreenWidget {
+            if !isImageWidget && !isLockScreenWidget && !isClockWidget {
                 Section("Widget Size") {
                     Picker("Size", selection: $configuration.size) {
                         ForEach(WidgetSize.homeScreenCases, id: \.self) { size in
