@@ -227,12 +227,7 @@ struct WidgetEditorView: View {
                 Text("Rounded").tag(ClockFontStyle.rounded as ClockFontStyle?)
                 Text("Serif").tag(ClockFontStyle.serif as ClockFontStyle?)
             }
-            HStack {
-                Text("Font Size")
-                Slider(value: $configuration.clockFontSize, in: 20...80, step: 2)
-                Text("\(configuration.clockFontSize.map { Int($0) } ?? 48)")
-                    .frame(width: 30)
-            }
+            Text("Font Size: \(configuration.clockFontSize.map { Int($0) } ?? 48)")
         }
         clockActionsSection
     }
