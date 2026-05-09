@@ -56,6 +56,7 @@ struct WidgetEditorView: View {
                 lockScreenItemSection
             } else if isClockWidget {
                 clockSettingsSection
+                clockActionsSection
             } else {
                 gridItemsSection
                 backgroundSection
@@ -233,7 +234,6 @@ struct WidgetEditorView: View {
                     .tint(.gray)
             }
         }
-        clockActionsSection
     }
     
     @ViewBuilder
