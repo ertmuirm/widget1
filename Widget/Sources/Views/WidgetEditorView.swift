@@ -230,8 +230,7 @@ struct WidgetEditorView: View {
             HStack {
                 Text("Font Size")
                 Slider(value: $configuration.clockFontSize, in: 20...80, step: 2)
-                Text("\(Int(configuration.clockFontSize ?? 48))")
-                    .monospacedDigit()
+                Text("\(configuration.clockFontSize.map { Int($0) } ?? 48)")
                     .frame(width: 30)
             }
         }
