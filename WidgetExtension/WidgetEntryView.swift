@@ -25,28 +25,28 @@ struct WidgetEntryView: View {
     }
 
     // MARK: - Clock Widget
-
+    
+    private var clockFontDesign: Font.Design {
+        let style = entry.configuration.clockFontStyle ?? .default
+        switch style {
+        case .default: return .default
+        case .monospaced: return .monospaced
+        case .rounded: return .rounded
+        case .serif: return .serif
+        }
+    }
+    
     @ViewBuilder
     private var clockWidget: some View {
         let digit = digitString
         let size = entry.configuration.clockFontSize ?? 48
-        let fontStyle = entry.configuration.clockFontStyle ?? .default
         let backgroundOpacity = entry.configuration.clockBackgroundOpacity ?? 1.0
-        
-        let fontDesign: Font.Design
-        switch fontStyle {
-        case .default: fontDesign = .default
-        case .monospaced: fontDesign = .monospaced
-        case .rounded: fontDesign = .rounded
-        case .serif: fontDesign = .serif
-        }
-        
         let backgroundColor = Color.black.opacity(backgroundOpacity)
         
         ZStack {
             backgroundColor
             Text(digit)
-                .font(.system(size: size, weight: .bold, design: fontDesign))
+                .font(.system(size: size, weight: .bold, design: clockFontDesign))
                 .minimumScaleFactor(0.5)
                 .foregroundColor(.white)
         }
