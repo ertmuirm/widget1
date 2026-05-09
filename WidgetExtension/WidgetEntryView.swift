@@ -43,28 +43,27 @@ struct WidgetEntryView: View {
         
         ZStack(alignment: .leading) {
             // Clock digit with optional action
-            if let firstAction = entry.configuration.clockActions?.first {
+            if let firstAction = entry.configuration.clockActions?.first, firstAction.action != nil {
                 Link(destination: actionURL(firstAction) ?? URL(string: "widget1://")!) {
                     Text(digit)
                         .font(.system(size: size, weight: .bold, design: clockFontDesign))
                         .minimumScaleFactor(0.5)
-                        .foregroundColor(.white)
+                        .foregroundStyle(.white)
                 }
                 .buttonStyle(.plain)
             } else {
                 Text(digit)
                     .font(.system(size: size, weight: .bold, design: clockFontDesign))
                     .minimumScaleFactor(0.5)
-                    .foregroundColor(.white)
+                    .foregroundStyle(.white)
             }
             
             // Second action on trailing edge
-            if entry.configuration.clockActions?.count ?? 0 > 1,
-               let secondAction = entry.configuration.clockActions?[1] {
+            if let actions = entry.configuration.clockActions, actions.count > 1,
+               let secondAction = actions.last, secondAction.action != nil {
                 Spacer()
                 Link(destination: actionURL(secondAction) ?? URL(string: "widget1://")!) {
-                    itemView(secondAction, size: min(size * 0.4, 24))
-                        .foregroundColor(.white)
+                    clockActionIcon(secondAction, size: min(size * 0.4, 24))
                 }
                 .buttonStyle(.plain)
             }
@@ -74,11 +73,31 @@ struct WidgetEntryView: View {
     
     private func actionURL(_ item: WidgetItem) -> URL? {
         guard let action = item.action else { return nil }
-        switch action {
-        case .URL(let url, _): return url
-        case .deepLink(let path): return URL(string: path)
-        case .appIntent(let intent): return URL(string: "widget1://intent/\(intent)")
+        switch action.type {
+        case .urlScheme:
+            if let url = URL(string: action.payload) { return url }
+            return URL(string: "widget1://\(action.payload)")
+        case .shortcut:
+            return URL(string: "widget1://shortcut/\(action.payload)")
+        case .appIntent:
+            return URL(string: "widget1://intent/\(action.payload)")
         }
+    }
+    
+    private func clockActionIcon(_ item: WidgetItem, size: CGFloat) -> some View {
+        Group {
+            if item.displayType == .icon {
+                Image(systemName: item.sfSymbolName ?? "star.fill")
+                    .font(.system(size: size))
+            } else if item.displayType == .text {
+                Text(item.customText ?? "")
+                    .font(.system(size: size * 0.6, weight: .medium))
+            } else {
+                Image(systemName: "star.fill")
+                    .font(.system(size: size))
+            }
+        }
+        .foregroundStyle(.white)
     }
 
     private var digitString: String {
