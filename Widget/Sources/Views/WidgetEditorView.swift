@@ -246,7 +246,7 @@ struct WidgetEditorView: View {
                 }
                 .foregroundStyle(.gray)
             } else {
-                ForEach($configuration.clockActions ?? []) { $item in
+                ForEach(configuration.clockActions ?? []) { item in
                     Button {
                         if let idx = configuration.clockActions?.firstIndex(where: { $0.id == item.id }) {
                             editingItemIndex = EditingItemIndex(id: idx, isClockAction: true)
