@@ -210,13 +210,6 @@ struct WidgetEditorView: View {
     @State private var clockFontSize: Double = 48
 
     private var clockSettingsSection: some View {
-        List {
-            clockDisplaySection
-            clockActionsSection
-        }
-    }
-    
-    private var clockDisplaySection: some View {
         Section("Display") {
             Picker("Digits", selection: $clockDigitPosition) {
                 Text("Hour (12h)").tag(ClockDigitPosition.hour)
@@ -226,33 +219,6 @@ struct WidgetEditorView: View {
                 Text("Size: \(Int(clockFontSize))")
                 Slider(value: $clockFontSize, in: 20...80, step: 2)
             }
-        }
-    }
-    
-    private var clockActionsSection: some View {
-        Section("Actions") {
-            ForEach(configuration.clockActions ?? []) { item in
-                Text("Action")
-                    .foregroundStyle(.secondary)
-            }
-            if (configuration.clockActions ?? []).count < 2 {
-                addClockButton
-            }
-        }
-    }
-    
-    private var addClockButton: some View {
-        Button { addClockAction() } label: {
-            Label("Add Action", systemImage: "plus")
-        }
-    }
-    
-    private func addClockAction() {
-        if configuration.clockActions == nil {
-            configuration.clockActions = []
-        }
-        if (configuration.clockActions ?? []).count < 2 {
-            configuration.clockActions?.append(WidgetItem())
         }
     }
 
