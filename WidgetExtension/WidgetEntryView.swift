@@ -29,18 +29,37 @@ struct WidgetEntryView: View {
     @ViewBuilder
     private var clockWidget: some View {
         let digit = digitString
+        let size = entry.configuration.clockFontSize ?? 48
+        let style = entry.configuration.clockFontStyle ?? .system
+        
         Text(digit)
-            .font(.system(size: entry.configuration.clockFontSize ?? 48, weight: .bold))
+            .font(clockFont(style: style, size: size))
             .minimumScaleFactor(0.5)
+            .foregroundColor(.white)
+    }
+
+    private func clockFont(style: ClockFontStyle, size: Double) -> Font {
+        switch style {
+        case .system:
+            return .system(size: size, weight: .bold)
+        case .rounded:
+            return .system(size: size, weight: .bold).rounded()
+        case .serif:
+            return .serif(size: size, weight: .bold)
+        case .monospaced:
+            return .monospacedSystem(size: size, weight: .bold)
+        }
     }
 
     private var digitString: String {
         let position = entry.configuration.clockDigitPosition ?? .hour
         let calendar = Calendar.current
         let now = Date()
-        let hour = calendar.component(.hour, from: now)
+        
+        // Use hour12 for 12-hour format
+        let hour12 = calendar.component(.hour, from: now)
         let minute = calendar.component(.minute, from: now)
-        let displayHour = hour == 0 ? 12 : hour
+        let displayHour = hour12 == 0 ? 12 : (hour12 > 12 ? hour12 - 12 : hour12)
         
         switch position {
         case .hour:

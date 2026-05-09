@@ -126,11 +126,12 @@ struct BroadcastClockWidget: Widget {
             provider: ClockBroadcastProvider()
         ) { entry in
             WidgetEntryView(entry: entry)
-                .containerBackground(for: .widget) { Color.clear }
+                .containerBackground(.clear, for: .widget)
         }
         .configurationDisplayName("Clock Widget")
         .description("Display hour or minute digits")
-        .supportedFamilies([.systemMedium])
+        .supportedFamilies([.systemSmall])
+        .containerBackgroundRemovable(true)
     }
 }
 

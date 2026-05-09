@@ -140,10 +140,11 @@ struct WidgetListView: View {
         .sheet(isPresented: $showAddClockSheet) {
             let newConfig = WidgetConfig(
                 name: "Clock Widget",
-                size: .systemMedium,
+                size: .systemSmall,
                 widgetKind: .clock,
                 clockDigitPosition: .hour,
-                clockFontSize: 48
+                clockFontSize: 48,
+                clockFontStyle: .system
             )
             NavigationStack {
                 WidgetEditorView(configuration: newConfig, isNew: true)

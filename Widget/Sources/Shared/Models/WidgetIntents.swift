@@ -746,15 +746,31 @@ enum ClockDigitPositionEntity: String, AppEnum {
 
 struct ClockBroadcastProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> WidgetEntry {
-        WidgetEntry(date: Date(), configuration: .defaultConfiguration)
+        var config = WidgetConfig.defaultConfiguration
+        config.widgetKind = .clock
+        config.clockDigitPosition = .hour
+        config.clockFontSize = 48
+        config.clockFontStyle = .system
+        return WidgetEntry(date: Date(), configuration: config)
     }
     func snapshot(for configuration: SelectClockWidgetIntent, in context: Context) async -> WidgetEntry {
-        let position: ClockDigitPosition? = configuration.digitPosition == .minute ? .minute : .hour
-        return makeClockEntry(position: position)
+        makeClockEntry(config: configuration)
     }
     func timeline(for configuration: SelectClockWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        let position: ClockDigitPosition? = configuration.digitPosition == .minute ? .minute : .hour
-        return makeClockTimeline(position: position)
+        let entry = makeClockEntry(config: configuration)
+        // Update every minute
+        let next = Calendar.current.date(byAdding: .minute, value: 1, to: Date()) ?? Date()
+        return Timeline(entries: [entry], policy: .after(next))
+    }
+    
+    private func makeClockEntry(config selectConfig: SelectClockWidgetIntent) -> WidgetEntry {
+        var config = WidgetConfig.defaultConfiguration
+        config.widgetKind = .clock
+        // Use intent's digit position, default to hour
+        config.clockDigitPosition = selectConfig.digitPosition == .minute ? .minute : .hour
+        config.clockFontSize = 48
+        config.clockFontStyle = .system
+        return WidgetEntry(date: Date(), configuration: config)
     }
 }
 
