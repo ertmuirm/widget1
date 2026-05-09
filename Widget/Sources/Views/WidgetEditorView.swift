@@ -239,44 +239,43 @@ struct WidgetEditorView: View {
     }
     
     private var clockActionsSection: some View {
-        Group {
-            if (configuration.clockActions?.isEmpty ?? true) || (configuration.clockActions == nil) {
-                Button { addClockAction() } label: {
-                    Label("Add Action", systemImage: "plus")
+        if (configuration.clockActions?.isEmpty ?? true) || (configuration.clockActions == nil) {
+            Button { addClockAction() } label: {
+                Label("Add Action", systemImage: "plus")
+            }
+            .foregroundStyle(.gray)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Actions (\(configuration.clockActions?.count ?? 0)/2)")
+                    .font(.headline)
+                
+                ForEach(configuration.clockActions ?? []) { item in
+                    HStack {
+                        Button {
+                            if let idx = configuration.clockActions?.firstIndex(where: { $0.id == item.id }) {
+                                editingItemIndex = EditingItemIndex(id: idx, isClockAction: true)
+                            }
+                        } label: {
+                            Text(clockActionDisplayName(item))
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Button {
+                            deleteClockAction(at: configuration.clockActions?.firstIndex(where: { $0.id == item.id }) ?? 0)
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .foregroundStyle(.red)
+                    }
                 }
-                .foregroundStyle(.gray)
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(configuration.clockActions ?? []) { item in
-                        HStack {
-                            Button {
-                                if let idx = configuration.clockActions?.firstIndex(where: { $0.id == item.id }) {
-                                    editingItemIndex = EditingItemIndex(id: idx, isClockAction: true)
-                                }
-                            } label: {
-                                Text(clockActionDisplayName(item))
-                            }
-                            .buttonStyle(.plain)
-                            
-                            Button {
-                                deleteClockAction(at: configuration.clockActions?.firstIndex(where: { $0.id == item.id }) ?? 0)
-                            } label: {
-                                Image(systemName: "trash")
-                            }
-                            .foregroundStyle(.red)
-                        }
+                
+                if (configuration.clockActions?.count ?? 0) < 2 {
+                    Button { addClockAction() } label: {
+                        Label("Add Action", systemImage: "plus")
                     }
-                    
-                    if (configuration.clockActions?.count ?? 0) < 2 {
-                        Button { addClockAction() } label: {
-                            Label("Add Action", systemImage: "plus")
-                        }
-                        .foregroundStyle(.gray)
-                    }
+                    .foregroundStyle(.gray)
                 }
             }
-        } header: {
-            Text("Actions (\(configuration.clockActions?.count ?? 0)/2)")
         }
     }
     
