@@ -230,6 +230,10 @@ struct WidgetEditorView: View {
             }
             Text("Font Size: \(Int(configuration.clockFontSize ?? 48))")
         }
+        Section {
+            Slider(value: $configuration.clockFontSize, in: 20...80, step: 2)
+                .tint(.gray)
+        }
     }
     
     @ViewBuilder
