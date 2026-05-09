@@ -268,7 +268,7 @@ struct WidgetEditorView: View {
             }
             
             // Digit 2 action
-            if configuration.items.count > 1, let digit2 = configuration.items[safe: 1] {
+            if configuration.items.count > 1, let digit2 = configuration.items[1] {
                 NavigationLink(destination: ItemEditorView(item: $configuration.items[1], widgetKind: configuration.widgetKind)) {
                     Label("Digit 2 Action", systemImage: "2.circle")
                 }

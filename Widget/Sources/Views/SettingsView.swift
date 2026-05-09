@@ -76,7 +76,7 @@ struct SettingsView: View {
             }
             
             // Clock Widget
-            Section("Clock Widget") {
+            Section {
                 Picker("Clock Font", selection: $clockFontName) {
                     ForEach(ClockFont.predefinedFonts, id: \.self) { font in
                         Text(font).tag(font)
@@ -91,6 +91,8 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+            } header: {
+                Text("Clock Widget")
             } footer: {
                 Text("Settings for Clock widget digits. Use 24-96pt font size for best display.")
                     .font(.caption)
