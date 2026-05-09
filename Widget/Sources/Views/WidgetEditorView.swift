@@ -88,7 +88,22 @@ struct WidgetEditorView: View {
         // Grid item editor sheet
         .sheet(item: $editingItemIndex) { sel in
             NavigationStack {
-                ItemEditorView(item: $configuration.items[sel.id], widgetKind: configuration.widgetKind)
+                if sel.isClockAction {
+                    if let actions = configuration.clockActions, sel.id < actions.count {
+                        var editedItem = actions[sel.id]
+                        ItemEditorView(item: Binding(
+                            get: { editedItem },
+                            set: { newItem in
+                                if var actions = configuration.clockActions {
+                                    actions[sel.id] = newItem
+                                    configuration.clockActions = actions
+                                }
+                            }
+                        ), widgetKind: configuration.widgetKind)
+                    }
+                } else {
+                    ItemEditorView(item: $configuration.items[sel.id], widgetKind: configuration.widgetKind)
+                }
             }
         }
         // Slide editor sheet
@@ -220,6 +235,50 @@ struct WidgetEditorView: View {
                     .frame(width: 30)
             }
         }
+        clockActionsSection
+    }
+    
+    private var clockActionsSection: some View {
+        Section {
+            if configuration.clockActions?.isEmpty ?? true {
+                Button { addClockAction() } label: {
+                    Label("Add Action", systemImage: "plus")
+                }
+                .foregroundStyle(.gray)
+            } else {
+                ForEach($configuration.clockActions ?? []) { $item in
+                    Button {
+                        if let idx = configuration.clockActions?.firstIndex(where: { $0.id == item.id }) {
+                            editingItemIndex = EditingItemIndex(id: idx, isClockAction: true)
+                        }
+                    } label: {
+                        ItemRowView(item: item) {
+                            configuration.clockActions?.removeAll { $0.id == item.id }
+                        }
+                    }
+                }
+                .onDelete { indexSet in
+                    configuration.clockActions?.remove(atOffsets: indexSet)
+                }
+                
+                if (configuration.clockActions?.count ?? 0) < 2 {
+                    Button { addClockAction() } label: {
+                        Label("Add Action", systemImage: "plus")
+                    }
+                    .foregroundStyle(.gray)
+                }
+            }
+        } header: {
+            Text("Actions (\(configuration.clockActions?.count ?? 0)/2)")
+        }
+    }
+    
+    private func addClockAction() {
+        let newItem = WidgetItem(displayType: .icon, sfSymbolName: "star.fill", customText: "Action")
+        if configuration.clockActions == nil {
+            configuration.clockActions = []
+        }
+        configuration.clockActions?.append(newItem)
     }
 
     // MARK: - Lock screen single-item section
@@ -513,7 +572,7 @@ struct WidgetEditorView: View {
 
 // MARK: - Helpers
 
-struct EditingItemIndex: Identifiable { let id: Int }
+struct EditingItemIndex: Identifiable { let id: Int; var isClockAction: Bool = false }
 
 // MARK: - Slide Row View
 

@@ -41,10 +41,44 @@ struct WidgetEntryView: View {
         let digit = digitString
         let size = entry.configuration.clockFontSize ?? 48
         
-        Text(digit)
-            .font(.system(size: size, weight: .bold, design: clockFontDesign))
-            .minimumScaleFactor(0.5)
-            .foregroundColor(.white)
+        ZStack(alignment: .leading) {
+            // Clock digit with optional action
+            if let firstAction = entry.configuration.clockActions?.first {
+                Link(destination: actionURL(firstAction) ?? URL(string: "widget1://")!) {
+                    Text(digit)
+                        .font(.system(size: size, weight: .bold, design: clockFontDesign))
+                        .minimumScaleFactor(0.5)
+                        .foregroundColor(.white)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text(digit)
+                    .font(.system(size: size, weight: .bold, design: clockFontDesign))
+                    .minimumScaleFactor(0.5)
+                    .foregroundColor(.white)
+            }
+            
+            // Second action on trailing edge
+            if entry.configuration.clockActions?.count ?? 0 > 1,
+               let secondAction = entry.configuration.clockActions?[1] {
+                Spacer()
+                Link(destination: actionURL(secondAction) ?? URL(string: "widget1://")!) {
+                    itemView(secondAction, size: min(size * 0.4, 24))
+                        .foregroundColor(.white)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+    
+    private func actionURL(_ item: WidgetItem) -> URL? {
+        guard let action = item.action else { return nil }
+        switch action {
+        case .URL(let url, _): return url
+        case .deepLink(let path): return URL(string: path)
+        case .appIntent(let intent): return URL(string: "widget1://intent/\(intent)")
+        }
     }
 
     private var digitString: String {

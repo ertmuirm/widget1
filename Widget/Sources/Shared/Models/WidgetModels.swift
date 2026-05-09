@@ -204,6 +204,8 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
     var clockFontStyle: ClockFontStyle?
     /// Clock font size for .clock widgets
     var clockFontSize: Double?
+    /// Actions for clock widget (up to 2 actions)
+    var clockActions: [WidgetItem]?
 
     init(
         id: UUID = UUID(),
@@ -220,7 +222,8 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         currentSlideIndex: Int? = nil,
         clockDigitPosition: ClockDigitPosition? = nil,
         clockFontStyle: ClockFontStyle? = nil,
-        clockFontSize: Double? = nil
+        clockFontSize: Double? = nil,
+        clockActions: [WidgetItem]? = nil
     ) {
         self.id = id
         self.name = name
@@ -237,6 +240,7 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         self.clockDigitPosition = clockDigitPosition
         self.clockFontStyle = clockFontStyle
         self.clockFontSize = clockFontSize
+        self.clockActions = clockActions
     }
     
     /// Default configuration for placeholder
