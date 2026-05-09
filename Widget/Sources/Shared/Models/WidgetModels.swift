@@ -113,6 +113,24 @@ enum ClockDigitPosition: String, Codable, CaseIterable {
     }
 }
 
+// MARK: - Clock Font Style
+
+enum ClockFontStyle: String, Codable, CaseIterable {
+    case `default`
+    case monospaced
+    case rounded
+    case serif
+    
+    var displayName: String {
+        switch self {
+        case .default:    return "Default"
+        case .monospaced: return "Monospaced"
+        case .rounded:   return "Rounded"
+        case .serif:    return "Serif"
+        }
+    }
+}
+
 // MARK: - Image Slide
 
 /// One image (or QR code) in an Image Slideshow widget
@@ -182,6 +200,8 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
     var currentSlideIndex: Int?
     /// Clock digit position for .clock widgets
     var clockDigitPosition: ClockDigitPosition?
+    /// Clock font style for .clock widgets
+    var clockFontStyle: ClockFontStyle?
     /// Clock font size for .clock widgets
     var clockFontSize: Double?
 
@@ -199,6 +219,7 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         slides: [ImageSlide]? = nil,
         currentSlideIndex: Int? = nil,
         clockDigitPosition: ClockDigitPosition? = nil,
+        clockFontStyle: ClockFontStyle? = nil,
         clockFontSize: Double? = nil
     ) {
         self.id = id
@@ -214,6 +235,7 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         self.slides = slides
         self.currentSlideIndex = currentSlideIndex
         self.clockDigitPosition = clockDigitPosition
+        self.clockFontStyle = clockFontStyle
         self.clockFontSize = clockFontSize
     }
     
