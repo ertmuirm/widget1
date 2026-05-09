@@ -215,6 +215,13 @@ struct WidgetEditorView: View {
 
     // MARK: - Clock Widget Settings
 
+    private var clockFontSizeBinding: Binding<Double> {
+        Binding(
+            get: { configuration.clockFontSize ?? 48 },
+            set: { configuration.clockFontSize = $0 }
+        )
+    }
+    
     @ViewBuilder
     private var clockSettingsSection: some View {
         Section {
@@ -231,7 +238,7 @@ struct WidgetEditorView: View {
             Text("Font Size: \(Int(configuration.clockFontSize ?? 48))")
         }
         Section {
-            Slider(value: $configuration.clockFontSize, in: 20...80, step: 2)
+            Slider(value: clockFontSizeBinding, in: 20...80, step: 2)
                 .tint(.gray)
         }
     }
