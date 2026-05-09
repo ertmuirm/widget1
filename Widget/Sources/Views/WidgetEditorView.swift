@@ -238,6 +238,7 @@ struct WidgetEditorView: View {
         clockActionsSection
     }
     
+    @ViewBuilder
     private var clockActionsSection: some View {
         if (configuration.clockActions?.isEmpty ?? true) || (configuration.clockActions == nil) {
             Button { addClockAction() } label: {
