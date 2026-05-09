@@ -30,11 +30,26 @@ struct WidgetEntryView: View {
     private var clockWidget: some View {
         let digit = digitString
         let size = entry.configuration.clockFontSize ?? 48
+        let fontStyle = entry.configuration.clockFontStyle ?? .default
+        let backgroundOpacity = entry.configuration.clockBackgroundOpacity ?? 1.0
         
-        Text(digit)
-            .font(.system(size: size, weight: .bold, design: .default))
-            .minimumScaleFactor(0.5)
-            .foregroundColor(.white)
+        let fontDesign: Font.Design
+        switch fontStyle {
+        case .default: fontDesign = .default
+        case .monospaced: fontDesign = .monospaced
+        case .rounded: fontDesign = .rounded
+        case .serif: fontDesign = .serif
+        }
+        
+        let backgroundColor = Color.black.opacity(backgroundOpacity)
+        
+        ZStack {
+            backgroundColor
+            Text(digit)
+                .font(.system(size: size, weight: .bold, design: fontDesign))
+                .minimumScaleFactor(0.5)
+                .foregroundColor(.white)
+        }
     }
 
     private var digitString: String {

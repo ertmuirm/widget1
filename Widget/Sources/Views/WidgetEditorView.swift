@@ -78,6 +78,9 @@ struct WidgetEditorView: View {
             if configuration.widgetKind == .clock {
                 clockDigitPosition = configuration.clockDigitPosition ?? .hour
                 clockFontSize = configuration.clockFontSize ?? 48
+                clockFontStyle = configuration.clockFontStyle ?? .default
+                clockBackgroundOpacity = configuration.clockBackgroundOpacity ?? 1.0
+                clockActions = configuration.clockActions ?? []
             }
         }
         .listStyle(.insetGrouped)
@@ -208,17 +211,62 @@ struct WidgetEditorView: View {
     // Internal state for clock widget settings (for proper binding)
     @State private var clockDigitPosition: ClockDigitPosition = .hour
     @State private var clockFontSize: Double = 48
+    @State private var clockFontStyle: ClockFontStyle = .default
+    @State private var clockBackgroundOpacity: Double = 1.0
+    @State private var clockActions: [WidgetItem] = []
 
     private var clockSettingsSection: some View {
-        Section("Display") {
-            Picker("Digits", selection: $clockDigitPosition) {
-                Text("Hour (12h)").tag(ClockDigitPosition.hour)
-                Text("Minute").tag(ClockDigitPosition.minute)
+        Group {
+            Section("Display") {
+                Picker("Digits", selection: $clockDigitPosition) {
+                    Text("Hour (12h)").tag(ClockDigitPosition.hour)
+                    Text("Minute").tag(ClockDigitPosition.minute)
+                }
+                Picker("Font", selection: $clockFontStyle) {
+                    ForEach(ClockFontStyle.allCases, id: \.self) { style in
+                        Text(style.displayName).tag(style)
+                    }
+                }
+                VStack(alignment: .leading) {
+                    Text("Size: \(Int(clockFontSize))")
+                    Slider(value: $clockFontSize, in: 20...80, step: 2)
+                }
             }
-            VStack(alignment: .leading) {
-                Text("Size: \(Int(clockFontSize))")
-                Slider(value: $clockFontSize, in: 20...80, step: 2)
+            
+            Section("Background") {
+                VStack(alignment: .leading) {
+                    Text("Opacity: \(Int(clockBackgroundOpacity * 100))%")
+                    Slider(value: $clockBackgroundOpacity, in: 0...1, step: 0.1)
+                }
             }
+            
+            Section("Actions") {
+                if clockActions.isEmpty {
+                    Text("No actions")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(clockActions) { item in
+                        Text("Action")
+                            .foregroundStyle(.primary)
+                    }
+                }
+                if clockActions.count < 2 {
+                    Button { addClockAction() } label: {
+                        Label("Add Action", systemImage: "plus")
+                    }
+                }
+            }
+        }
+    }
+    
+    private func addClockAction() {
+        if clockActions.count < 2 {
+            let newItem = WidgetItem(
+                displayType: .icon,
+                sfSymbolName: "globe",
+                action: nil
+            )
+            clockActions.append(newItem)
         }
     }
 
@@ -507,6 +555,9 @@ struct WidgetEditorView: View {
         if isClockWidget {
             configuration.clockDigitPosition = clockDigitPosition
             configuration.clockFontSize = clockFontSize
+            configuration.clockFontStyle = clockFontStyle
+            configuration.clockBackgroundOpacity = clockBackgroundOpacity
+            configuration.clockActions = clockActions
         }
         if isNew {
             viewModel.addConfiguration(configuration)
