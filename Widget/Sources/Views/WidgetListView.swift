@@ -8,6 +8,7 @@ struct WidgetListView: View {
     @State private var showAddSheet = false
     @State private var showAddImageSheet = false
     @State private var showAddLockScreenSheet = false
+    @State private var showAddClockSheet = false
     @State private var showAddLauncherSheet = false
     @State private var showSettingsSheet = false
 
@@ -89,6 +90,11 @@ struct WidgetListView: View {
                     } label: {
                         Label("Lock Screen Widget", systemImage: "lock.display")
                     }
+                    Button {
+                        showAddClockSheet = true
+                    } label: {
+                        Label("Clock Widget", systemImage: "clock")
+                    }
                     if viewModel.launcherConfigs.count < LauncherConfig.maxConfigs {
                         Button {
                             showAddLauncherSheet = true
@@ -126,6 +132,18 @@ struct WidgetListView: View {
                 size: .systemSmall,
                 items: [WidgetItem()],
                 widgetKind: .lockScreen
+            )
+            NavigationStack {
+                WidgetEditorView(configuration: newConfig, isNew: true)
+            }
+        }
+        .sheet(isPresented: $showAddClockSheet) {
+            let newConfig = WidgetConfig(
+                name: "Clock Widget",
+                size: .systemMedium,
+                widgetKind: .clock,
+                clockDigitPosition: .hour,
+                clockFontSize: 48
             )
             NavigationStack {
                 WidgetEditorView(configuration: newConfig, isNew: true)

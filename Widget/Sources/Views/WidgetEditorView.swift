@@ -29,6 +29,7 @@ struct WidgetEditorView: View {
 
     private var isImageWidget: Bool { configuration.widgetKind == .imageSlideshow }
     private var isLockScreenWidget: Bool { configuration.widgetKind == .lockScreen }
+    private var isClockWidget: Bool { configuration.widgetKind == .clock }
 
     var body: some View {
         List {
@@ -53,6 +54,8 @@ struct WidgetEditorView: View {
                 slideshowActionSection
             } else if isLockScreenWidget {
                 lockScreenItemSection
+            } else if isClockWidget {
+                clockSettingsSection
             } else {
                 gridItemsSection
                 backgroundSection
@@ -193,6 +196,25 @@ struct WidgetEditorView: View {
     }
 
     // MARK: - Grid items section
+
+    // MARK: - Clock Widget Settings
+
+    @ViewBuilder
+    private var clockSettingsSection: some View {
+        Section {
+            Picker("Digits", selection: $configuration.clockDigitPosition) {
+                Text("Hour (12h)").tag(ClockDigitPosition.hour as ClockDigitPosition?)
+                Text("Minute").tag(ClockDigitPosition.minute as ClockDigitPosition?)
+            }
+            HStack {
+                Text("Font Size")
+                Slider(value: $configuration.clockFontSize, in: 20...80, step: 2)
+                Text("\(Int(configuration.clockFontSize ?? 48))")
+                    .monospacedDigit()
+                    .frame(width: 30)
+            }
+        }
+    }
 
     // MARK: - Lock screen single-item section
 
