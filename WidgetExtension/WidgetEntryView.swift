@@ -5,6 +5,8 @@ import AppIntents
 /// Main widget entry view that renders based on widget family
 struct WidgetEntryView: View {
     @Environment(\.widgetFamily) var widgetFamily
+    @Environment(\.widgetRenderingMode) var widgetRenderingMode
+    @Environment(\.accessibilityReduceTransparency) var reduceTransparency
     let entry: WidgetEntry
 
     var body: some View {
@@ -50,10 +52,11 @@ struct WidgetEntryView: View {
 
     @ViewBuilder
     private func clockDigitCell(digit: String, url: URL?, fontSize: CGFloat) -> some View {
+        let foreground: Color = widgetRenderingMode == .vibrant ? .primary : .white
         let label = Text(digit)
             .font(clockFont(size: fontSize))
             .minimumScaleFactor(0.3)
-            .foregroundStyle(Color.white)
+            .foregroundStyle(foreground)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         if let url = url {
@@ -140,7 +143,6 @@ struct WidgetEntryView: View {
                     .aspectRatio(1, contentMode: .fit)
             }
         }
-        .padding(-10)
     }
 
     // MARK: - Cell with optional URL link
@@ -211,7 +213,6 @@ struct WidgetEntryView: View {
                             }
                         }
                     }
-                    .padding(-10)
                 } else if let content = slide.barcodeContent, !content.isEmpty {
                     // Barcode: full-width, centred vertically with padding for readability
                     GeometryReader { geo in
@@ -232,7 +233,6 @@ struct WidgetEntryView: View {
                             }
                         }
                     }
-                    .padding(-10)
                 } else {
                     VStack(spacing: 4) {
                         Image(systemName: "qrcode")

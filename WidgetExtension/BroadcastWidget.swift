@@ -2,6 +2,23 @@ import WidgetKit
 import SwiftUI
 import AppIntents
 
+// MARK: - Rendering-mode-aware background
+
+private struct WidgetBackground: View {
+    @Environment(\.widgetRenderingMode) private var renderingMode
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    let color: Color
+    let opacity: Double
+
+    var body: some View {
+        if renderingMode == .fullColor && !reduceTransparency {
+            color.opacity(opacity)
+        } else {
+            Color.secondary.opacity(0.1)
+        }
+    }
+}
+
 // MARK: - Small Widget — home screen Small (3×3 grid, systemSmall)
 
 struct BroadcastSmallWidget: Widget {
@@ -15,13 +32,17 @@ struct BroadcastSmallWidget: Widget {
         ) { entry in
             WidgetEntryView(entry: entry)
                 .containerBackground(for: .widget) {
-                    entry.configuration.backgroundColor.swiftUIColor
-                        .opacity(entry.configuration.backgroundOpacity)
+                    WidgetBackground(
+                        color: entry.configuration.backgroundColor.swiftUIColor,
+                        opacity: entry.configuration.backgroundOpacity
+                    )
                 }
         }
         .configurationDisplayName("Small Widget")
         .description("A 3×3 customizable widget")
         .supportedFamilies([.systemSmall])
+        .contentMarginsDisabled()
+        .containerBackgroundRemovable(true)
     }
 }
 
@@ -38,13 +59,17 @@ struct BroadcastMediumWidget: Widget {
         ) { entry in
             WidgetEntryView(entry: entry)
                 .containerBackground(for: .widget) {
-                    entry.configuration.backgroundColor.swiftUIColor
-                        .opacity(entry.configuration.backgroundOpacity)
+                    WidgetBackground(
+                        color: entry.configuration.backgroundColor.swiftUIColor,
+                        opacity: entry.configuration.backgroundOpacity
+                    )
                 }
         }
         .configurationDisplayName("Medium Widget")
         .description("A 6×3 customizable widget")
         .supportedFamilies([.systemMedium])
+        .contentMarginsDisabled()
+        .containerBackgroundRemovable(true)
     }
 }
 
@@ -61,13 +86,17 @@ struct BroadcastLargeWidget: Widget {
         ) { entry in
             WidgetEntryView(entry: entry)
                 .containerBackground(for: .widget) {
-                    entry.configuration.backgroundColor.swiftUIColor
-                        .opacity(entry.configuration.backgroundOpacity)
+                    WidgetBackground(
+                        color: entry.configuration.backgroundColor.swiftUIColor,
+                        opacity: entry.configuration.backgroundOpacity
+                    )
                 }
         }
         .configurationDisplayName("Large Widget")
         .description("A 6×6 customizable widget")
         .supportedFamilies([.systemLarge])
+        .contentMarginsDisabled()
+        .containerBackgroundRemovable(true)
     }
 }
 
@@ -88,6 +117,7 @@ struct BroadcastLockWidget: Widget {
         .configurationDisplayName("Lock Screen Widget")
         .description("A customizable lock screen widget")
         .supportedFamilies([.accessoryCircular, .accessoryInline, .accessoryRectangular])
+        .contentMarginsDisabled()
     }
 }
 
@@ -108,8 +138,9 @@ struct BroadcastImageWidget: Widget {
         .configurationDisplayName("Code Widget")
         .description("Display QR codes on your home screen")
         .supportedFamilies([.systemSmall])
-        // Prevent iOS 26 Clear/Liquid Glass mode from stripping the white background,
-        // which would make the black-on-white QR code invisible.
+        .contentMarginsDisabled()
+        // Prevent Clear/Liquid Glass mode from stripping the white background —
+        // a transparent surface would make the black QR code invisible.
         .containerBackgroundRemovable(false)
     }
 }
@@ -126,11 +157,13 @@ struct BroadcastClockWidget: Widget {
             provider: ClockBroadcastProvider()
         ) { entry in
             WidgetEntryView(entry: entry)
-                .containerBackground(.clear, for: .widget)
+                .containerBackground(for: .widget) { Color.clear }
         }
         .configurationDisplayName("Clock Widget")
         .description("Display hour or minute digits")
         .supportedFamilies([.systemSmall])
+        .contentMarginsDisabled()
+        .containerBackgroundRemovable(true)
     }
 }
 
@@ -157,4 +190,17 @@ struct BroadcastClockWidget: Widget {
             WidgetItem(displayType: .text, customText: "Hello")
         ]
     ))
+}
+
+#Preview("Clock", as: .systemSmall) {
+    BroadcastClockWidget()
+} timeline: {
+    WidgetEntry(date: .now, configuration: {
+        var c = WidgetConfig.defaultConfiguration
+        c.widgetKind = .clock
+        c.clockDigitPosition = .hour
+        c.clockFontSize = 80
+        c.backgroundOpacity = 0
+        return c
+    }())
 }
