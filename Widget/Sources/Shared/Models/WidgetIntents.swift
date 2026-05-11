@@ -111,6 +111,11 @@ private struct SlimConfig: Codable {
     var it: [SlimItem] // items
     var sl: [SlimSlide]? // slides             (nil = no slides)
     var ci: Int?       // currentSlideIndex
+    // Clock-specific fields
+    var cdp: String?    // clockDigitPosition.rawValue
+    var cfn: String?    // clockFontName
+    var cfsz: Double?   // clockFontSize
+    var ca: [SlimItem]? // clockActions (first = tens digit, second = units digit)
 }
 
 private extension SlimConfig {
@@ -136,7 +141,11 @@ private extension SlimConfig {
                 )
             }
         }
-        ci = config.currentSlideIndex
+        ci   = config.currentSlideIndex
+        cdp  = config.clockDigitPosition?.rawValue
+        cfn  = config.clockFontName
+        cfsz = config.clockFontSize
+        ca   = config.clockActions.map { $0.map { SlimItem($0) } }
     }
     func toWidgetConfig() -> WidgetConfig {
         let slides: [ImageSlide]? = sl.map { slimSlides in
@@ -163,7 +172,11 @@ private extension SlimConfig {
             showItemLabels: sil,
             widgetKind: k.flatMap { WidgetKind(rawValue: $0) },
             slides: slides,
-            currentSlideIndex: ci
+            currentSlideIndex: ci,
+            clockDigitPosition: cdp.flatMap { ClockDigitPosition(rawValue: $0) },
+            clockFontName: cfn,
+            clockFontSize: cfsz,
+            clockActions: ca?.map { $0.toWidgetItem() }
         )
     }
 }
@@ -221,7 +234,7 @@ func resolveItemURL(_ item: WidgetItem) -> URL? {
 
 private func filteredConfigs(size: WidgetSize) -> [WidgetConfig] {
     ((try? SharedStorage.shared.loadConfigurations()) ?? [])
-        .filter { $0.size == size && $0.widgetKind != .imageSlideshow && $0.widgetKind != .lockScreen }
+        .filter { $0.size == size && $0.widgetKind != .imageSlideshow && $0.widgetKind != .lockScreen && $0.widgetKind != .clock }
 }
 
 private func filteredConfigs(kind: WidgetKind) -> [WidgetConfig] {
@@ -348,14 +361,13 @@ private func makeClockEntry(position: ClockDigitPosition?) -> WidgetEntry {
     let calendar = Calendar.current
     let now = Date()
     let hour = calendar.component(.hour, from: now)
-    let minute = calendar.component(.minute, from: now)
     let displayHour = hour == 0 ? 12 : hour
     
     var config = WidgetConfig.defaultConfiguration
     config.widgetKind = .clock
     config.clockDigitPosition = position ?? .hour
-    config.clockFontSize = 48
-    config.backgroundOpacity = 0 // Transparent for iOS 26 clear mode
+    config.clockFontSize = 80
+    config.backgroundOpacity = 0
     
     return WidgetEntry(date: now, configuration: config)
 }
@@ -789,7 +801,7 @@ struct ClockBroadcastProvider: AppIntentTimelineProvider {
         var config = WidgetConfig.defaultConfiguration
         config.widgetKind = .clock
         config.clockDigitPosition = .hour
-        config.clockFontSize = 48
+        config.clockFontSize = 80
         return WidgetEntry(date: Date(), configuration: config)
     }
     func snapshot(for configuration: SelectClockWidgetIntent, in context: Context) async -> WidgetEntry {
