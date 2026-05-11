@@ -217,96 +217,102 @@ struct WidgetEditorView: View {
 
     private var clockFontSizeBinding: Binding<Double> {
         Binding(
-            get: { configuration.clockFontSize ?? 48 },
+            get: { configuration.clockFontSize ?? 80 },
             set: { configuration.clockFontSize = $0 }
         )
     }
-    
+
     @ViewBuilder
     private var clockSettingsSection: some View {
-        Section {
-            Picker("Digits", selection: $configuration.clockDigitPosition) {
+        Section("Digits") {
+            Picker("Position", selection: $configuration.clockDigitPosition) {
                 Text("Hour (12h)").tag(ClockDigitPosition.hour as ClockDigitPosition?)
                 Text("Minute").tag(ClockDigitPosition.minute as ClockDigitPosition?)
             }
-            Picker("Style", selection: $configuration.clockFontStyle) {
-                Text("Default").tag(ClockFontStyle.default as ClockFontStyle?)
-                Text("Monospaced").tag(ClockFontStyle.monospaced as ClockFontStyle?)
-                Text("Rounded").tag(ClockFontStyle.rounded as ClockFontStyle?)
-                Text("Serif").tag(ClockFontStyle.serif as ClockFontStyle?)
-            }
-            Text("Font Size: \(Int(configuration.clockFontSize ?? 48))")
         }
-        Section {
-            Slider(value: clockFontSizeBinding, in: 20...80, step: 2)
-                .tint(.gray)
+        Section("Font") {
+            NavigationLink {
+                ClockFontPickerView(selectedFontName: $configuration.clockFontName)
+            } label: {
+                HStack {
+                    Text("Font")
+                    Spacer()
+                    Text(configuration.clockFontName ?? "Default")
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Size: \(Int(configuration.clockFontSize ?? 80)) pt")
+                Slider(value: clockFontSizeBinding, in: 20...120, step: 2)
+                    .tint(.gray)
+            }
         }
     }
-    
+
     @ViewBuilder
     private var clockActionsSection: some View {
-        if (configuration.clockActions?.isEmpty ?? true) || (configuration.clockActions == nil) {
-            Button { addClockAction() } label: {
-                Label("Add Action", systemImage: "plus")
+        let actions = configuration.clockActions ?? []
+        Section {
+            Text("Each digit can have its own tap action (first digit = tens, second digit = units).")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        Section("Digit Actions") {
+            clockActionRow(label: "Tens Digit", index: 0, actions: actions)
+            clockActionRow(label: "Units Digit", index: 1, actions: actions)
+        }
+    }
+
+    @ViewBuilder
+    private func clockActionRow(label: String, index: Int, actions: [WidgetItem]) -> some View {
+        if index < actions.count {
+            let item = actions[index]
+            HStack {
+                Button {
+                    editingItemIndex = EditingItemIndex(id: index, isClockAction: true)
+                } label: {
+                    ItemRowView(item: item)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button {
+                    deleteClockAction(at: index)
+                } label: {
+                    Image(systemName: "trash")
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
+            }
+        } else {
+            Button {
+                addClockAction(at: index)
+            } label: {
+                Label("\(label): Add Action", systemImage: "plus")
             }
             .foregroundStyle(.gray)
-        } else {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Actions (\(configuration.clockActions?.count ?? 0)/2)")
-                    .font(.headline)
-                
-                ForEach(configuration.clockActions ?? []) { item in
-                    HStack {
-                        Button {
-                            if let idx = configuration.clockActions?.firstIndex(where: { $0.id == item.id }) {
-                                editingItemIndex = EditingItemIndex(id: idx, isClockAction: true)
-                            }
-                        } label: {
-                            Text(clockActionDisplayName(item))
-                        }
-                        .buttonStyle(.plain)
-                        
-                        Button {
-                            deleteClockAction(at: configuration.clockActions?.firstIndex(where: { $0.id == item.id }) ?? 0)
-                        } label: {
-                            Image(systemName: "trash")
-                        }
-                        .foregroundStyle(.red)
-                    }
-                }
-                
-                if (configuration.clockActions?.count ?? 0) < 2 {
-                    Button { addClockAction() } label: {
-                        Label("Add Action", systemImage: "plus")
-                    }
-                    .foregroundStyle(.gray)
-                }
-            }
         }
     }
-    
-    private func clockActionDisplayName(_ item: WidgetItem) -> String {
-        switch item.displayType {
-        case .icon: return item.sfSymbolName ?? "Icon"
-        case .text: return item.customText ?? "Text"
-        case .image: return item.customImageFilename ?? "Image"
-        case .qrCode: return item.qrCodeContent ?? "QR"
-        }
-    }
-    
+
     private func deleteClockAction(at index: Int) {
-        if var actions = configuration.clockActions, index < actions.count {
-            actions.remove(at: index)
-            configuration.clockActions = actions
+        guard var actions = configuration.clockActions, index < actions.count else { return }
+        actions[index] = WidgetItem(displayType: .icon, sfSymbolName: nil, action: nil)
+        // Remove trailing placeholder-only items to keep the array compact
+        while actions.last?.action == nil && !(actions.isEmpty) {
+            actions.removeLast()
         }
+        configuration.clockActions = actions.isEmpty ? nil : actions
     }
-    
-    private func addClockAction() {
-        let newItem = WidgetItem(displayType: .icon, sfSymbolName: "star.fill", customText: "Action")
-        if configuration.clockActions == nil {
-            configuration.clockActions = []
+
+    private func addClockAction(at index: Int) {
+        var actions = configuration.clockActions ?? []
+        // Pad with placeholder items so index exists
+        while actions.count <= index {
+            actions.append(WidgetItem(displayType: .icon, sfSymbolName: "star.fill"))
         }
-        configuration.clockActions?.append(newItem)
+        configuration.clockActions = actions
+        editingItemIndex = EditingItemIndex(id: index, isClockAction: true)
     }
 
     // MARK: - Lock screen single-item section
@@ -1127,6 +1133,40 @@ struct ItemRowView: View {
         case .image:  return item.customImageFilename != nil ? "Image" : "No image"
         case .qrCode: return item.qrCodeContent.map { $0.prefix(20) + ($0.count > 20 ? "…" : "") } ?? "QR Code"
         }
+    }
+}
+
+// MARK: - Clock Font Picker
+
+struct ClockFontPickerView: View {
+    @Binding var selectedFontName: String?
+    @Environment(\.dismiss) private var dismiss
+
+    private let families: [String] = ["Default"] + UIFont.familyNames.sorted()
+
+    var body: some View {
+        List(families, id: \.self) { family in
+            Button {
+                selectedFontName = family == "Default" ? nil : family
+                dismiss()
+            } label: {
+                HStack {
+                    Text(family)
+                        .font(family == "Default"
+                              ? .body
+                              : Font.custom(family, size: 17))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    if (family == "Default" && selectedFontName == nil) || family == selectedFontName {
+                        Image(systemName: "checkmark")
+                            .foregroundStyle(.accentColor)
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Font")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

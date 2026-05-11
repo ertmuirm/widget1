@@ -143,7 +143,7 @@ struct WidgetListView: View {
                 size: .systemSmall,
                 widgetKind: .clock,
                 clockDigitPosition: .hour,
-                clockFontSize: 48
+                clockFontSize: 80
             )
             NavigationStack {
                 WidgetEditorView(configuration: newConfig, isNew: true)
