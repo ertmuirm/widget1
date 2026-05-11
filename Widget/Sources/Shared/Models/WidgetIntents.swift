@@ -361,13 +361,14 @@ private func makeClockEntry(position: ClockDigitPosition?) -> WidgetEntry {
     let calendar = Calendar.current
     let now = Date()
     let hour = calendar.component(.hour, from: now)
+    let minute = calendar.component(.minute, from: now)
     let displayHour = hour == 0 ? 12 : hour
     
     var config = WidgetConfig.defaultConfiguration
     config.widgetKind = .clock
     config.clockDigitPosition = position ?? .hour
-    config.clockFontSize = 80
-    config.backgroundOpacity = 0
+    config.clockFontSize = 48
+    config.backgroundOpacity = 0 // Transparent for iOS 26 clear mode
     
     return WidgetEntry(date: now, configuration: config)
 }

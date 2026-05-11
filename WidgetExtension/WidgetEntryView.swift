@@ -25,97 +25,49 @@ struct WidgetEntryView: View {
     }
 
     // MARK: - Clock Widget
-    
-    private var clockFontDesign: Font.Design {
-        let style = entry.configuration.clockFontStyle ?? .default
-        switch style {
-        case .default: return .default
-        case .monospaced: return .monospaced
-        case .rounded: return .rounded
-        case .serif: return .serif
-        }
-    }
-    
+
     @ViewBuilder
     private var clockWidget: some View {
-        let digit = digitString
-        let size = entry.configuration.clockFontSize ?? 48
-        
-        ZStack(alignment: .leading) {
-            // Clock digit with optional action
-            if let firstAction = entry.configuration.clockActions?.first, firstAction.action != nil {
-                Link(destination: actionURL(firstAction) ?? URL(string: "widget1://")!) {
-                    Text(digit)
-                        .font(.system(size: size, weight: .bold, design: clockFontDesign))
-                        .minimumScaleFactor(0.5)
-                        .foregroundStyle(.white)
-                }
-                .buttonStyle(.plain)
-            } else {
-                Text(digit)
-                    .font(.system(size: size, weight: .bold, design: clockFontDesign))
-                    .minimumScaleFactor(0.5)
-                    .foregroundStyle(.white)
-            }
-            
-            // Second action on trailing edge
-            if let actions = entry.configuration.clockActions, actions.count > 1,
-               let secondAction = actions.last, secondAction.action != nil {
-                Spacer()
-                Link(destination: actionURL(secondAction) ?? URL(string: "widget1://")!) {
-                    clockActionIcon(secondAction, size: min(size * 0.4, 24))
-                }
-                .buttonStyle(.plain)
-            }
+        let position = entry.configuration.clockDigitPosition ?? .hour
+        let fontSize = entry.configuration.clockFontSize ?? 80
+        let calendar = Calendar.current
+        let hour24 = calendar.component(.hour, from: entry.date)
+        let minute = calendar.component(.minute, from: entry.date)
+        let displayHour = hour24 == 0 ? 12 : (hour24 > 12 ? hour24 - 12 : hour24)
+        let value = position == .hour ? displayHour : minute
+        let tens = String((value / 10) % 10)
+        let units = String(value % 10)
+        let actions = entry.configuration.clockActions ?? []
+        let tensAction = actions.first.flatMap { resolveItemURL($0) }
+        let unitsAction = actions.count > 1 ? actions[1].flatMap { resolveItemURL($0) } : nil
+
+        HStack(spacing: 0) {
+            clockDigitCell(digit: tens, url: tensAction, fontSize: fontSize)
+            clockDigitCell(digit: units, url: unitsAction, fontSize: fontSize)
         }
-        .padding(.horizontal, 4)
-    }
-    
-    private func actionURL(_ item: WidgetItem) -> URL? {
-        guard let action = item.action else { return nil }
-        switch action.type {
-        case .urlScheme:
-            if let url = URL(string: action.payload) { return url }
-            return URL(string: "widget1://\(action.payload)")
-        case .shortcut:
-            return URL(string: "widget1://shortcut/\(action.payload)")
-        case .appIntent:
-            return URL(string: "widget1://intent/\(action.payload)")
-        }
-    }
-    
-    private func clockActionIcon(_ item: WidgetItem, size: CGFloat) -> some View {
-        Group {
-            if item.displayType == .icon {
-                Image(systemName: item.sfSymbolName ?? "star.fill")
-                    .font(.system(size: size))
-            } else if item.displayType == .text {
-                Text(item.customText ?? "")
-                    .font(.system(size: size * 0.6, weight: .medium))
-            } else {
-                Image(systemName: "star.fill")
-                    .font(.system(size: size))
-            }
-        }
-        .foregroundStyle(.white)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private var digitString: String {
-        let position = entry.configuration.clockDigitPosition ?? .hour
-        let calendar = Calendar.current
-        let now = Date()
-        
-        // Use hour12 for 12-hour format
-        let hour12 = calendar.component(.hour, from: now)
-        let minute = calendar.component(.minute, from: now)
-        let displayHour = hour12 == 0 ? 12 : (hour12 > 12 ? hour12 - 12 : hour12)
-        
-        switch position {
-        case .hour:
-            return String(format: "%02d", displayHour)
-        case .minute:
-            return String(format: "%02d", minute)
+    @ViewBuilder
+    private func clockDigitCell(digit: String, url: URL?, fontSize: CGFloat) -> some View {
+        let label = Text(digit)
+            .font(clockFont(size: fontSize))
+            .minimumScaleFactor(0.3)
+            .foregroundStyle(Color.white)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+        if let url = url {
+            Link(destination: url) { label }
+        } else {
+            label
         }
+    }
+
+    private func clockFont(size: CGFloat) -> Font {
+        if let name = entry.configuration.clockFontName {
+            return .custom(name, size: size)
+        }
+        return .system(size: size, weight: .bold, design: .default)
     }
 
     // MARK: - Home Screen (grid)
