@@ -664,7 +664,7 @@ struct SlideRowView: View {
                         .lineLimit(1)
                 } else if slide.isQRCode {
                     let preview = slide.qrCodeContent.map { s in
-                        s.isEmpty ? "No content" : (s.count > 24 ? String(s.prefix(24)) + "…" : s)
+                        s.isEmpty ? "No content" : (s.count > 24 ? String(s.prefix(24)) + "\u{2026}" : s)
                     } ?? "No content"
                     Text(preview)
                         .font(.caption)
@@ -871,7 +871,7 @@ struct SlideEditorView: View {
             if !slide.isQRCode && !slide.isBarcode {
                 Section("Position & Scale") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Zoom: \(String(format: "%.1f", slide.scale))×")
+                        Text("Zoom: \(String(format: "%.1f", slide.scale))\u{D7}")
                         Slider(value: $slide.scale, in: 1.0...4.0, step: 0.1)
                             .tint(.gray)
                     }
@@ -933,7 +933,7 @@ struct SlideEditorView: View {
                             HStack {
                                 Text("App Action")
                                 Spacer()
-                                Text(action.displayName ?? (action.payload.isEmpty ? "Select…" : action.payload))
+                                Text(action.displayName ?? (action.payload.isEmpty ? "Select\u{2026}" : action.payload))
                                     .foregroundStyle(action.payload.isEmpty ? .tertiary : .secondary)
                                     .lineLimit(1)
                                 Image(systemName: "chevron.right")
@@ -1131,7 +1131,7 @@ struct ItemRowView: View {
         case .icon:   return item.sfSymbolName ?? "Icon"
         case .text:   return item.customText ?? "Text"
         case .image:  return item.customImageFilename != nil ? "Image" : "No image"
-        case .qrCode: return item.qrCodeContent.map { $0.prefix(20) + ($0.count > 20 ? "…" : "") } ?? "QR Code"
+        case .qrCode: return item.qrCodeContent.map { $0.prefix(20) + ($0.count > 20 ? "\u{2026}" : "") } ?? "QR Code"
         }
     }
 }
@@ -1151,24 +1151,27 @@ struct ClockFontPickerView: View {
                     selectedFontName = family == "Default" ? nil : family
                     dismiss()
                 } label: {
-                    HStack {
-                        Text(family)
-                            .font(family == "Default"
-                                  ? .body
-                                  : Font.custom(family, size: 17))
-                            .foregroundStyle(.white)
-                        Spacer()
-                        if (family == "Default" && selectedFontName == nil) || family == selectedFontName {
-                            Image(systemName: "checkmark")
-                                .foregroundStyle(.accentColor)
-                        }
-                    }
+                    fontRow(family)
                 }
             }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Font")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder
+    private func fontRow(_ family: String) -> some View {
+        let isSelected = (family == "Default" && selectedFontName == nil) || family == selectedFontName
+        HStack {
+            Text(family)
+                .font(family == "Default" ? .body : Font.custom(family, size: 17))
+                .foregroundStyle(.white)
+            Spacer()
+            if isSelected {
+                Image(systemName: "checkmark").foregroundStyle(.accentColor)
+            }
+        }
     }
 }
 

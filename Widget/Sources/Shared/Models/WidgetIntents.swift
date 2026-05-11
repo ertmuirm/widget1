@@ -358,10 +358,8 @@ private func makeTimeline(configID: String?) -> Timeline<WidgetEntry> {
 }
 
 private func makeClockEntry(position: ClockDigitPosition?) -> WidgetEntry {
-    let calendar = Calendar.current
     let now = Date()
-    let hour = calendar.component(.hour, from: now)
-    
+
     var config = WidgetConfig.defaultConfiguration
     config.widgetKind = .clock
     config.clockDigitPosition = position ?? .hour
