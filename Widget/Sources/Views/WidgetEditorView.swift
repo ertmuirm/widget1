@@ -449,7 +449,7 @@ struct WidgetEditorView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 16))
                             if let label = slide.qrCodeLabel, !label.isEmpty {
                                 Text(label)
-                                    .font(.system(size: slide.qrCodeLabelSize, weight: .bold))
+                                    .font(.system(size: 12, weight: .bold))
                                     .foregroundStyle(.white)
                                     .lineLimit(1)
                                     .padding(.horizontal, 6)
@@ -1169,7 +1169,7 @@ struct ClockFontPickerView: View {
                 .foregroundStyle(.white)
             Spacer()
             if isSelected {
-                Image(systemName: "checkmark").foregroundStyle(.accentColor)
+                Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
             }
         }
     }
