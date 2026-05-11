@@ -39,7 +39,7 @@ struct WidgetEntryView: View {
         let units = String(value % 10)
         let actions = entry.configuration.clockActions ?? []
         let tensAction = actions.first.flatMap { resolveItemURL($0) }
-        let unitsAction = actions.count > 1 ? actions[1].flatMap { resolveItemURL($0) } : nil
+        let unitsAction = actions.count > 1 ? resolveItemURL(actions[1]) : nil
 
         HStack(spacing: 0) {
             clockDigitCell(digit: tens, url: tensAction, fontSize: fontSize)

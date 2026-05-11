@@ -361,8 +361,6 @@ private func makeClockEntry(position: ClockDigitPosition?) -> WidgetEntry {
     let calendar = Calendar.current
     let now = Date()
     let hour = calendar.component(.hour, from: now)
-    let minute = calendar.component(.minute, from: now)
-    let displayHour = hour == 0 ? 12 : hour
     
     var config = WidgetConfig.defaultConfiguration
     config.widgetKind = .clock
