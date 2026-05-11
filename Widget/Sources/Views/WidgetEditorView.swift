@@ -1145,21 +1145,23 @@ struct ClockFontPickerView: View {
     private let families: [String] = ["Default"] + UIFont.familyNames.sorted()
 
     var body: some View {
-        List(families, id: \.self) { family in
-            Button {
-                selectedFontName = family == "Default" ? nil : family
-                dismiss()
-            } label: {
-                HStack {
-                    Text(family)
-                        .font(family == "Default"
-                              ? .body
-                              : Font.custom(family, size: 17))
-                        .foregroundStyle(.white)
-                    Spacer()
-                    if (family == "Default" && selectedFontName == nil) || family == selectedFontName {
-                        Image(systemName: "checkmark")
-                            .foregroundStyle(.accentColor)
+        List {
+            ForEach(families, id: \.self) { family in
+                Button {
+                    selectedFontName = family == "Default" ? nil : family
+                    dismiss()
+                } label: {
+                    HStack {
+                        Text(family)
+                            .font(family == "Default"
+                                  ? .body
+                                  : Font.custom(family, size: 17))
+                            .foregroundStyle(.white)
+                        Spacer()
+                        if (family == "Default" && selectedFontName == nil) || family == selectedFontName {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(.accentColor)
+                        }
                     }
                 }
             }
