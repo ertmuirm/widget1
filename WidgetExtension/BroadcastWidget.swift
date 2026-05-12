@@ -19,6 +19,34 @@ private struct WidgetBackground: View {
     }
 }
 
+// MARK: - Checkerboard (preview transparency aid)
+
+/// Renders a light/dark tile checkerboard — used in Xcode previews as a
+/// containerBackground so it's easy to see which parts of the widget are
+/// actually transparent.
+struct CheckerboardView: View {
+    var tileSize: CGFloat = 8
+
+    var body: some View {
+        Canvas { context, size in
+            let cols = Int(ceil(size.width  / tileSize))
+            let rows = Int(ceil(size.height / tileSize))
+            for row in 0..<rows {
+                for col in 0..<cols {
+                    let light = (row + col) % 2 == 0
+                    let rect = CGRect(
+                        x: CGFloat(col) * tileSize,
+                        y: CGFloat(row) * tileSize,
+                        width: tileSize,
+                        height: tileSize
+                    )
+                    context.fill(Path(rect), with: .color(light ? .white : Color(white: 0.78)))
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Small Widget — home screen Small (3×3 grid, systemSmall)
 
 struct BroadcastSmallWidget: Widget {
@@ -157,7 +185,11 @@ struct BroadcastClockWidget: Widget {
             provider: ClockBroadcastProvider()
         ) { entry in
             WidgetEntryView(entry: entry)
-                .containerBackground(for: .widget) { Color.clear }
+                // Empty body — no background view at all. Combined with
+                // containerBackgroundRemovable(true) this gives the system
+                // full permission to render nothing behind the widget in
+                // iOS 26 Clear Mode, producing true transparency.
+                .containerBackground(for: .widget) { }
         }
         .configurationDisplayName("Clock Widget")
         .description("Display hour or minute digits")
@@ -192,8 +224,40 @@ struct BroadcastClockWidget: Widget {
     ))
 }
 
+// Clock preview with checkerboard containerBackground so transparent areas
+// are visually obvious — tiles show through wherever the widget has no content.
+private struct ClockCheckerboardPreview: Widget {
+    var body: some WidgetConfiguration {
+        AppIntentConfiguration(
+            kind: "ClockCheckerboardPreview",
+            intent: SelectClockWidgetIntent.self,
+            provider: ClockBroadcastProvider()
+        ) { entry in
+            WidgetEntryView(entry: entry)
+                .containerBackground(for: .widget) {
+                    CheckerboardView()
+                }
+        }
+        .contentMarginsDisabled()
+        .containerBackgroundRemovable(false)
+    }
+}
+
 #Preview("Clock", as: .systemSmall) {
     BroadcastClockWidget()
+} timeline: {
+    WidgetEntry(date: .now, configuration: {
+        var c = WidgetConfig.defaultConfiguration
+        c.widgetKind = .clock
+        c.clockDigitPosition = .hour
+        c.clockFontSize = 80
+        c.backgroundOpacity = 0
+        return c
+    }())
+}
+
+#Preview("Clock – transparency check", as: .systemSmall) {
+    ClockCheckerboardPreview()
 } timeline: {
     WidgetEntry(date: .now, configuration: {
         var c = WidgetConfig.defaultConfiguration
