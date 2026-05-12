@@ -5,6 +5,8 @@ import AppIntents
 /// Main widget entry view that renders based on widget family
 struct WidgetEntryView: View {
     @Environment(\.widgetFamily) var widgetFamily
+    @Environment(\.widgetRenderingMode) var widgetRenderingMode
+    @Environment(\.accessibilityReduceTransparency) var reduceTransparency
     let entry: WidgetEntry
 
     var body: some View {
@@ -12,6 +14,8 @@ struct WidgetEntryView: View {
         case .systemSmall, .systemMedium, .systemLarge, .systemExtraLarge:
             if entry.configuration.widgetKind == .imageSlideshow {
                 imageSlideshowWidget
+            } else if entry.configuration.widgetKind == .clock {
+                clockWidget
             } else {
                 homeScreenWidget
             }
@@ -20,6 +24,53 @@ struct WidgetEntryView: View {
         default:
             homeScreenWidget
         }
+    }
+
+    // MARK: - Clock Widget
+
+    @ViewBuilder
+    private var clockWidget: some View {
+        let position = entry.configuration.clockDigitPosition ?? .hour
+        let fontSize = entry.configuration.clockFontSize ?? 80
+        let calendar = Calendar.current
+        let hour24 = calendar.component(.hour, from: entry.date)
+        let minute = calendar.component(.minute, from: entry.date)
+        let displayHour = hour24 == 0 ? 12 : (hour24 > 12 ? hour24 - 12 : hour24)
+        let value = position == .hour ? displayHour : minute
+        let tens = String((value / 10) % 10)
+        let units = String(value % 10)
+        let actions = entry.configuration.clockActions ?? []
+        let tensAction = actions.first.flatMap { resolveItemURL($0) }
+        let unitsAction = actions.count > 1 ? resolveItemURL(actions[1]) : nil
+
+        HStack(spacing: 0) {
+            clockDigitCell(digit: tens, url: tensAction, fontSize: fontSize)
+            clockDigitCell(digit: units, url: unitsAction, fontSize: fontSize)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private func clockDigitCell(digit: String, url: URL?, fontSize: CGFloat) -> some View {
+        let foreground: Color = widgetRenderingMode == .vibrant ? .primary : .white
+        let label = Text(digit)
+            .font(clockFont(size: fontSize))
+            .minimumScaleFactor(0.3)
+            .foregroundStyle(foreground)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+        if let url = url {
+            Link(destination: url) { label }
+        } else {
+            label
+        }
+    }
+
+    private func clockFont(size: CGFloat) -> Font {
+        if let name = entry.configuration.clockFontName {
+            return .custom(name, size: size)
+        }
+        return .system(size: size, weight: .bold, design: .default)
     }
 
     // MARK: - Home Screen (grid)
@@ -92,7 +143,6 @@ struct WidgetEntryView: View {
                     .aspectRatio(1, contentMode: .fit)
             }
         }
-        .padding(-10)
     }
 
     // MARK: - Cell with optional URL link
