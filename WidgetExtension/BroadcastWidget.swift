@@ -190,16 +190,16 @@ struct BroadcastClockWidget: Widget {
             provider: ClockBroadcastProvider()
         ) { entry in
             WidgetEntryView(entry: entry)
-                // Color.clear makes the widget transparent in Default and Dark
-                // mode — the wallpaper shows through. In iOS 26 Clear Mode the
-                // system applies liquid glass on top regardless (OS-level, not
-                // suppressible via public API).
+                // containerBackgroundRemovable(false) + Color.clear forces
+                // permanent transparency in Default and Dark modes — the system
+                // cannot add its own dark backing surface. Same mechanism as
+                // the Code widget keeping its white background in Clear Mode.
                 .containerBackground(for: .widget) { Color.clear }
         }
         .configurationDisplayName("Clock Widget")
         .description("Display hour or minute digits")
         .supportedFamilies([.systemSmall])
-        .containerBackgroundRemovable(true)
+        .containerBackgroundRemovable(false)
     }
 }
 
