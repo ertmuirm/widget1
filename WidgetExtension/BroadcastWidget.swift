@@ -14,7 +14,7 @@ private struct WidgetBackground: View {
         if renderingMode == .fullColor && !reduceTransparency {
             color.opacity(opacity)
         } else {
-            Color.secondary.opacity(0.1)
+            Color.clear
         }
     }
 }
