@@ -213,6 +213,7 @@ struct WidgetEntryView: View {
                             }
                         }
                     }
+                    .padding(-10)
                 } else if let content = slide.barcodeContent, !content.isEmpty {
                     // Barcode: full-width, centred vertically with padding for readability
                     GeometryReader { geo in
@@ -233,6 +234,7 @@ struct WidgetEntryView: View {
                             }
                         }
                     }
+                    .padding(-10)
                 } else {
                     VStack(spacing: 4) {
                         Image(systemName: "qrcode")

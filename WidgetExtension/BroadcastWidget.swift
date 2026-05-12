@@ -21,11 +21,12 @@ private struct WidgetBackground: View {
 
 // MARK: - Checkerboard (preview transparency aid)
 
-/// Renders a light/dark tile checkerboard — used in Xcode previews as a
-/// containerBackground so it's easy to see which parts of the widget are
-/// actually transparent.
+/// Used in Xcode previews as a ZStack layer behind WidgetEntryView so any
+/// transparent region of the widget shows up as tiles rather than solid black.
+/// Use darkMode: true to simulate dark wallpaper / dark-mode scenarios.
 struct CheckerboardView: View {
     var tileSize: CGFloat = 8
+    var darkMode: Bool = false
 
     var body: some View {
         Canvas { context, size in
@@ -33,14 +34,17 @@ struct CheckerboardView: View {
             let rows = Int(ceil(size.height / tileSize))
             for row in 0..<rows {
                 for col in 0..<cols {
-                    let light = (row + col) % 2 == 0
+                    let primary = (row + col) % 2 == 0
                     let rect = CGRect(
                         x: CGFloat(col) * tileSize,
                         y: CGFloat(row) * tileSize,
                         width: tileSize,
                         height: tileSize
                     )
-                    context.fill(Path(rect), with: .color(light ? .white : Color(white: 0.78)))
+                    let color: Color = darkMode
+                        ? (primary ? Color(white: 0.22) : Color(white: 0.12))
+                        : (primary ? .white              : Color(white: 0.78))
+                    context.fill(Path(rect), with: .color(color))
                 }
             }
         }
@@ -166,7 +170,8 @@ struct BroadcastImageWidget: Widget {
         .configurationDisplayName("Code Widget")
         .description("Display QR codes on your home screen")
         .supportedFamilies([.systemSmall])
-        .contentMarginsDisabled()
+        // No contentMarginsDisabled — the system margins are intentional here;
+        // WidgetEntryView uses .padding(-10) to fill edge-to-edge within them.
         // Prevent Clear/Liquid Glass mode from stripping the white background —
         // a transparent surface would make the black QR code invisible.
         .containerBackgroundRemovable(false)
@@ -188,7 +193,7 @@ struct BroadcastClockWidget: Widget {
                 // Empty body — no background view at all. Combined with
                 // containerBackgroundRemovable(true) this gives the system
                 // full permission to render nothing behind the widget in
-                // iOS 26 Clear Mode, producing true transparency.
+                // iOS 26 Clear Mode.
                 .containerBackground(for: .widget) { }
         }
         .configurationDisplayName("Clock Widget")
@@ -197,6 +202,47 @@ struct BroadcastClockWidget: Widget {
         .contentMarginsDisabled()
         .containerBackgroundRemovable(true)
     }
+}
+
+// MARK: - Clock checkerboard preview helpers
+
+/// Wraps the clock in a ZStack with a checkerboard so transparent regions are
+/// immediately visible in the Xcode canvas — checkerboard is rendered as widget
+/// content, not containerBackground, so it always appears regardless of how the
+/// preview host handles containerBackground.
+private struct ClockCheckerboardPreview: Widget {
+    let darkMode: Bool
+
+    init(darkMode: Bool = false) { self.darkMode = darkMode }
+
+    var body: some WidgetConfiguration {
+        AppIntentConfiguration(
+            kind: darkMode ? "ClockCheckDark" : "ClockCheckLight",
+            intent: SelectClockWidgetIntent.self,
+            provider: ClockBroadcastProvider()
+        ) { entry in
+            ZStack {
+                CheckerboardView(darkMode: darkMode)
+                WidgetEntryView(entry: entry)
+            }
+            .containerBackground(for: .widget) { }
+        }
+        .contentMarginsDisabled()
+        .containerBackgroundRemovable(false)
+    }
+}
+
+private func clockPreviewEntry() -> WidgetEntry {
+    WidgetEntry(
+        date: .now,
+        configuration: WidgetConfig(
+            name: "Clock",
+            size: .systemSmall,
+            widgetKind: .clock,
+            clockDigitPosition: .hour,
+            clockFontSize: 80
+        )
+    )
 }
 
 // MARK: - Previews
@@ -224,47 +270,24 @@ struct BroadcastClockWidget: Widget {
     ))
 }
 
-// Clock preview with checkerboard containerBackground so transparent areas
-// are visually obvious — tiles show through wherever the widget has no content.
-private struct ClockCheckerboardPreview: Widget {
-    var body: some WidgetConfiguration {
-        AppIntentConfiguration(
-            kind: "ClockCheckerboardPreview",
-            intent: SelectClockWidgetIntent.self,
-            provider: ClockBroadcastProvider()
-        ) { entry in
-            WidgetEntryView(entry: entry)
-                .containerBackground(for: .widget) {
-                    CheckerboardView()
-                }
-        }
-        .contentMarginsDisabled()
-        .containerBackgroundRemovable(false)
-    }
-}
-
 #Preview("Clock", as: .systemSmall) {
     BroadcastClockWidget()
 } timeline: {
-    WidgetEntry(date: .now, configuration: {
-        var c = WidgetConfig.defaultConfiguration
-        c.widgetKind = .clock
-        c.clockDigitPosition = .hour
-        c.clockFontSize = 80
-        c.backgroundOpacity = 0
-        return c
-    }())
+    clockPreviewEntry()
 }
 
-#Preview("Clock – transparency check", as: .systemSmall) {
-    ClockCheckerboardPreview()
+// Checkerboard previews — transparent pixels show as tiles, opaque pixels hide them.
+// Light board = simulates light wallpaper / Default appearance.
+// Dark board  = simulates dark wallpaper / Dark Mode.
+
+#Preview("Clock – light bg check", as: .systemSmall) {
+    ClockCheckerboardPreview(darkMode: false)
 } timeline: {
-    WidgetEntry(date: .now, configuration: {
-        var c = WidgetConfig.defaultConfiguration
-        c.widgetKind = .clock
-        c.clockDigitPosition = .hour
-        c.clockFontSize = 80
-        c.backgroundOpacity = 0
-        return c
-    }())
+    clockPreviewEntry()
+}
+
+#Preview("Clock – dark bg check", as: .systemSmall) {
+    ClockCheckerboardPreview(darkMode: true)
+} timeline: {
+    clockPreviewEntry()
 }
