@@ -213,7 +213,8 @@ struct BroadcastClockWidget: Widget {
 private struct ClockCheckerboardPreview: Widget {
     let darkMode: Bool
 
-    init(darkMode: Bool = false) { self.darkMode = darkMode }
+    init() { self.darkMode = false }
+    init(darkMode: Bool) { self.darkMode = darkMode }
 
     var body: some WidgetConfiguration {
         AppIntentConfiguration(
