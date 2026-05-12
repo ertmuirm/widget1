@@ -86,15 +86,15 @@ enum DisplayType: String, Codable, CaseIterable {
 enum WidgetKind: String, Codable {
     case grid
     case imageSlideshow
-    case lockScreen
     case clock
+    case lockScreen
 
     var displayName: String {
         switch self {
         case .grid:            return "Grid"
         case .imageSlideshow:  return "Code"
-        case .lockScreen:      return "Lock Screen"
         case .clock:          return "Clock"
+        case .lockScreen:      return "Lock Screen"
         }
     }
 }
@@ -104,30 +104,13 @@ enum WidgetKind: String, Codable {
 enum ClockDigitPosition: String, Codable, CaseIterable {
     case hour
     case minute
-
+    
     var displayName: String {
         switch self {
-        case .hour:   return "Hour"
-        case .minute: return "Minute"
+        case .hour:    return "Hour (12h)"
+        case .minute:  return "Minute"
         }
     }
-}
-
-// MARK: - Clock Font
-
-struct ClockFont {
-    static let predefinedFonts: [String] = [
-        "SF Pro",
-        "Helvetica Neue",
-        "Avenir Next",
-        "Futura",
-        "Gill Sans",
-        "Optima",
-        "Palatino",
-        "Times New Roman",
-        "Georgia",
-        "Courier New"
-    ]
 }
 
 // MARK: - Image Slide
@@ -197,12 +180,14 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
     var slides: [ImageSlide]?
     /// Currently displayed slide index for .imageSlideshow widgets
     var currentSlideIndex: Int?
-    /// Clock digit position (.hour or .minute)
+    /// Clock digit position for .clock widgets
     var clockDigitPosition: ClockDigitPosition?
-    /// Clock font name (nil = default SF Pro)
+    /// Clock font family name for .clock widgets (nil = system default)
     var clockFontName: String?
-    /// Clock font size (nil = default 48)
-    var clockFontSize: CGFloat?
+    /// Clock font size for .clock widgets
+    var clockFontSize: Double?
+    /// Actions for clock widget: first = tens digit, second = units digit
+    var clockActions: [WidgetItem]?
 
     init(
         id: UUID = UUID(),
@@ -219,7 +204,8 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         currentSlideIndex: Int? = nil,
         clockDigitPosition: ClockDigitPosition? = nil,
         clockFontName: String? = nil,
-        clockFontSize: CGFloat? = nil
+        clockFontSize: Double? = nil,
+        clockActions: [WidgetItem]? = nil
     ) {
         self.id = id
         self.name = name
@@ -236,6 +222,7 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         self.clockDigitPosition = clockDigitPosition
         self.clockFontName = clockFontName
         self.clockFontSize = clockFontSize
+        self.clockActions = clockActions
     }
     
     /// Default configuration for placeholder
@@ -257,22 +244,6 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         ],
         backgroundColor: CodableColor.black,
         backgroundOpacity: 1.0
-    )
-    
-    /// Default clock configuration (used as placeholder)
-    static let defaultClockConfiguration = WidgetConfig(
-        name: "Clock",
-        size: .systemMedium,
-        items: [
-            WidgetItem(id: UUID(), displayType: .text, customText: "0", fontSize: 48, foregroundColor: CodableColor.white, backgroundColor: CodableColor.clear, backgroundOpacity: 1.0, action: nil),
-            WidgetItem(id: UUID(), displayType: .text, customText: "0", fontSize: 48, foregroundColor: CodableColor.white, backgroundColor: CodableColor.clear, backgroundOpacity: 1.0, action: nil)
-        ],
-        backgroundColor: CodableColor.clear,
-        backgroundOpacity: 0,
-        widgetKind: .clock,
-        clockDigitPosition: .hour,
-        clockFontName: "SF Pro",
-        clockFontSize: 48
     )
     
     /// Computed property for max items based on widget size

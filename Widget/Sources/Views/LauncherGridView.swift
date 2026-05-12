@@ -51,7 +51,7 @@ struct LauncherGridView: View {
         }
         // Dismiss on any swipe with at least 60 pt travel in any direction.
         .gesture(
-            DragGesture(minimumDistance: 60, coordinateSpace: .local)
+            DragGesture(minimumDistance: 20, coordinateSpace: .local)
                 .onEnded { _ in dismissAndSuspend() }
         )
     }
