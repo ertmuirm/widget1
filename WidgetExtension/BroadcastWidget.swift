@@ -190,11 +190,11 @@ struct BroadcastClockWidget: Widget {
             provider: ClockBroadcastProvider()
         ) { entry in
             WidgetEntryView(entry: entry)
-                // Empty body — no background view at all. Combined with
-                // containerBackgroundRemovable(true) this gives the system
-                // full permission to render nothing behind the widget in
-                // iOS 26 Clear Mode.
-                .containerBackground(for: .widget) { }
+                // Color.clear makes the widget transparent in Default and Dark
+                // mode — the wallpaper shows through. In iOS 26 Clear Mode the
+                // system applies liquid glass on top regardless (OS-level, not
+                // suppressible via public API).
+                .containerBackground(for: .widget) { Color.clear }
         }
         .configurationDisplayName("Clock Widget")
         .description("Display hour or minute digits")
@@ -225,7 +225,7 @@ private struct ClockCheckerboardPreview: Widget {
                 CheckerboardView(darkMode: darkMode)
                 WidgetEntryView(entry: entry)
             }
-            .containerBackground(for: .widget) { }
+            .containerBackground(for: .widget) { Color.clear }
         }
         .contentMarginsDisabled()
         .containerBackgroundRemovable(false)
@@ -280,13 +280,13 @@ private func clockPreviewEntry() -> WidgetEntry {
 // Light board = simulates light wallpaper / Default appearance.
 // Dark board  = simulates dark wallpaper / Dark Mode.
 
-#Preview("Clock – light bg check", as: .systemSmall) {
+#Preview("Clock \u{2013} light bg check", as: .systemSmall) {
     ClockCheckerboardPreview(darkMode: false)
 } timeline: {
     clockPreviewEntry()
 }
 
-#Preview("Clock – dark bg check", as: .systemSmall) {
+#Preview("Clock \u{2013} dark bg check", as: .systemSmall) {
     ClockCheckerboardPreview(darkMode: true)
 } timeline: {
     clockPreviewEntry()
