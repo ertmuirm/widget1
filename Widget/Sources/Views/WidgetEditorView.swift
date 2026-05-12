@@ -55,7 +55,8 @@ struct WidgetEditorView: View {
             } else if isLockScreenWidget {
                 lockScreenItemSection
             } else if isClockWidget {
-                clockWidgetSection
+                clockSettingsSection
+                clockActionsSection
             } else {
                 gridItemsSection
                 backgroundSection
@@ -88,7 +89,22 @@ struct WidgetEditorView: View {
         // Grid item editor sheet
         .sheet(item: $editingItemIndex) { sel in
             NavigationStack {
-                ItemEditorView(item: $configuration.items[sel.id], widgetKind: configuration.widgetKind)
+                if sel.isClockAction {
+                    if let actions = configuration.clockActions, sel.id < actions.count {
+                        var editedItem = actions[sel.id]
+                        ItemEditorView(item: Binding(
+                            get: { editedItem },
+                            set: { newItem in
+                                if var actions = configuration.clockActions {
+                                    actions[sel.id] = newItem
+                                    configuration.clockActions = actions
+                                }
+                            }
+                        ), widgetKind: configuration.widgetKind)
+                    }
+                } else {
+                    ItemEditorView(item: $configuration.items[sel.id], widgetKind: configuration.widgetKind)
+                }
             }
         }
         // Slide editor sheet
@@ -197,6 +213,108 @@ struct WidgetEditorView: View {
 
     // MARK: - Grid items section
 
+    // MARK: - Clock Widget Settings
+
+    private var clockFontSizeBinding: Binding<Double> {
+        Binding(
+            get: { configuration.clockFontSize ?? 80 },
+            set: { configuration.clockFontSize = $0 }
+        )
+    }
+
+    @ViewBuilder
+    private var clockSettingsSection: some View {
+        Section("Digits") {
+            Picker("Position", selection: $configuration.clockDigitPosition) {
+                Text("Hour (12h)").tag(ClockDigitPosition.hour as ClockDigitPosition?)
+                Text("Minute").tag(ClockDigitPosition.minute as ClockDigitPosition?)
+            }
+        }
+        Section("Font") {
+            NavigationLink {
+                ClockFontPickerView(selectedFontName: $configuration.clockFontName)
+            } label: {
+                HStack {
+                    Text("Font")
+                    Spacer()
+                    Text(configuration.clockFontName ?? "Default")
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Size: \(Int(configuration.clockFontSize ?? 80)) pt")
+                Slider(value: clockFontSizeBinding, in: 20...120, step: 2)
+                    .tint(.gray)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var clockActionsSection: some View {
+        let actions = configuration.clockActions ?? []
+        Section {
+            Text("Each digit can have its own tap action (first digit = tens, second digit = units).")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        Section("Digit Actions") {
+            clockActionRow(label: "Tens Digit", index: 0, actions: actions)
+            clockActionRow(label: "Units Digit", index: 1, actions: actions)
+        }
+    }
+
+    @ViewBuilder
+    private func clockActionRow(label: String, index: Int, actions: [WidgetItem]) -> some View {
+        if index < actions.count {
+            let item = actions[index]
+            HStack {
+                Button {
+                    editingItemIndex = EditingItemIndex(id: index, isClockAction: true)
+                } label: {
+                    ItemRowView(item: item)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button {
+                    deleteClockAction(at: index)
+                } label: {
+                    Image(systemName: "trash")
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
+            }
+        } else {
+            Button {
+                addClockAction(at: index)
+            } label: {
+                Label("\(label): Add Action", systemImage: "plus")
+            }
+            .foregroundStyle(.gray)
+        }
+    }
+
+    private func deleteClockAction(at index: Int) {
+        guard var actions = configuration.clockActions, index < actions.count else { return }
+        actions[index] = WidgetItem(displayType: .icon, sfSymbolName: nil, action: nil)
+        // Remove trailing placeholder-only items to keep the array compact
+        while actions.last?.action == nil && !(actions.isEmpty) {
+            actions.removeLast()
+        }
+        configuration.clockActions = actions.isEmpty ? nil : actions
+    }
+
+    private func addClockAction(at index: Int) {
+        var actions = configuration.clockActions ?? []
+        // Pad with placeholder items so index exists
+        while actions.count <= index {
+            actions.append(WidgetItem(displayType: .icon, sfSymbolName: "star.fill"))
+        }
+        configuration.clockActions = actions
+        editingItemIndex = EditingItemIndex(id: index, isClockAction: true)
+    }
+
     // MARK: - Lock screen single-item section
 
     @ViewBuilder
@@ -226,57 +344,6 @@ struct WidgetEditorView: View {
                 }
                 .foregroundStyle(.gray)
             }
-        }
-    }
-
-    // MARK: - Clock Widget Section
-
-    private var clockWidgetSection: some View {
-        Section {
-            // Digit position picker
-            Picker("Digit Position", selection: $configuration.clockDigitPosition) {
-                ForEach(ClockDigitPosition.allCases, id: \.self) { position in
-                    Text(position.displayName).tag(position)
-                }
-            }
-            
-            // Font name picker
-            Picker("Font", selection: $configuration.clockFontName) {
-                ForEach(ClockFont.predefinedFonts, id: \.self) { font in
-                    Text(font).tag(font)
-                }
-            }
-            
-            // Font size stepper
-            Stepper(value: Binding(
-                get: { configuration.clockFontSize ?? 48 },
-                set: { configuration.clockFontSize = $0 }
-            ), in: 24...96, step: 2) {
-                HStack {
-                    Text("Font Size")
-                    Spacer()
-                    Text("\(Int(configuration.clockFontSize ?? 48)) pt")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            
-            // Digit 1 action
-            if let digit1 = configuration.items.first {
-                NavigationLink(destination: ItemEditorView(item: $configuration.items[0], widgetKind: configuration.widgetKind)) {
-                    Label("Digit 1 Action", systemImage: "1.circle")
-                }
-            }
-            
-            // Digit 2 action
-            if configuration.items.count > 1 {
-                NavigationLink(destination: ItemEditorView(item: $configuration.items[1], widgetKind: configuration.widgetKind)) {
-                    Label("Digit 2 Action", systemImage: "2.circle")
-                }
-            }
-        } header: {
-            Text("Clock Settings")
-        } footer: {
-            Text("Configure which digits to display (hour or minute) and their tap actions.")
         }
     }
 
@@ -382,7 +449,7 @@ struct WidgetEditorView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 16))
                             if let label = slide.qrCodeLabel, !label.isEmpty {
                                 Text(label)
-                                    .font(.system(size: slide.qrCodeLabelSize, weight: .bold))
+                                    .font(.system(size: 12, weight: .bold))
                                     .foregroundStyle(.white)
                                     .lineLimit(1)
                                     .padding(.horizontal, 6)
@@ -539,7 +606,7 @@ struct WidgetEditorView: View {
 
 // MARK: - Helpers
 
-struct EditingItemIndex: Identifiable { let id: Int }
+struct EditingItemIndex: Identifiable { let id: Int; var isClockAction: Bool = false }
 
 // MARK: - Slide Row View
 
@@ -597,7 +664,7 @@ struct SlideRowView: View {
                         .lineLimit(1)
                 } else if slide.isQRCode {
                     let preview = slide.qrCodeContent.map { s in
-                        s.isEmpty ? "No content" : (s.count > 24 ? String(s.prefix(24)) + "…" : s)
+                        s.isEmpty ? "No content" : (s.count > 24 ? String(s.prefix(24)) + "\u{2026}" : s)
                     } ?? "No content"
                     Text(preview)
                         .font(.caption)
@@ -804,7 +871,7 @@ struct SlideEditorView: View {
             if !slide.isQRCode && !slide.isBarcode {
                 Section("Position & Scale") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Zoom: \(String(format: "%.1f", slide.scale))×")
+                        Text("Zoom: \(String(format: "%.1f", slide.scale))\u{D7}")
                         Slider(value: $slide.scale, in: 1.0...4.0, step: 0.1)
                             .tint(.gray)
                     }
@@ -866,7 +933,7 @@ struct SlideEditorView: View {
                             HStack {
                                 Text("App Action")
                                 Spacer()
-                                Text(action.displayName ?? (action.payload.isEmpty ? "Select…" : action.payload))
+                                Text(action.displayName ?? (action.payload.isEmpty ? "Select\u{2026}" : action.payload))
                                     .foregroundStyle(action.payload.isEmpty ? .tertiary : .secondary)
                                     .lineLimit(1)
                                 Image(systemName: "chevron.right")
@@ -1064,7 +1131,46 @@ struct ItemRowView: View {
         case .icon:   return item.sfSymbolName ?? "Icon"
         case .text:   return item.customText ?? "Text"
         case .image:  return item.customImageFilename != nil ? "Image" : "No image"
-        case .qrCode: return item.qrCodeContent.map { $0.prefix(20) + ($0.count > 20 ? "…" : "") } ?? "QR Code"
+        case .qrCode: return item.qrCodeContent.map { $0.prefix(20) + ($0.count > 20 ? "\u{2026}" : "") } ?? "QR Code"
+        }
+    }
+}
+
+// MARK: - Clock Font Picker
+
+struct ClockFontPickerView: View {
+    @Binding var selectedFontName: String?
+    @Environment(\.dismiss) private var dismiss
+
+    private let families: [String] = ["Default"] + UIFont.familyNames.sorted()
+
+    var body: some View {
+        List {
+            ForEach(families, id: \.self) { family in
+                Button {
+                    selectedFontName = family == "Default" ? nil : family
+                    dismiss()
+                } label: {
+                    fontRow(family)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Font")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @ViewBuilder
+    private func fontRow(_ family: String) -> some View {
+        let isSelected = (family == "Default" && selectedFontName == nil) || family == selectedFontName
+        HStack {
+            Text(family)
+                .font(family == "Default" ? .body : Font.custom(family, size: 17))
+                .foregroundStyle(.white)
+            Spacer()
+            if isSelected {
+                Image(systemName: "checkmark").foregroundStyle(Color.accentColor)
+            }
         }
     }
 }

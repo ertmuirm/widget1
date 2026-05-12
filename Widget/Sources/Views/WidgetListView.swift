@@ -8,8 +8,8 @@ struct WidgetListView: View {
     @State private var showAddSheet = false
     @State private var showAddImageSheet = false
     @State private var showAddLockScreenSheet = false
-    @State private var showAddLauncherSheet = false
     @State private var showAddClockSheet = false
+    @State private var showAddLauncherSheet = false
     @State private var showSettingsSheet = false
 
     var body: some View {
@@ -138,21 +138,12 @@ struct WidgetListView: View {
             }
         }
         .sheet(isPresented: $showAddClockSheet) {
-            let clockFontName = UserDefaults.standard.string(forKey: "defaultClockFontName") ?? "SF Pro"
-            let clockFontSize = UserDefaults.standard.double(forKey: "defaultClockFontSize")
             let newConfig = WidgetConfig(
-                name: "Clock",
-                size: .systemMedium,
-                items: [
-                    WidgetItem(displayType: .text, customText: "0", fontSize: clockFontSize > 0 ? CGFloat(clockFontSize) : 48, foregroundColor: CodableColor.white, backgroundColor: CodableColor.clear, backgroundOpacity: 1.0, action: nil),
-                    WidgetItem(displayType: .text, customText: "0", fontSize: clockFontSize > 0 ? CGFloat(clockFontSize) : 48, foregroundColor: CodableColor.white, backgroundColor: CodableColor.clear, backgroundOpacity: 1.0, action: nil)
-                ],
-                backgroundColor: CodableColor.clear,
-                backgroundOpacity: 0,
+                name: "Clock Widget",
+                size: .systemSmall,
                 widgetKind: .clock,
                 clockDigitPosition: .hour,
-                clockFontName: clockFontName,
-                clockFontSize: clockFontSize > 0 ? clockFontSize : 48
+                clockFontSize: 80
             )
             NavigationStack {
                 WidgetEditorView(configuration: newConfig, isNew: true)
