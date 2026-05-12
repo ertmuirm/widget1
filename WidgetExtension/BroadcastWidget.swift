@@ -199,7 +199,6 @@ struct BroadcastClockWidget: Widget {
         .configurationDisplayName("Clock Widget")
         .description("Display hour or minute digits")
         .supportedFamilies([.systemSmall])
-        .contentMarginsDisabled()
         .containerBackgroundRemovable(true)
     }
 }
@@ -228,7 +227,6 @@ private struct ClockCheckerboardPreview: Widget {
             }
             .containerBackground(for: .widget) { Color.clear }
         }
-        .contentMarginsDisabled()
         .containerBackgroundRemovable(false)
     }
 }
