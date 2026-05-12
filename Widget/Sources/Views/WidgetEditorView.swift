@@ -1142,7 +1142,11 @@ struct ClockFontPickerView: View {
     @Binding var selectedFontName: String?
     @Environment(\.dismiss) private var dismiss
 
-    private let families: [String] = ["Default"] + UIFont.familyNames.sorted()
+    private let families: [String] = {
+        let custom = ["Digitaled"]
+        let system = UIFont.familyNames.sorted().filter { !custom.contains($0) }
+        return ["Default"] + custom + system
+    }()
 
     var body: some View {
         List {

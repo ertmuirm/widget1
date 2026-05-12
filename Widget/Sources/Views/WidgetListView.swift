@@ -339,6 +339,8 @@ struct WidgetPreviewView: View {
                             .font(.title2)
                             .foregroundStyle(.secondary)
                     }
+                } else if configuration.widgetKind == .clock {
+                    clockDigitsPreview
                 } else if configuration.items.isEmpty {
                     Image(systemName: "plus")
                         .font(.title2)
@@ -354,6 +356,39 @@ struct WidgetPreviewView: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    @ViewBuilder
+    private var clockDigitsPreview: some View {
+        let position = configuration.clockDigitPosition ?? .hour
+        let cal = Calendar.current
+        let now = Date()
+        let h24 = cal.component(.hour, from: now)
+        let min = cal.component(.minute, from: now)
+        let displayHour = h24 == 0 ? 12 : (h24 > 12 ? h24 - 12 : h24)
+        let value = position == .hour ? displayHour : min
+        let tens = String((value / 10) % 10)
+        let units = String(value % 10)
+        let fontSize = configuration.clockFontSize ?? 80
+        HStack(spacing: 0) {
+            Text(tens)
+                .font(clockPreviewFont(size: fontSize))
+                .foregroundStyle(.white)
+                .minimumScaleFactor(0.3)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Text(units)
+                .font(clockPreviewFont(size: fontSize))
+                .foregroundStyle(.white)
+                .minimumScaleFactor(0.3)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    private func clockPreviewFont(size: CGFloat) -> Font {
+        if let name = configuration.clockFontName {
+            return .custom(name, size: size)
+        }
+        return .system(size: size, weight: .bold)
     }
 
     private func calculateItemSize(containerSize: CGSize) -> CGSize {
