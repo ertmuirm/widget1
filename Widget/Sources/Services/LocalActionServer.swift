@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import UIKit
+import UserNotifications
 
 /// Local HTTP TCP server that listens for widget action commands on the LAN.
 ///
@@ -154,13 +155,40 @@ final class LocalActionServer {
             guard SharedStorage.shared.pendingRemoteCommandID == capturedCommandID else {
                 task.end(); return
             }
-            SharedStorage.shared.pendingRemoteCommandID = nil
-            // Use callback-based open — no Swift concurrency scheduler, executes
-            // immediately on main thread during voip wakeup without throttling.
-            ActionExecutionService.shared.executeBackground(capturedEntry.action) {
+
+            if UIApplication.shared.applicationState == .active {
+                // Foreground: execute immediately.
+                SharedStorage.shared.pendingRemoteCommandID = nil
+                ActionExecutionService.shared.executeBackground(capturedEntry.action) {
+                    task.end()
+                }
+            } else {
+                // Background/locked: iOS blocks URL opens from suspended apps.
+                // Fire an immediate local notification instead — tapping it brings
+                // the app to foreground and drainPendingRemoteCommand() executes
+                // the action. pendingRemoteCommandID is kept set for that drain.
+                LocalActionServer.notifyArrival(entry: capturedEntry, commandID: capturedCommandID)
                 task.end()
             }
         }
+    }
+
+    // MARK: - Notification trigger
+
+    /// Fires an immediate local notification so the user can tap to bring the
+    /// app to foreground and execute the command. This is the only reliable
+    /// mechanism to trigger an action on a locked/backgrounded iOS device
+    /// without an APNs certificate.
+    private static func notifyArrival(entry: PushCommandEntry, commandID: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "Remote Command"
+        content.body = entry.label.isEmpty ? entry.command : entry.label
+        content.sound = .default
+        if #available(iOS 15, *) { content.interruptionLevel = .timeSensitive }
+        let request = UNNotificationRequest(identifier: "cmd-\(commandID)",
+                                            content: content,
+                                            trigger: nil)
+        UNUserNotificationCenter.current().add(request)
     }
 
     private func send(status: Int, body: String, to connection: NWConnection) {
