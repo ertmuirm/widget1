@@ -263,8 +263,7 @@ final class SharedStorage {
         }
         UserDefaults.standard.set(data, forKey: Self.configKey)
         UserDefaults.standard.synchronize()
-        appendExtensionLog("SAVE: \(configurations.count) configs size=\(data.count) kc=\(kcWriteStatus==errSecSuccess ? "ok" : "fail(\(kcWriteStatus))")")
-    }
+        appendExtensionLog("SAVE: \(configurations.count) configs size=\(data.count) kc=\(kcWriteStatus==errSecSuccess ? "ok" : "fail(\(kcWriteStatus))")")    }
 
     func loadConfigurations() throws -> [WidgetConfig] {
         guard let data = gatherRead(forKey: Self.configKey) else {
@@ -293,8 +292,7 @@ final class SharedStorage {
         }
         if !configs.isEmpty && keychainRead(forKey: Self.configKey) == nil {
             let st = keychainWrite(data, forKey: Self.configKey)
-            appendExtensionLog("LOAD: migrated \(configs.count) configs → kc=\(st==errSecSuccess ? "ok" : "fail(\(st))")")
-        } else {
+            appendExtensionLog("LOAD: migrated \(configs.count) configs → kc=\(st==errSecSuccess ? "ok" : "fail(\(st))")")        } else {
             appendExtensionLog("LOAD: \(configs.count) configs")
         }
         return configs
@@ -707,6 +705,16 @@ final class SharedStorage {
             return v == 0 ? 8080 : v
         }
         set { UserDefaults.standard.set(newValue, forKey: "target_server_port") }
+    }
+
+    /// Command ID received while the app was backgrounded. AppDelegate drains this
+    /// in applicationDidBecomeActive and executes the corresponding action in foreground.
+    var pendingRemoteCommandID: String? {
+        get { UserDefaults.standard.string(forKey: "pendingRemoteCommandID") }
+        set {
+            if let v = newValue { UserDefaults.standard.set(v, forKey: "pendingRemoteCommandID") }
+            else { UserDefaults.standard.removeObject(forKey: "pendingRemoteCommandID") }
+        }
     }
 }
 
