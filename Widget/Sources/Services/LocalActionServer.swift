@@ -106,8 +106,8 @@ final class LocalActionServer {
             return
         }
 
-        DispatchQueue.main.async {
-            ActionExecutionService.shared.execute(action: entry.action)
+        Task { @MainActor in
+            try? await ActionExecutionService.shared.execute(action: entry.action)
         }
         send(status: 200, body: "OK: \(entry.label)", to: connection)
     }
