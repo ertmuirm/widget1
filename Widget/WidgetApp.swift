@@ -10,6 +10,10 @@ struct WidgetApp: App {
         WindowGroup {
             ContentView()
                 .onOpenURL { url in
+                    if url.scheme == "widgetar" && url.host == "execute-pending" {
+                        AppDelegate.drainPendingRemoteCommand()
+                        return
+                    }
                     Task { @MainActor in
                         if url.scheme == "widgetar" {
                             // Handled by ContentView's .onOpenURL

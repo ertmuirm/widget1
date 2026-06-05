@@ -24,8 +24,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         SharedStorage.shared.pendingRemoteCommandID = nil
         let entries = SharedStorage.shared.loadPushCommandEntries()
         guard let entry = entries.first(where: { $0.command == commandID }) else { return }
-        Task { @MainActor in
-            try? await ActionExecutionService.shared.execute(action: entry.action)
-        }
+        ActionExecutionService.shared.executeBackground(entry.action) { }
     }
 }

@@ -158,14 +158,32 @@ final class LocalActionServer {
                 task.end(); return
             }
 
-            // Execute immediately. voip mode gives real background execution time —
-            // the app is NOT suspended here, so UIApplication.open() works for URL
-            // schemes the same as it does from the foreground. Clearing the pending
-            // slot first prevents a double-fire if didBecomeActive also drains.
-            SharedStorage.shared.pendingRemoteCommandID = nil
-            ActionExecutionService.shared.executeBackground(capturedEntry.action) {
+            if UIApplication.shared.applicationState == .active {
+                // Foreground: execute directly and clear the pending slot.
+                SharedStorage.shared.pendingRemoteCommandID = nil
+                ActionExecutionService.shared.executeBackground(capturedEntry.action) {
+                    task.end()
+                }
+            } else {
+                // Background: open own URL scheme via SpringBoard so iOS brings the
+                // app to foreground. pendingRemoteCommandID stays set; the onOpenURL
+                // handler for widgetar://execute-pending drains it once foregrounded.
+                LocalActionServer.openSelfURL("widgetar://execute-pending")
                 task.end()
             }
+        }
+    }
+
+    // MARK: - SpringBoard URL open
+
+    /// Opens a URL via LSApplicationWorkspace (SpringBoard), bringing this app to foreground.
+    private static func openSelfURL(_ urlString: String) {
+        guard let url = URL(string: urlString) else { return }
+        let sel = NSSelectorFromString("openURL:")
+        if let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
+           let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject,
+           ws.responds(to: sel) {
+            ws.perform(sel, with: url)
         }
     }
 

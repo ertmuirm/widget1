@@ -49,13 +49,13 @@ struct WidgetEntryView: View {
             let a3 = actions.count > 3 ? resolveItemURL(actions[3]) : nil
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
-                    clockDigitCell(digit: hourTens,  url: a0, fontSize: fontSize)
-                    clockDigitCell(digit: hourUnits, url: a1, fontSize: fontSize)
+                    clockDigitCell(digit: hourTens,  url: a0, fontSize: fontSize, frameAlignment: .trailing)
+                    clockDigitCell(digit: hourUnits, url: a1, fontSize: fontSize, frameAlignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 HStack(spacing: 0) {
-                    clockDigitCell(digit: minTens,  url: a2, fontSize: fontSize)
-                    clockDigitCell(digit: minUnits, url: a3, fontSize: fontSize)
+                    clockDigitCell(digit: minTens,  url: a2, fontSize: fontSize, frameAlignment: .trailing)
+                    clockDigitCell(digit: minUnits, url: a3, fontSize: fontSize, frameAlignment: .leading)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -69,8 +69,8 @@ struct WidgetEntryView: View {
             let tensAction = actions.first.flatMap { resolveItemURL($0) }
             let unitsAction = actions.count > 1 ? resolveItemURL(actions[1]) : nil
             HStack(spacing: 0) {
-                clockDigitCell(digit: tens,  url: tensAction,  fontSize: fontSize)
-                clockDigitCell(digit: units, url: unitsAction, fontSize: fontSize)
+                clockDigitCell(digit: tens,  url: tensAction,  fontSize: fontSize, frameAlignment: .trailing)
+                clockDigitCell(digit: units, url: unitsAction, fontSize: fontSize, frameAlignment: .leading)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, -20)
@@ -80,13 +80,14 @@ struct WidgetEntryView: View {
     }
 
     @ViewBuilder
-    private func clockDigitCell(digit: String, url: URL?, fontSize: CGFloat) -> some View {
+    private func clockDigitCell(digit: String, url: URL?, fontSize: CGFloat,
+                                frameAlignment: Alignment = .center) -> some View {
         let foreground: Color = widgetRenderingMode == .vibrant ? .primary : .white
         let label = Text(digit)
             .font(clockFont(size: fontSize))
             .minimumScaleFactor(0.3)
             .foregroundStyle(foreground)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: frameAlignment)
 
         if let url = url {
             Link(destination: url) { label }
