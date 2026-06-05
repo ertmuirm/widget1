@@ -426,6 +426,7 @@ struct WidgetPreviewView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .padding(-16)
         } else {
             let value = position == .hour ? displayHour : min
             let tens = String((value / 10) % 10)
@@ -442,6 +443,8 @@ struct WidgetPreviewView: View {
                     .minimumScaleFactor(0.3)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            .padding(-16)
+            .offset(x: -5)
         }
     }
 
