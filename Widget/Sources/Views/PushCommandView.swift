@@ -6,7 +6,7 @@ struct PushCommandView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var entries: [PushCommandEntry] = []
-    @State private var registrationStatus: String = ""
+    @State private var lastPollDate: Date?
 
     private var topic: String { SharedStorage.shared.ntfyTopic }
 
@@ -51,15 +51,6 @@ struct PushCommandView: View {
                     }
                     .foregroundStyle(.blue)
                 }
-
-                if !registrationStatus.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: statusIcon)
-                        Text(registrationStatus)
-                    }
-                    .font(.caption)
-                    .foregroundStyle(statusColor)
-                }
             }
             .padding(.vertical, 4)
 
@@ -73,10 +64,20 @@ struct PushCommandView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.trailing)
             }
+
+            HStack(spacing: 6) {
+                Image(systemName: "clock.arrow.2.circlepath")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(lastPollText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
         } header: {
             Text("ntfy.sh Configuration")
         } footer: {
-            Text("POST your command as the message body to the publish URL. The app will execute the matching action silently in the background.")
+            Text("iOS polls ntfy.sh during background refresh — typically every 15–30 minutes depending on device usage patterns. POST your command as the message body to trigger an action.")
                 .font(.caption2)
         }
     }
@@ -118,25 +119,17 @@ struct PushCommandView: View {
 
     // MARK: - Helpers
 
-    private var statusIcon: String {
-        switch registrationStatus {
-        case "Registered":          return "checkmark.circle.fill"
-        case let s where s.hasPrefix("Error"): return "exclamationmark.triangle.fill"
-        default:                    return "clock"
-        }
-    }
-
-    private var statusColor: Color {
-        switch registrationStatus {
-        case "Registered":          return .green
-        case let s where s.hasPrefix("Error"): return .red
-        default:                    return .secondary
-        }
+    private var lastPollText: String {
+        guard let date = lastPollDate else { return "Not yet polled" }
+        let seconds = Int(-date.timeIntervalSinceNow)
+        if seconds < 60  { return "Last polled \(seconds)s ago" }
+        if seconds < 3600 { return "Last polled \(seconds / 60)m ago" }
+        return "Last polled \(seconds / 3600)h ago"
     }
 
     private func reload() {
         entries = SharedStorage.shared.loadPushCommandEntries()
-        registrationStatus = SharedStorage.shared.ntfyRegistrationStatus ?? "Not registered"
+        lastPollDate = SharedStorage.shared.ntfyLastPollDate
     }
 
     private func saveEntries() {
@@ -239,7 +232,7 @@ struct PushCommandEditorView: View {
     }
 }
 
-// MARK: - Action Type Picker (reuses ActionType display strings)
+// MARK: - Action Type Picker
 
 struct PushActionTypePicker: View {
     @Environment(\.dismiss) private var dismiss

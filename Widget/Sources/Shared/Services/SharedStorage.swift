@@ -125,10 +125,10 @@ final class SharedStorage {
 
     // MARK: - Push Command Storage
 
-    private static let pushCommandKey = "pushCommandEntries"
-    private static let ntfyTopicKey   = "ntfyTopic"
-    private static let ntfyStatusKey  = "ntfyRegistrationStatus"
-    private static let ntfyTokenKey   = "ntfyDeviceToken"
+    private static let pushCommandKey    = "pushCommandEntries"
+    private static let ntfyTopicKey      = "ntfyTopic"
+    private static let ntfyLastMsgKey    = "ntfyLastMessageID"
+    private static let ntfyLastPollKey   = "ntfyLastPollDate"
 
     func savePushCommandEntries(_ entries: [PushCommandEntry]) {
         guard let data = try? encoder.encode(entries) else { return }
@@ -154,14 +154,16 @@ final class SharedStorage {
         return topic
     }
 
-    var ntfyRegistrationStatus: String? {
-        get { UserDefaults.standard.string(forKey: Self.ntfyStatusKey) }
-        set { UserDefaults.standard.set(newValue, forKey: Self.ntfyStatusKey) }
+    /// ID of the last ntfy message processed; used as the "since" cursor for polling.
+    var ntfyLastMessageID: String? {
+        get { UserDefaults.standard.string(forKey: Self.ntfyLastMsgKey) }
+        set { UserDefaults.standard.set(newValue, forKey: Self.ntfyLastMsgKey) }
     }
 
-    var ntfyDeviceToken: String? {
-        get { UserDefaults.standard.string(forKey: Self.ntfyTokenKey) }
-        set { UserDefaults.standard.set(newValue, forKey: Self.ntfyTokenKey) }
+    /// Timestamp of the most recent background poll (for UI display).
+    var ntfyLastPollDate: Date? {
+        get { UserDefaults.standard.object(forKey: Self.ntfyLastPollKey) as? Date }
+        set { UserDefaults.standard.set(newValue, forKey: Self.ntfyLastPollKey) }
     }
 }
 

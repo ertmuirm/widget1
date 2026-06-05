@@ -1,7 +1,6 @@
 import UIKit
-import UserNotifications
 
-final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+final class AppDelegate: NSObject, UIApplicationDelegate {
 
     // MARK: - Launch
 
@@ -9,115 +8,88 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        UNUserNotificationCenter.current().delegate = self
-        requestPushAuthorization(application: application)
+        // Tell iOS to call performFetchWithCompletionHandler as often as possible.
+        // iOS still decides the exact schedule; "minimum" is just a lower bound.
+        UIApplication.shared.setMinimumBackgroundFetchInterval(
+            UIApplication.backgroundFetchIntervalMinimum
+        )
         return true
     }
 
-    // MARK: - Push Registration
-
-    private func requestPushAuthorization(application: UIApplication) {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
-            guard granted else { return }
-            DispatchQueue.main.async { application.registerForRemoteNotifications() }
-        }
-    }
-
-    func application(
-        _ application: UIApplication,
-        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
-    ) {
-        let tokenHex = deviceToken.map { String(format: "%02x", $0) }.joined()
-        SharedStorage.shared.ntfyDeviceToken = tokenHex
-        SharedStorage.shared.ntfyRegistrationStatus = "Registering…"
-        registerTokenWithNtfy(tokenHex)
-    }
-
-    func application(
-        _ application: UIApplication,
-        didFailToRegisterForRemoteNotificationsWithError error: Error
-    ) {
-        SharedStorage.shared.ntfyRegistrationStatus = "APNS error: \(error.localizedDescription)"
-    }
-
-    // MARK: - ntfy.sh Token Registration
+    // MARK: - Background Fetch — ntfy.sh HTTP Polling
     //
-    // Binds our APNS device token to our unique topic on ntfy.sh.
-    // After registration, any POST to https://ntfy.sh/<topic> is forwarded
-    // to this device as an APNS silent push.
+    // iOS calls this when it grants background CPU time (UIBackgroundModes: fetch).
+    // No push certificate or paid developer account required.
+    //
+    // Protocol:
+    //   GET https://ntfy.sh/{topic}/json?poll=1&since={lastMessageId}
+    //   Response: newline-delimited JSON, one message object per line.
+    //
+    // BATTERY: completionHandler fires immediately after dispatching matched
+    // actions so the OS can reclaim the CPU as quickly as possible.
 
-    private func registerTokenWithNtfy(_ tokenHex: String) {
+    func application(
+        _ application: UIApplication,
+        performFetchWithCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
         let topic = SharedStorage.shared.ntfyTopic
 
-        guard let url = URL(string: "https://ntfy.sh/v1/account/token") else { return }
+        // "since" is either the last seen message ID (string) or, on first run,
+        // the current Unix timestamp so we skip messages sent before monitoring started.
+        let since = SharedStorage.shared.ntfyLastMessageID
+            ?? String(Int(Date().timeIntervalSince1970))
+
+        guard let url = URL(string: "https://ntfy.sh/\(topic)/json?poll=1&since=\(since)") else {
+            completionHandler(.noData)
+            return
+        }
 
         var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 10
 
-        let body: [String: Any] = [
-            "token": tokenHex,
-            "subscriptions": [["topic": topic]]
-        ]
-        guard let bodyData = try? JSONSerialization.data(withJSONObject: body) else { return }
-        request.httpBody = bodyData
+        URLSession.shared.dataTask(with: request) { data, _, error in
+            SharedStorage.shared.ntfyLastPollDate = Date()
 
-        URLSession.shared.dataTask(with: request) { _, response, error in
-            if let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) {
-                SharedStorage.shared.ntfyRegistrationStatus = "Registered"
-            } else {
-                let detail = error?.localizedDescription
-                    ?? "HTTP \((response as? HTTPURLResponse)?.statusCode ?? 0)"
-                SharedStorage.shared.ntfyRegistrationStatus = "Error: \(detail)"
+            guard let data = data, error == nil, !data.isEmpty else {
+                completionHandler(error == nil ? .noData : .failed)
+                return
             }
+
+            let lines = String(decoding: data, as: UTF8.self)
+                .components(separatedBy: "\n")
+                .filter { !$0.isEmpty }
+
+            let entries = SharedStorage.shared.loadPushCommandEntries()
+            var lastID: String?
+            var executedAny = false
+
+            for line in lines {
+                guard
+                    let lineData = line.data(using: .utf8),
+                    let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                    json["event"] as? String == "message",
+                    let msgID   = json["id"] as? String,
+                    let message = json["message"] as? String
+                else { continue }
+
+                lastID = msgID
+
+                let command = message.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let match = entries.first(where: { $0.command == command }) else { continue }
+
+                let action = match.action
+                DispatchQueue.main.async {
+                    Task { _ = try? await ActionExecutionService.shared.execute(action: action) }
+                }
+                executedAny = true
+            }
+
+            if let id = lastID {
+                SharedStorage.shared.ntfyLastMessageID = id
+            }
+
+            // Signal OS immediately — do NOT wait for async action execution
+            completionHandler(executedAny ? .newData : .noData)
         }.resume()
-    }
-
-    // MARK: - Silent Background Push Handler
-    //
-    // Called when a silent push (content-available: 1) arrives from ntfy.sh.
-    // ntfy.sh places the published message text in the "ntfy_message" key.
-    //
-    // BATTERY: completionHandler fires immediately after dispatching the
-    // action so the OS can suspend the CPU back to sleep within milliseconds.
-    // The action itself runs fire-and-forget on the main actor.
-
-    func application(
-        _ application: UIApplication,
-        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
-        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
-    ) {
-        guard let rawMessage = userInfo["ntfy_message"] as? String else {
-            completionHandler(.noData)
-            return
-        }
-
-        let command = rawMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-        let entries = SharedStorage.shared.loadPushCommandEntries()
-
-        guard let match = entries.first(where: { $0.command == command }) else {
-            completionHandler(.noData)
-            return
-        }
-
-        // Signal OS immediately — do NOT await the action
-        completionHandler(.newData)
-
-        // Execute the mapped action on the main actor, fire-and-forget
-        let action = match.action
-        DispatchQueue.main.async {
-            Task { _ = try? await ActionExecutionService.shared.execute(action: action) }
-        }
-    }
-
-    // MARK: - Foreground Notification Display
-
-    func userNotificationCenter(
-        _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-    ) {
-        // Suppress banners for ntfy command pushes; they are silent by design
-        completionHandler([])
     }
 }
