@@ -1,7 +1,6 @@
 import Foundation
 import Network
 import UIKit
-import UserNotifications
 
 /// Local HTTP TCP server that listens for widget action commands on the LAN.
 ///
@@ -16,6 +15,9 @@ import UserNotifications
 ///   - AppDelegate observes didBecomeActiveNotification as a guaranteed fallback
 ///     for the rare case where the main queue dispatch doesn't fire in time.
 ///   - Ownership check on pendingRemoteCommandID ensures exactly one path fires.
+///   - When backgrounded, LSApplicationWorkspace.openApplicationWithBundleID: is
+///     used to bring the app to foreground via SpringBoard (same private API used
+///     elsewhere in the app), which then triggers the didBecomeActive drain.
 final class LocalActionServer {
     static let shared = LocalActionServer()
 
@@ -163,32 +165,32 @@ final class LocalActionServer {
                     task.end()
                 }
             } else {
-                // Background/locked: iOS blocks URL opens from suspended apps.
-                // Fire an immediate local notification instead — tapping it brings
-                // the app to foreground and drainPendingRemoteCommand() executes
-                // the action. pendingRemoteCommandID is kept set for that drain.
-                LocalActionServer.notifyArrival(entry: capturedEntry, commandID: capturedCommandID)
+                // Background/locked: ask SpringBoard to bring this app to the foreground
+                // via LSApplicationWorkspace — the same private API already used elsewhere
+                // in the app (URLOpener.swift / WidgetApp.swift). This bypasses the normal
+                // UIApplication.open() restriction on backgrounded apps because the call
+                // goes directly to SpringBoard. Once active, didBecomeActiveNotification
+                // fires and drainPendingRemoteCommand() executes the action.
+                // pendingRemoteCommandID remains set for that drain.
+                LocalActionServer.foregroundSelf()
                 task.end()
             }
         }
     }
 
-    // MARK: - Notification trigger
+    // MARK: - SpringBoard foreground request
 
-    /// Fires an immediate local notification so the user can tap to bring the
-    /// app to foreground and execute the command. This is the only reliable
-    /// mechanism to trigger an action on a locked/backgrounded iOS device
-    /// without an APNs certificate.
-    private static func notifyArrival(entry: PushCommandEntry, commandID: String) {
-        let content = UNMutableNotificationContent()
-        content.title = "Remote Command"
-        content.body = entry.label.isEmpty ? entry.command : entry.label
-        content.sound = .default
-        if #available(iOS 15, *) { content.interruptionLevel = .timeSensitive }
-        let request = UNNotificationRequest(identifier: "cmd-\(commandID)",
-                                            content: content,
-                                            trigger: nil)
-        UNUserNotificationCenter.current().add(request)
+    /// Asks SpringBoard to bring this app to the foreground via LSApplicationWorkspace.
+    /// Called during a voip background wakeup so the pending command can be drained
+    /// once the app becomes active.
+    private static func foregroundSelf() {
+        guard let bundleID = Bundle.main.bundleIdentifier,
+              let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
+              let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject
+        else { return }
+        let sel = NSSelectorFromString("openApplicationWithBundleID:")
+        guard ws.responds(to: sel) else { return }
+        ws.perform(sel, with: bundleID)
     }
 
     private func send(status: Int, body: String, to connection: NWConnection) {
