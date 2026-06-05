@@ -18,14 +18,11 @@ struct SettingsView: View {
         )
     }
 
-    // Bindings backed by SharedStorage so the widget extension can read them via the app group
     private var showItemLabels: Binding<Bool> {
         Binding(
             get: { SharedStorage.shared.showItemLabels },
             set: { newVal in
                 SharedStorage.shared.showItemLabels = newVal
-                // Bake value into every config so it travels via the embedded entity
-                // ID and is readable by the extension without cross-process IPC.
                 let updated = viewModel.configurations.map { c -> WidgetConfig in
                     var copy = c; copy.showItemLabels = newVal; return copy
                 }
@@ -143,6 +140,23 @@ struct SettingsView: View {
                     Text("Copy a trigger URL to use it in a home screen Shortcut or Back Tap.")
                         .font(.caption)
                 }
+            }
+
+            // Remote Control
+            Section {
+                NavigationLink(destination: ServerSettingsView()) {
+                    Label("Local Server", systemImage: "network")
+                }
+                .foregroundStyle(.white)
+                NavigationLink(destination: PushCommandView()) {
+                    Label("Command Mappings", systemImage: "terminal")
+                }
+                .foregroundStyle(.white)
+            } header: {
+                Text("Remote Control")
+            } footer: {
+                Text("Trigger widget actions from your PC via HTTP GET on the same Wi-Fi network.")
+                    .font(.caption)
             }
 
             // Backup & Restore

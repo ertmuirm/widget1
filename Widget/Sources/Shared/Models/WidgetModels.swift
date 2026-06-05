@@ -446,3 +446,19 @@ struct ExportData: Codable {
         self.configurations = configurations
     }
 }
+
+// MARK: - Push Command Entry
+
+struct PushCommandEntry: Codable, Identifiable, Equatable {
+    let id: UUID
+    var command: String
+    var label: String
+    var action: WidgetAction
+
+    init(id: UUID = UUID(), command: String = "", label: String = "", action: WidgetAction = WidgetAction()) {
+        self.id = id
+        self.command = command
+        self.label = label
+        self.action = action
+    }
+}
