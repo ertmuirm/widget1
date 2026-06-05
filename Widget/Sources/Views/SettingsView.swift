@@ -6,8 +6,6 @@ struct SettingsView: View {
 
     @EnvironmentObject var viewModel: WidgetViewModel
 
-    // MARK: - Launcher Settings (AppStorage for live updates)
-
     @AppStorage("launcherFontSize")  private var launcherFontSize: Double = 16
     @AppStorage("launcherRowHeight") private var launcherRowHeight: Double = 44
 
@@ -18,14 +16,11 @@ struct SettingsView: View {
         )
     }
 
-    // Bindings backed by SharedStorage so the widget extension can read them via the app group
     private var showItemLabels: Binding<Bool> {
         Binding(
             get: { SharedStorage.shared.showItemLabels },
             set: { newVal in
                 SharedStorage.shared.showItemLabels = newVal
-                // Bake value into every config so it travels via the embedded entity
-                // ID and is readable by the extension without cross-process IPC.
                 let updated = viewModel.configurations.map { c -> WidgetConfig in
                     var copy = c; copy.showItemLabels = newVal; return copy
                 }
@@ -48,61 +43,49 @@ struct SettingsView: View {
 
     var body: some View {
         List {
-            // General
             Section("General") {
                 Picker("Default Widget Size", selection: $defaultWidgetSize) {
                     ForEach(WidgetSize.homeScreenCases, id: \.rawValue) { size in
                         Text(size.displayName).tag(size.rawValue)
                     }
                 }
-
                 Stepper(value: $defaultTextFontSize, in: 6...30, step: 1) {
                     HStack {
                         Text("Default Text Font Size")
                         Spacer()
-                        Text("\(Int(defaultTextFontSize)) pt")
-                            .foregroundStyle(.secondary)
+                        Text("\(Int(defaultTextFontSize)) pt").foregroundStyle(.secondary)
                     }
                 }
-
                 Stepper(value: $defaultQRLabelSize, in: 6...24, step: 1) {
                     HStack {
                         Text("Default Code Label Size")
                         Spacer()
-                        Text("\(Int(defaultQRLabelSize)) pt")
-                            .foregroundStyle(.secondary)
+                        Text("\(Int(defaultQRLabelSize)) pt").foregroundStyle(.secondary)
                     }
                 }
             }
-            
-            // Clock Widget
+
             Section {
                 Picker("Clock Font", selection: $clockFontName) {
                     ForEach(ClockFont.predefinedFonts, id: \.self) { font in
                         Text(font).tag(font)
                     }
                 }
-                
                 Stepper(value: $clockFontSize, in: 24...96, step: 2) {
                     HStack {
                         Text("Font Size")
                         Spacer()
-                        Text("\(Int(clockFontSize)) pt")
-                            .foregroundStyle(.secondary)
+                        Text("\(Int(clockFontSize)) pt").foregroundStyle(.secondary)
                     }
                 }
             } header: {
                 Text("Clock Widget")
             } footer: {
-                Text("Settings for Clock widget digits. Use 24-96pt font size for best display.")
-                    .font(.caption)
+                Text("Settings for Clock widget digits. Use 24-96pt font size for best display.").font(.caption)
             }
 
-            // Widgets
             Section {
-                Toggle("Show Item Labels", isOn: showItemLabels)
-                    .foregroundStyle(.white)
-
+                Toggle("Show Item Labels", isOn: showItemLabels).foregroundStyle(.white)
                 NavigationLink(destination: WidgetPreviewSettingsView()) {
                     Label("Preview Settings", systemImage: "eye")
                 }
@@ -114,50 +97,40 @@ struct SettingsView: View {
                     .font(.caption)
             }
 
-            // Launcher Grid
             if !viewModel.launcherConfigs.isEmpty {
                 Section {
                     Stepper(value: $launcherFontSize, in: 10...30, step: 1) {
                         HStack {
                             Text("Font Size")
                             Spacer()
-                            Text("\(Int(launcherFontSize)) pt")
-                                .foregroundStyle(.secondary)
+                            Text("\(Int(launcherFontSize)) pt").foregroundStyle(.secondary)
                         }
                     }
-
                     Stepper(value: $launcherRowHeight, in: 20...80, step: 2) {
                         HStack {
                             Text("Row Height")
                             Spacer()
-                            Text("\(Int(launcherRowHeight)) pt")
-                                .foregroundStyle(.secondary)
+                            Text("\(Int(launcherRowHeight)) pt").foregroundStyle(.secondary)
                         }
                     }
-
                     Picker("Back Tap Grid", selection: backTapLauncherID) {
                         Text("None").tag("")
                         ForEach(viewModel.launcherConfigs) { launcher in
                             Text(launcher.name).tag(launcher.id.uuidString)
                         }
                     }
-
                     ForEach(viewModel.launcherConfigs) { launcher in
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(launcher.name)
-                                    .font(.subheadline)
+                                Text(launcher.name).font(.subheadline)
                                 Text(launcher.triggerURL.absoluteString)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
+                                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             }
                             Spacer()
                             Button {
                                 UIPasteboard.general.string = launcher.triggerURL.absoluteString
                             } label: {
-                                Image(systemName: "doc.on.doc")
-                                    .foregroundStyle(.secondary)
+                                Image(systemName: "doc.on.doc").foregroundStyle(.secondary)
                             }
                             .buttonStyle(.plain)
                         }
@@ -165,8 +138,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Launcher Grids")
                 } footer: {
-                    Text("Copy a trigger URL to use it in a home screen Shortcut or Back Tap.")
-                        .font(.caption)
+                    Text("Copy a trigger URL to use it in a home screen Shortcut or Back Tap.").font(.caption)
                 }
             }
 
@@ -176,49 +148,40 @@ struct SettingsView: View {
                     Label("Local Server", systemImage: "network")
                 }
                 .foregroundStyle(.white)
+                NavigationLink(destination: PushCommandView()) {
+                    Label("Command Mappings", systemImage: "terminal")
+                }
+                .foregroundStyle(.white)
             } header: {
                 Text("Remote Control")
             } footer: {
-                Text("Configure a local TCP server to trigger widget actions from your PC via HTTP GET requests on the same Wi-Fi network.")
+                Text("Trigger widget actions from your PC via HTTP GET on the same Wi-Fi network.")
                     .font(.caption)
             }
 
-            // Backup & Restore
             Section("Backup & Restore") {
-                Button {
-                    backupConfigs()
-                } label: {
+                Button { backupConfigs() } label: {
                     Label("Backup to Files", systemImage: "square.and.arrow.up")
                 }
                 .foregroundStyle(.gray)
-
-                Button {
-                    restoreConfigs()
-                } label: {
+                Button { restoreConfigs() } label: {
                     Label("Restore from Backup", systemImage: "square.and.arrow.down")
                 }
                 .foregroundStyle(.gray)
-
                 if let lastBackup = SharedStorage.shared.lastBackupDate {
                     HStack {
                         Text("Last Backup")
                         Spacer()
-                        Text(lastBackup, style: .date)
-                            .foregroundStyle(.secondary)
+                        Text(lastBackup, style: .date).foregroundStyle(.secondary)
                     }
                 }
-
                 Text("Backup file location: On My iPhone / Widget / widget_backup.json")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
-            // Debug (DEBUG only)
             #if DEBUG
             Section("Debug") {
-                Button(role: .destructive) {
-                    viewModel.deleteAllConfigurations()
-                } label: {
+                Button(role: .destructive) { viewModel.deleteAllConfigurations() } label: {
                     Label("Reset All Data", systemImage: "trash")
                 }
                 .foregroundStyle(.red)
@@ -228,15 +191,12 @@ struct SettingsView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Settings")
         .preferredColorScheme(.dark)
-        .alert(backupAlertIsError ? "Error" : "Success",
-               isPresented: $showBackupAlert) {
+        .alert(backupAlertIsError ? "Error" : "Success", isPresented: $showBackupAlert) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(backupAlertMessage)
         }
     }
-
-    // MARK: - Backup / Restore
 
     private func backupConfigs() {
         do {
@@ -281,8 +241,7 @@ struct WidgetPreviewSettingsView: View {
     var body: some View {
         List {
             Section {
-                Toggle("Show Background", isOn: $previewBackground)
-                    .foregroundStyle(.white)
+                Toggle("Show Background", isOn: $previewBackground).foregroundStyle(.white)
             } header: {
                 Text("Widget Preview")
             } footer: {
@@ -308,17 +267,12 @@ enum ThemeColors {
 
 extension View {
     func themeCard() -> some View {
-        self
-            .padding()
-            .background(ThemeColors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+        self.padding().background(ThemeColors.cardBackground).clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
 #Preview {
-    NavigationStack {
-        SettingsView()
-    }
-    .environmentObject(WidgetViewModel())
-    .preferredColorScheme(.dark)
+    NavigationStack { SettingsView() }
+        .environmentObject(WidgetViewModel())
+        .preferredColorScheme(.dark)
 }

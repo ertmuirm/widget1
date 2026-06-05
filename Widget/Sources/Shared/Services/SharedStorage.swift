@@ -29,23 +29,11 @@ final class SharedStorage {
 
     /// All app-group candidates, in priority order.
     static let appGroupCandidates: [String] = [
-        "group.com.ioswidget.J3D2F4SMVD",   // SideStore: team ID appended
-        "group.J3D2F4SMVD.com.ioswidget",   // SideStore: team ID prepended
-        "group.com.ioswidget"                // canonical / unsigned
+        "group.com.ioswidget.J3D2F4SMVD",
+        "group.J3D2F4SMVD.com.ioswidget",
+        "group.com.ioswidget"
     ]
 
-    // MARK: - Keychain shared access group
-
-    /// The keychain access group shared between the main app and widget extension.
-    ///
-    /// The entitlement hardcodes `J3D2F4SMVD.com.ioswidget.shared` (no variable
-    /// expansion needed). SideStore leaves already-prefixed team-ID groups alone.
-    /// We probe at runtime so the fallback (`com.ioswidget.shared`) covers the
-    /// simulator / unsigned builds. `SecTaskCreateFromSelf` is macOS-only, so we
-    /// use a harmless SecItemCopyMatching probe instead.
-    /// Non-nil only when a test write to the group actually succeeds (errSecSuccess).
-    /// A read-only probe returns errSecItemNotFound even without the entitlement on
-    /// some iOS versions, so we must probe with a write to get a reliable answer.
     static let sharedKeychainGroup: String? = {
         let candidates = [
             "J3D2F4SMVD.com.ioswidget.shared",
@@ -67,7 +55,7 @@ final class SharedStorage {
                 return group
             }
         }
-        return nil  // nil = keychain sharing unavailable (e.g. SideStore strips the entitlement)
+        return nil
     }()
 
     private static let keychainService = "com.ioswidget.widgetdata"
@@ -97,7 +85,6 @@ final class SharedStorage {
         query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
         let status = SecItemAdd(query as CFDictionary, nil)
         if status != errSecSuccess {
-            // Log write failure directly to standard UserDefaults (no recursion risk)
             let msg = "KC-WRITE-FAIL key=\(key) group=\(group) status=\(status)"
             let existing = UserDefaults.standard.string(forKey: Self.extensionLogKey) ?? ""
             let lines = existing.components(separatedBy: "\n").filter { !$0.isEmpty }
@@ -123,7 +110,6 @@ final class SharedStorage {
         return result as? Data
     }
 
-    /// True when the shared Keychain already contains widget config data.
     var keychainHasConfigs: Bool {
         guard let group = Self.sharedKeychainGroup else { return false }
         let query: [String: Any] = [
@@ -148,19 +134,15 @@ final class SharedStorage {
         SecItemDelete(query as CFDictionary)
     }
 
-    // MARK: - Accessors (for UI display)
+    // MARK: - Accessors
 
     var activeAppGroupID: String {
         if keychainRead(forKey: Self.configKey) != nil { return "keychain:\(Self.sharedKeychainGroup ?? "nil")" }
         for id in Self.appGroupCandidates {
-            if let ud = UserDefaults(suiteName: id), ud.data(forKey: Self.configKey) != nil {
-                return id
-            }
+            if let ud = UserDefaults(suiteName: id), ud.data(forKey: Self.configKey) != nil { return id }
         }
         for id in Self.appGroupCandidates {
-            if FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) != nil {
-                return id
-            }
+            if FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) != nil { return id }
         }
         return Self.appGroupCandidates.last!
     }
@@ -168,9 +150,6 @@ final class SharedStorage {
     var groupDiagnostic: String {
         let kcGroup = Self.sharedKeychainGroup ?? "nil"
         let kcData  = keychainRead(forKey: Self.configKey) != nil
-
-        // Live write test: write a tiny probe item and read it back, then delete.
-        // This tells us definitively if cross-process keychain is functional.
         let writeTestStatus: String
         if let group = Self.sharedKeychainGroup {
             let probe = "probe".data(using: .utf8)!
@@ -185,7 +164,6 @@ final class SharedStorage {
             wq[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
             let addSt = SecItemAdd(wq as CFDictionary, nil)
             if addSt == errSecSuccess {
-                // Try reading back immediately
                 var rq = wq; rq[kSecReturnData as String] = true; rq[kSecMatchLimit as String] = kSecMatchLimitOne
                 rq.removeValue(forKey: kSecValueData as String); rq.removeValue(forKey: kSecAttrAccessible as String)
                 var ref: AnyObject?
@@ -198,130 +176,84 @@ final class SharedStorage {
         } else {
             writeTestStatus = "no-group"
         }
-
         var lines = ["keychain:\(kcGroup): " + (kcData ? "✓data" : "✗data") + " test:\(writeTestStatus)"]
         lines += Self.appGroupCandidates.map { id -> String in
-            let hasContainer = FileManager.default.containerURL(
-                forSecurityApplicationGroupIdentifier: id) != nil
+            let hasContainer = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) != nil
             let hasData = UserDefaults(suiteName: id)?.data(forKey: Self.configKey) != nil
             return "\(id.replacingOccurrences(of: "group.", with: "")): "
-                + (hasContainer ? "✓container" : "✗container")
-                + " " + (hasData ? "✓data" : "✗data")
+                + (hasContainer ? "✓container" : "✗container") + " " + (hasData ? "✓data" : "✗data")
         }
         return lines.joined(separator: "\n")
     }
 
-    // MARK: - SCATTER write helpers
+    // MARK: - Scatter / Gather
 
     private func scatterWrite(_ data: Data, forKey key: String) {
-        // 1. Keychain (primary cross-process channel)
-        let kcStatus = keychainWrite(data, forKey: key)
-        // 2. App-group UserDefaults suites
+        keychainWrite(data, forKey: key)
         for id in Self.appGroupCandidates {
-            if let ud = UserDefaults(suiteName: id) {
-                ud.set(data, forKey: key)
-                ud.synchronize()
+            if let ud = UserDefaults(suiteName: id) { ud.set(data, forKey: key); ud.synchronize() }
+        }
+        for id in Self.appGroupCandidates {
+            if let c = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                try? data.write(to: c.appendingPathComponent("widgetConfigs.json"), options: .atomicWrite)
             }
         }
-        // 3. App-group container files
-        for id in Self.appGroupCandidates {
-            if let container = FileManager.default.containerURL(
-                forSecurityApplicationGroupIdentifier: id) {
-                let url = container.appendingPathComponent("widgetConfigs.json")
-                try? data.write(to: url, options: .atomicWrite)
-            }
-        }
-        // 4. Standard UserDefaults (process-local last resort)
-        UserDefaults.standard.set(data, forKey: key)
-        UserDefaults.standard.synchronize()
+        UserDefaults.standard.set(data, forKey: key); UserDefaults.standard.synchronize()
     }
 
-    // MARK: - GATHER read helper
-
     private func gatherRead(forKey key: String) -> Data? {
-        // 1. Keychain (primary cross-process channel)
         if let data = keychainRead(forKey: key), !data.isEmpty { return data }
-        // 2. App-group UserDefaults suites
         for id in Self.appGroupCandidates {
-            if let data = UserDefaults(suiteName: id)?.data(forKey: key), !data.isEmpty {
-                return data
+            if let data = UserDefaults(suiteName: id)?.data(forKey: key), !data.isEmpty { return data }
+        }
+        for id in Self.appGroupCandidates {
+            if let c = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                let url = c.appendingPathComponent("widgetConfigs.json")
+                if let data = try? Data(contentsOf: url), !data.isEmpty { return data }
             }
         }
-        // 3. App-group container files
-        for id in Self.appGroupCandidates {
-            if let container = FileManager.default.containerURL(
-                forSecurityApplicationGroupIdentifier: id) {
-                let url = container.appendingPathComponent("widgetConfigs.json")
-                if let data = try? Data(contentsOf: url), !data.isEmpty {
-                    return data
-                }
-            }
-        }
-        // 4. Standard UserDefaults
         return UserDefaults.standard.data(forKey: key)
     }
 
     // MARK: - Configuration CRUD
 
     func saveConfigurations(_ configurations: [WidgetConfig]) throws {
-        // Strip embedded imageData before encoding. Images are accessed by filename
-        // at render time, so inlining them here just inflates the JSON and silently
-        // blows past UserDefaults / Keychain size limits (causing the widget to load
-        // nothing). encodeEntityID() provides 80-px thumbnails for the cross-process
-        // fallback path; full-resolution access goes through loadWidgetImageData().
         var compact = configurations
         for i in compact.indices {
-            for j in (compact[i].slides ?? []).indices {
-                compact[i].slides![j].imageData = nil
-            }
-            for j in compact[i].items.indices {
-                compact[i].items[j].imageData = nil
-            }
+            for j in (compact[i].slides ?? []).indices { compact[i].slides![j].imageData = nil }
+            for j in compact[i].items.indices { compact[i].items[j].imageData = nil }
         }
         let data = try encoder.encode(compact)
         let kcWriteStatus = keychainWrite(data, forKey: Self.configKey)
-        // Scatter to UserDefaults and app-group container files
         for id in Self.appGroupCandidates {
             if let ud = UserDefaults(suiteName: id) { ud.set(data, forKey: Self.configKey); ud.synchronize() }
         }
         for id in Self.appGroupCandidates {
-            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
-                let url = container.appendingPathComponent("widgetConfigs.json")
-                try? data.write(to: url, options: .atomicWrite)
+            if let c = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                try? data.write(to: c.appendingPathComponent("widgetConfigs.json"), options: .atomicWrite)
             }
         }
-        UserDefaults.standard.set(data, forKey: Self.configKey)
-        UserDefaults.standard.synchronize()
+        UserDefaults.standard.set(data, forKey: Self.configKey); UserDefaults.standard.synchronize()
         appendExtensionLog("SAVE: \(configurations.count) configs size=\(data.count) kc=\(kcWriteStatus==errSecSuccess ? "ok" : "fail(\(kcWriteStatus))")")
     }
 
     func loadConfigurations() throws -> [WidgetConfig] {
         guard let data = gatherRead(forKey: Self.configKey) else {
-            appendExtensionLog("LOAD: no data found in any store")
-            return []
+            appendExtensionLog("LOAD: no data found in any store"); return []
         }
         var configs = try decoder.decode([WidgetConfig].self, from: data)
-        // Populate imageData from storage, preserving JSON-embedded data as cross-process fallback.
         for i in configs.indices {
-            // Slides (Image Slideshow widget)
             if configs[i].slides != nil {
                 for j in configs[i].slides!.indices {
                     let fn = configs[i].slides![j].filename
-                    guard !fn.isEmpty else { continue }  // QR slides have empty filename
-                    if let d = loadWidgetImageData(filename: fn) {
-                        configs[i].slides![j].imageData = d
-                    }
-                    // else: keep imageData already decoded from JSON (cross-process fallback)
+                    guard !fn.isEmpty else { continue }
+                    if let d = loadWidgetImageData(filename: fn) { configs[i].slides![j].imageData = d }
                 }
             }
-            // Grid / lock-screen items with displayType == .image
             for j in configs[i].items.indices {
                 guard configs[i].items[j].displayType == .image,
-                      let fn = configs[i].items[j].customImageFilename,
-                      !fn.isEmpty else { continue }
-                if let d = loadWidgetImageData(filename: fn) {
-                    configs[i].items[j].imageData = d
-                }
+                      let fn = configs[i].items[j].customImageFilename, !fn.isEmpty else { continue }
+                if let d = loadWidgetImageData(filename: fn) { configs[i].items[j].imageData = d }
             }
         }
         if !configs.isEmpty && keychainRead(forKey: Self.configKey) == nil {
@@ -346,10 +278,8 @@ final class SharedStorage {
         for id in Self.appGroupCandidates {
             UserDefaults(suiteName: id)?.removeObject(forKey: Self.configKey)
             UserDefaults(suiteName: id)?.synchronize()
-            if let container = FileManager.default.containerURL(
-                forSecurityApplicationGroupIdentifier: id) {
-                try? FileManager.default.removeItem(
-                    at: container.appendingPathComponent("widgetConfigs.json"))
+            if let c = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                try? FileManager.default.removeItem(at: c.appendingPathComponent("widgetConfigs.json"))
             }
         }
         UserDefaults.standard.removeObject(forKey: Self.configKey)
@@ -361,47 +291,30 @@ final class SharedStorage {
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime]
         let line = "[\(iso.string(from: Date()))] \(message)"
-
-        // Write log to keychain
-        let existing = keychainRead(forKey: Self.extensionLogKey)
-            .flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        let existing = keychainRead(forKey: Self.extensionLogKey).flatMap { String(data: $0, encoding: .utf8) } ?? ""
         let lines = existing.components(separatedBy: "\n").filter { !$0.isEmpty }
         let updated = (Array(lines.suffix(30)) + [line]).joined(separator: "\n")
-        if let data = updated.data(using: .utf8) {
-            keychainWrite(data, forKey: Self.extensionLogKey)
-        }
-
-        // Also write to all UserDefaults
+        if let data = updated.data(using: .utf8) { keychainWrite(data, forKey: Self.extensionLogKey) }
         for id in Self.appGroupCandidates {
             if let ud = UserDefaults(suiteName: id) {
                 let ex = ud.string(forKey: Self.extensionLogKey) ?? ""
                 let ls = ex.components(separatedBy: "\n").filter { !$0.isEmpty }
-                ud.set((Array(ls.suffix(30)) + [line]).joined(separator: "\n"),
-                       forKey: Self.extensionLogKey)
+                ud.set((Array(ls.suffix(30)) + [line]).joined(separator: "\n"), forKey: Self.extensionLogKey)
                 ud.synchronize()
             }
         }
         let ex = UserDefaults.standard.string(forKey: Self.extensionLogKey) ?? ""
         let ls = ex.components(separatedBy: "\n").filter { !$0.isEmpty }
-        UserDefaults.standard.set(
-            (Array(ls.suffix(30)) + [line]).joined(separator: "\n"),
-            forKey: Self.extensionLogKey)
+        UserDefaults.standard.set((Array(ls.suffix(30)) + [line]).joined(separator: "\n"), forKey: Self.extensionLogKey)
     }
 
     func readExtensionLog() -> String {
-        // Try Keychain first
         if let data = keychainRead(forKey: Self.extensionLogKey),
-           let log = String(data: data, encoding: .utf8), !log.isEmpty {
-            return log
-        }
+           let log = String(data: data, encoding: .utf8), !log.isEmpty { return log }
         for id in Self.appGroupCandidates {
-            if let log = UserDefaults(suiteName: id)?.string(forKey: Self.extensionLogKey),
-               !log.isEmpty {
-                return log
-            }
+            if let log = UserDefaults(suiteName: id)?.string(forKey: Self.extensionLogKey), !log.isEmpty { return log }
         }
-        return UserDefaults.standard.string(forKey: Self.extensionLogKey)
-            ?? "No extension log found"
+        return UserDefaults.standard.string(forKey: Self.extensionLogKey) ?? "No extension log found"
     }
 
     func clearExtensionLog() {
@@ -415,43 +328,32 @@ final class SharedStorage {
 
     // MARK: - Widget Image Storage
 
-    /// Directory where widget slide images are stored.
-    /// Tries app group container first (accessible by both targets), falls back to Documents.
     func widgetImagesDirectory() -> URL {
         for id in Self.appGroupCandidates {
-            if let container = FileManager.default.containerURL(
-                forSecurityApplicationGroupIdentifier: id) {
-                let dir = container.appendingPathComponent("widget_images")
+            if let c = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                let dir = c.appendingPathComponent("widget_images")
                 try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
                 return dir
             }
         }
-        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("widget_images")
+        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("widget_images")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
 
     func saveWidgetImage(_ data: Data, filename: String) {
-        // Write to app-group container files (primary cross-process channel for images).
-        // UserDefaults is intentionally omitted — individual image blobs push it over
-        // its ~1 MB limit and prevent synchronisation across processes.
         for id in Self.appGroupCandidates {
-            if let container = FileManager.default.containerURL(
-                forSecurityApplicationGroupIdentifier: id) {
-                let dir = container.appendingPathComponent("widget_images")
+            if let c = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                let dir = c.appendingPathComponent("widget_images")
                 try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
                 try? data.write(to: dir.appendingPathComponent(filename), options: .atomicWrite)
             }
         }
-        // Documents fallback (readable by main app only, but useful for editor preview)
-        let docDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("widget_images")
+        let docDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("widget_images")
         try? FileManager.default.createDirectory(at: docDir, withIntermediateDirectories: true)
         try? data.write(to: docDir.appendingPathComponent(filename), options: .atomicWrite)
     }
 
-    /// Load raw JPEG bytes for a slide image (used to populate imageData after deserialization).
     func loadWidgetImageData(filename: String) -> Data? {
         let udKey = "wi_\(filename)"
         if let d = keychainRead(forKey: udKey), !d.isEmpty { return d }
@@ -467,7 +369,6 @@ final class SharedStorage {
         for id in Self.appGroupCandidates {
             if let d = UserDefaults(suiteName: id)?.data(forKey: udKey), !d.isEmpty { return d }
         }
-        // Standard UserDefaults — always readable in same process
         if let d = UserDefaults.standard.data(forKey: udKey), !d.isEmpty { return d }
         return nil
     }
@@ -481,11 +382,8 @@ final class SharedStorage {
     func deleteWidgetImage(filename: String) {
         keychainDelete(forKey: "wi_\(filename)")
         for id in Self.appGroupCandidates {
-            if let container = FileManager.default.containerURL(
-                forSecurityApplicationGroupIdentifier: id) {
-                try? FileManager.default.removeItem(
-                    at: container.appendingPathComponent("widget_images")
-                        .appendingPathComponent(filename))
+            if let c = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                try? FileManager.default.removeItem(at: c.appendingPathComponent("widget_images").appendingPathComponent(filename))
             }
         }
         let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -493,15 +391,12 @@ final class SharedStorage {
         try? FileManager.default.removeItem(at: url)
         let udKey = "wi_\(filename)"
         for id in Self.appGroupCandidates {
-            UserDefaults(suiteName: id)?.removeObject(forKey: udKey)
-            UserDefaults(suiteName: id)?.synchronize()
+            UserDefaults(suiteName: id)?.removeObject(forKey: udKey); UserDefaults(suiteName: id)?.synchronize()
         }
     }
 
     // MARK: - Backup / Restore
 
-    /// Combined backup format. The launcherConfigs field is optional so old backup
-    /// files (plain [WidgetConfig] array or CombinedBackup without launchers) still load.
     struct CombinedBackup: Codable {
         var widgetConfigs: [WidgetConfig]
         var launcherConfigs: [LauncherConfig]?
@@ -511,7 +406,6 @@ final class SharedStorage {
         let widgetConfigs   = try loadConfigurations()
         let launcherConfigs = (try? loadLauncherConfigs()) ?? []
         guard !widgetConfigs.isEmpty || !launcherConfigs.isEmpty else { return nil }
-
         let payload = CombinedBackup(widgetConfigs: widgetConfigs, launcherConfigs: launcherConfigs)
         let json = try encoder.encode(payload)
         let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
@@ -521,7 +415,6 @@ final class SharedStorage {
         return backupURL
     }
 
-    /// Returns (restoredWidgetConfigs, restoredLauncherConfigs).
     @discardableResult
     func restoreFromBackup() throws -> Bool {
         let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
@@ -537,94 +430,64 @@ final class SharedStorage {
         return false
     }
 
-    func exportToJSON(_ configurations: [WidgetConfig]) throws -> Data {
-        try encoder.encode(configurations)
-    }
+    func exportToJSON(_ configurations: [WidgetConfig]) throws -> Data { try encoder.encode(configurations) }
+    func importFromJSON(_ data: Data) throws -> [WidgetConfig] { try decoder.decode([WidgetConfig].self, from: data) }
 
-    func importFromJSON(_ data: Data) throws -> [WidgetConfig] {
-        try decoder.decode([WidgetConfig].self, from: data)
-    }
-
-    // MARK: - Auto-backup (timestamped, non-overwriting)
-
-    /// Creates a timestamped backup in Documents/Backups/. Never overwrites an existing file.
-    /// Keeps only the 5 most recent auto-backups.
     func createAutoBackup() throws {
         let widgetConfigs   = try loadConfigurations()
         let launcherConfigs = (try? loadLauncherConfigs()) ?? []
         guard !widgetConfigs.isEmpty || !launcherConfigs.isEmpty else { return }
-
         let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let backupDir = docsURL.appendingPathComponent("Backups", isDirectory: true)
         try FileManager.default.createDirectory(at: backupDir, withIntermediateDirectories: true)
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd_HHmm"
+        let formatter = DateFormatter(); formatter.dateFormat = "yyyy-MM-dd_HHmm"
         let filename = "widget_backup_\(formatter.string(from: Date())).json"
         let backupURL = backupDir.appendingPathComponent(filename)
         guard !FileManager.default.fileExists(atPath: backupURL.path) else { return }
-
         let payload = CombinedBackup(widgetConfigs: widgetConfigs, launcherConfigs: launcherConfigs)
         let json = try encoder.encode(payload)
         try json.write(to: backupURL, options: .atomicWrite)
-
         let existing = (try? listAutoBackups()) ?? []
-        if existing.count > 5 {
-            for old in existing.dropFirst(5) { try? FileManager.default.removeItem(at: old) }
-        }
+        if existing.count > 5 { for old in existing.dropFirst(5) { try? FileManager.default.removeItem(at: old) } }
     }
 
-    /// Returns auto-backup URLs sorted newest-first.
     func listAutoBackups() throws -> [URL] {
         let docsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let backupDir = docsURL.appendingPathComponent("Backups", isDirectory: true)
         guard FileManager.default.fileExists(atPath: backupDir.path) else { return [] }
-        let files = try FileManager.default.contentsOfDirectory(
-            at: backupDir, includingPropertiesForKeys: [.creationDateKey])
+        let files = try FileManager.default.contentsOfDirectory(at: backupDir, includingPropertiesForKeys: [.creationDateKey])
         return files
             .filter { $0.pathExtension == "json" && $0.lastPathComponent.hasPrefix("widget_backup_") }
             .sorted { $0.lastPathComponent > $1.lastPathComponent }
     }
 
-    /// Restores configurations from a specific auto-backup URL.
     func restoreFromAutoBackup(url: URL) throws {
-        let data = try Data(contentsOf: url)
-        try restoreBackupData(data)
+        let data = try Data(contentsOf: url); try restoreBackupData(data)
     }
 
-    /// Decodes a backup file and saves both widget and launcher configs.
-    /// Handles three formats: CombinedBackup, legacy [WidgetConfig] array.
     private func restoreBackupData(_ data: Data) throws {
         if let combined = try? decoder.decode(CombinedBackup.self, from: data) {
             try saveConfigurations(combined.widgetConfigs)
-            if let launchers = combined.launcherConfigs {
-                try saveLauncherConfigs(launchers)
-            }
+            if let launchers = combined.launcherConfigs { try saveLauncherConfigs(launchers) }
         } else {
-            // Legacy format: plain array of WidgetConfig
-            let configs = try decoder.decode([WidgetConfig].self, from: data)
-            try saveConfigurations(configs)
+            try saveConfigurations(try decoder.decode([WidgetConfig].self, from: data))
         }
     }
 
     func getStorageInfo() throws -> StorageInfo {
         let configs = try loadConfigurations()
-        return StorageInfo(appGroupID: activeAppGroupID,
-                           configurationCount: configs.count,
-                           size: configs.count)
+        return StorageInfo(appGroupID: activeAppGroupID, configurationCount: configs.count, size: configs.count)
     }
 
     // MARK: - Preferences
 
     private func keychainBool(forKey key: String) -> Bool? {
-        guard let data = keychainRead(forKey: key),
-              let str = String(data: data, encoding: .utf8) else { return nil }
+        guard let data = keychainRead(forKey: key), let str = String(data: data, encoding: .utf8) else { return nil }
         return str == "true"
     }
 
     private func setKeychainBool(_ value: Bool, forKey key: String) {
-        let str = value ? "true" : "false"
-        if let data = str.data(using: .utf8) { keychainWrite(data, forKey: key) }
+        if let data = (value ? "true" : "false").data(using: .utf8) { keychainWrite(data, forKey: key) }
     }
 
     var hasCompletedOnboarding: Bool {
@@ -635,9 +498,7 @@ final class SharedStorage {
     var lastBackupDate: Date? {
         get {
             for id in Self.appGroupCandidates {
-                if let d = UserDefaults(suiteName: id)?.object(forKey: "lastBackupDate") as? Date {
-                    return d
-                }
+                if let d = UserDefaults(suiteName: id)?.object(forKey: "lastBackupDate") as? Date { return d }
             }
             return nil
         }
@@ -651,12 +512,9 @@ final class SharedStorage {
 
     var showItemLabels: Bool {
         get {
-            // Keychain first (cross-process)
             if let val = keychainBool(forKey: "showItemLabels") { return val }
             for id in Self.appGroupCandidates {
-                if let val = UserDefaults(suiteName: id)?.object(forKey: "showItemLabels") as? Bool {
-                    return val
-                }
+                if let val = UserDefaults(suiteName: id)?.object(forKey: "showItemLabels") as? Bool { return val }
             }
             return true
         }
@@ -672,9 +530,7 @@ final class SharedStorage {
     var hapticFeedback: Bool {
         get {
             for id in Self.appGroupCandidates {
-                if let val = UserDefaults(suiteName: id)?.object(forKey: "hapticFeedback") as? Bool {
-                    return val
-                }
+                if let val = UserDefaults(suiteName: id)?.object(forKey: "hapticFeedback") as? Bool { return val }
             }
             return true
         }
@@ -694,13 +550,9 @@ final class SharedStorage {
         let data = try encoder.encode(configs)
         keychainWrite(data, forKey: Self.launcherKey)
         for id in Self.appGroupCandidates {
-            if let ud = UserDefaults(suiteName: id) {
-                ud.set(data, forKey: Self.launcherKey)
-                ud.synchronize()
-            }
+            if let ud = UserDefaults(suiteName: id) { ud.set(data, forKey: Self.launcherKey); ud.synchronize() }
         }
-        UserDefaults.standard.set(data, forKey: Self.launcherKey)
-        UserDefaults.standard.synchronize()
+        UserDefaults.standard.set(data, forKey: Self.launcherKey); UserDefaults.standard.synchronize()
     }
 
     func loadLauncherConfigs() throws -> [LauncherConfig] {
@@ -746,9 +598,7 @@ final class SharedStorage {
 
     func loadPushCommandEntries() -> [PushCommandEntry] {
         guard let data = UserDefaults.standard.data(forKey: Self.pushCommandKey),
-              let entries = try? decoder.decode([PushCommandEntry].self, from: data) else {
-            return []
-        }
+              let entries = try? decoder.decode([PushCommandEntry].self, from: data) else { return [] }
         return entries
     }
 

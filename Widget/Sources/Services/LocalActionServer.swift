@@ -39,17 +39,13 @@ final class LocalActionServer {
         endBackgroundTask()
     }
 
-    func restart() {
-        stop()
-        start()
-    }
+    func restart() { stop(); start() }
 
     // MARK: - Background Task
 
     private func refreshBackgroundTask() {
         endBackgroundTask()
         bgTask = UIApplication.shared.beginBackgroundTask(withName: "LocalActionServer") { [weak self] in
-            // Re-request on expiry to maximise uptime while app is backgrounded
             self?.refreshBackgroundTask()
         }
     }
@@ -65,14 +61,10 @@ final class LocalActionServer {
     private func handle(connection: NWConnection) {
         connection.start(queue: queue)
         let saved = SharedStorage.shared.allowedSSID
-        guard !saved.isEmpty else {
-            receiveRequest(on: connection)
-            return
-        }
-        // SSID guard: compare current SSID to the saved one.
-        // If SSID cannot be read (entitlement missing → nil), allow the connection.
+        guard !saved.isEmpty else { receiveRequest(on: connection); return }
+        // If SSID cannot be read (entitlement absent → nil), allow the connection.
         NEHotspotNetwork.fetchCurrent { [weak self] network in
-            guard let self = self else { return }
+            guard let self else { return }
             if network == nil || network?.ssid == saved {
                 self.receiveRequest(on: connection)
             } else {
@@ -83,17 +75,10 @@ final class LocalActionServer {
 
     private func receiveRequest(on connection: NWConnection) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 4096) { [weak self] data, _, _, _ in
-            guard let self = self, let data = data, !data.isEmpty else {
-                connection.cancel()
-                return
-            }
+            guard let self, let data, !data.isEmpty else { connection.cancel(); return }
             let raw = String(decoding: data, as: UTF8.self)
-            let firstLine = raw.components(separatedBy: "\r\n").first ?? ""
-            let parts = firstLine.components(separatedBy: " ")
-            guard parts.count >= 2 else {
-                self.sendResponse(on: connection, status: 400, body: "Bad Request")
-                return
-            }
+            let parts = (raw.components(separatedBy: "\r\n").first ?? "").components(separatedBy: " ")
+            guard parts.count >= 2 else { self.sendResponse(on: connection, status: 400, body: "Bad Request"); return }
             self.dispatch(path: parts[1], on: connection)
         }
     }
@@ -103,19 +88,14 @@ final class LocalActionServer {
             let url = URL(string: "http://localhost" + path),
             url.path == "/execute-widget-action",
             let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
-            let id = items.first(where: { $0.name == "id" })?.value,
-            !id.isEmpty
-        else {
-            sendResponse(on: connection, status: 404, body: "Not Found")
-            return
-        }
+            let id = items.first(where: { $0.name == "id" })?.value, !id.isEmpty
+        else { sendResponse(on: connection, status: 404, body: "Not Found"); return }
 
         let entries = SharedStorage.shared.loadPushCommandEntries()
         guard let match = entries.first(where: { $0.command == id }) else {
             sendResponse(on: connection, status: 404, body: "Command not found: \(id)")
             return
         }
-
         let action = match.action
         DispatchQueue.main.async {
             Task { _ = try? await ActionExecutionService.shared.execute(action: action) }
@@ -136,8 +116,6 @@ final class LocalActionServer {
         let header = "HTTP/1.1 \(status) \(statusText)\r\nContent-Length: \(bodyData.count)\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n"
         var response = header.data(using: .utf8)!
         response.append(bodyData)
-        connection.send(content: response, completion: .contentProcessed { _ in
-            connection.cancel()
-        })
+        connection.send(content: response, completion: .contentProcessed { _ in connection.cancel() })
     }
 }

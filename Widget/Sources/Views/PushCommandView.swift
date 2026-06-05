@@ -1,76 +1,52 @@
 import SwiftUI
 
-// MARK: - Push Command List (main sheet)
+// MARK: - Push Command List
+// Presented as a NavigationLink destination from SettingsView → Remote Control.
 
 struct PushCommandView: View {
-    @Environment(\.dismiss) private var dismiss
-
     @State private var entries: [PushCommandEntry] = []
 
     var body: some View {
-        NavigationStack {
-            List {
-                commandsSection
-            }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Command Mappings")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+        List {
+            Section {
+                ForEach(entries.indices, id: \.self) { index in
+                    NavigationLink {
+                        PushCommandEditorView(entry: $entries[index], onChanged: saveEntries)
+                    } label: {
+                        PushCommandRowView(entry: entries[index])
+                    }
                 }
-            }
-            .onAppear { reload() }
-        }
-    }
+                .onDelete { indexSet in
+                    entries.remove(atOffsets: indexSet)
+                    saveEntries()
+                }
 
-    // MARK: - Commands Section
-
-    private var commandsSection: some View {
-        Section {
-            ForEach(entries.indices, id: \.self) { index in
-                NavigationLink {
-                    PushCommandEditorView(
-                        entry: $entries[index],
-                        onChanged: saveEntries
-                    )
+                Button {
+                    entries.append(PushCommandEntry())
+                    saveEntries()
                 } label: {
-                    PushCommandRowView(entry: entries[index])
+                    Label("Add Command", systemImage: "plus")
                 }
-            }
-            .onDelete { indexSet in
-                entries.remove(atOffsets: indexSet)
-                saveEntries()
-            }
+                .foregroundStyle(.blue)
 
-            Button {
-                entries.append(PushCommandEntry())
-                saveEntries()
-            } label: {
-                Label("Add Command", systemImage: "plus")
+            } header: {
+                Text("Commands (\(entries.count))")
+            } footer: {
+                Text("Each command maps a text ID to an action. Trigger with:\nGET http://<iPhone-IP>:<PORT>/execute-widget-action?id=YOUR_COMMAND\nCommands are case-sensitive.")
+                    .font(.caption2)
             }
-            .foregroundStyle(.blue)
-
-        } header: {
-            Text("Commands (\(entries.count))")
-        } footer: {
-            Text("Each command maps a text ID to an action. Trigger via GET http://<iPhone-IP>:<PORT>/execute-widget-action?id=YOUR_COMMAND — commands are case-sensitive.")
-                .font(.caption2)
         }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Command Mappings")
+        .navigationBarTitleDisplayMode(.inline)
+        .preferredColorScheme(.dark)
+        .onAppear { entries = SharedStorage.shared.loadPushCommandEntries() }
     }
 
-    // MARK: - Helpers
-
-    private func reload() {
-        entries = SharedStorage.shared.loadPushCommandEntries()
-    }
-
-    private func saveEntries() {
-        SharedStorage.shared.savePushCommandEntries(entries)
-    }
+    private func saveEntries() { SharedStorage.shared.savePushCommandEntries(entries) }
 }
 
-// MARK: - Row View
+// MARK: - Row
 
 struct PushCommandRowView: View {
     let entry: PushCommandEntry
@@ -80,30 +56,22 @@ struct PushCommandRowView: View {
             Text(entry.command.isEmpty ? "(no command set)" : entry.command)
                 .font(.headline)
                 .foregroundStyle(entry.command.isEmpty ? .secondary : .white)
-
             if !entry.label.isEmpty {
-                Text(entry.label)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                Text(entry.label).font(.subheadline).foregroundStyle(.secondary)
             }
-
-            let payloadSuffix = entry.action.payload.isEmpty ? "" : ": \(entry.action.payload)"
-            Text(entry.action.type.displayName + payloadSuffix)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            let suffix = entry.action.payload.isEmpty ? "" : ": \(entry.action.payload)"
+            Text(entry.action.type.displayName + suffix).font(.caption).foregroundStyle(.secondary)
         }
         .padding(.vertical, 2)
     }
 }
 
-// MARK: - Editor View
+// MARK: - Editor
 
 struct PushCommandEditorView: View {
     @Environment(\.dismiss) private var dismiss
-
     @Binding var entry: PushCommandEntry
     let onChanged: () -> Void
-
     @State private var showActionTypePicker = false
 
     var body: some View {
@@ -113,11 +81,9 @@ struct PushCommandEditorView: View {
                     .foregroundStyle(.white)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-
                 TextField("Label (optional description)", text: $entry.label)
                     .foregroundStyle(.white)
             }
-
             Section("Action") {
                 Button {
                     showActionTypePicker = true
@@ -125,26 +91,20 @@ struct PushCommandEditorView: View {
                     HStack {
                         Text("Type")
                         Spacer()
-                        Text(entry.action.type.displayName)
-                            .foregroundStyle(.secondary)
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
+                        Text(entry.action.type.displayName).foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
                     }
                 }
                 .foregroundStyle(.white)
 
                 if entry.action.type == .urlScheme {
                     TextField("URL Scheme (e.g. myapp://action)", text: $entry.action.payload)
-                        .foregroundStyle(.white)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                        .foregroundStyle(.white).textInputAutocapitalization(.never).autocorrectionDisabled()
                 } else {
                     TextField(
                         entry.action.type == .appIntent ? "Intent Name" : "Shortcut Name",
                         text: $entry.action.payload
-                    )
-                    .foregroundStyle(.white)
+                    ).foregroundStyle(.white)
                 }
             }
         }
@@ -153,10 +113,7 @@ struct PushCommandEditorView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Done") {
-                    onChanged()
-                    dismiss()
-                }
+                Button("Done") { onChanged(); dismiss() }
             }
         }
         .sheet(isPresented: $showActionTypePicker) {
@@ -176,22 +133,16 @@ struct PushActionTypePicker: View {
             List {
                 ForEach(ActionType.allCases, id: \.self) { type in
                     Button {
-                        selectedType = type
-                        dismiss()
+                        selectedType = type; dismiss()
                     } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(type.displayName)
-                                    .font(.headline)
-                                    .foregroundStyle(.white)
-                                Text(type.description)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                Text(type.displayName).font(.headline).foregroundStyle(.white)
+                                Text(type.description).font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
                             if type == selectedType {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(.blue)
+                                Image(systemName: "checkmark").foregroundStyle(.blue)
                             }
                         }
                     }
@@ -200,15 +151,8 @@ struct PushActionTypePicker: View {
             .listStyle(.insetGrouped)
             .navigationTitle("Action Type")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
             }
         }
     }
-}
-
-#Preview {
-    PushCommandView()
-        .preferredColorScheme(.dark)
 }

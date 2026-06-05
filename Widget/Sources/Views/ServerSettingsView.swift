@@ -20,7 +20,6 @@ struct ServerSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-
                 HStack {
                     Text("Allowed SSID")
                     Spacer()
@@ -30,7 +29,6 @@ struct ServerSettingsView: View {
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                 }
-
                 HStack {
                     Text("Listen Port")
                     Spacer()
@@ -43,7 +41,7 @@ struct ServerSettingsView: View {
             } header: {
                 Text("Configuration")
             } footer: {
-                Text("Leave Allowed SSID blank to accept connections from any Wi-Fi. If the SSID entitlement is unavailable, the check is skipped and all connections are allowed.")
+                Text("Leave Allowed SSID blank to accept connections from any Wi-Fi. If the SSID entitlement is unavailable the check is skipped.")
                     .font(.caption2)
             }
 
@@ -56,7 +54,6 @@ struct ServerSettingsView: View {
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.trailing)
                 }
-
                 HStack {
                     Text("Status")
                     Spacer()
@@ -66,15 +63,12 @@ struct ServerSettingsView: View {
                     Text(isRunning ? "Running" : "Stopped")
                         .foregroundStyle(isRunning ? .green : .red)
                 }
-
-                Button("Save & Restart") {
-                    saveAndRestart()
-                }
-                .foregroundStyle(.blue)
+                Button("Save & Restart") { saveAndRestart() }
+                    .foregroundStyle(.blue)
             } header: {
                 Text("Server")
             } footer: {
-                Text("Replace <iPhone-IP> with the device IP from Settings → Wi-Fi. Example: http://<iPhone-IP>:\(effectivePort)/execute-widget-action?id=YOUR_COMMAND")
+                Text("Find your iPhone IP in Settings → Wi-Fi → your network. Example: http://<iPhone-IP>:\(effectivePort)/execute-widget-action?id=YOUR_COMMAND")
                     .font(.caption2)
             }
         }
@@ -85,9 +79,7 @@ struct ServerSettingsView: View {
         .onAppear {
             isRunning = LocalActionServer.shared.isRunning
             NEHotspotNetwork.fetchCurrent { network in
-                DispatchQueue.main.async {
-                    currentSSID = network?.ssid ?? "Unavailable"
-                }
+                DispatchQueue.main.async { currentSSID = network?.ssid ?? "Unavailable" }
             }
         }
     }
@@ -103,8 +95,5 @@ struct ServerSettingsView: View {
 }
 
 #Preview {
-    NavigationStack {
-        ServerSettingsView()
-    }
-    .preferredColorScheme(.dark)
+    NavigationStack { ServerSettingsView() }.preferredColorScheme(.dark)
 }
