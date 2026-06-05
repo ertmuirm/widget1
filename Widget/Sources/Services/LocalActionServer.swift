@@ -1,16 +1,15 @@
 import Foundation
 import Network
-import NetworkExtension
 import UIKit
 
 /// Local HTTP TCP server that listens for widget action commands on the LAN.
-/// Only starts when a specific Wi-Fi SSID is configured AND the device is currently
-/// connected to that network. If no SSID is configured the server stays fully off
-/// so it consumes no background battery.
+/// Starts automatically when Wi-Fi is connected and an SSID is configured.
+/// Uses NWPathMonitor (no special entitlement) instead of NEHotspotNetwork.
 final class LocalActionServer {
     static let shared = LocalActionServer()
 
     private var listener: NWListener?
+    private var pathMonitor: NWPathMonitor?
     private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
 
     private init() {}
@@ -19,30 +18,49 @@ final class LocalActionServer {
 
     // MARK: - Public API
 
+    /// Start the server. No-op if no SSID is configured.
     func start() {
-        let ssid = SharedStorage.shared.allowedSSID
-        // If no SSID is configured the server is intentionally disabled.
-        guard !ssid.isEmpty else { return }
-
-        NEHotspotNetwork.fetchCurrent { [weak self] network in
-            guard let self else { return }
-            // Only start if we are actually on the configured network.
-            // nil means Wi-Fi is not connected — do not run.
-            guard let currentSSID = network?.ssid, currentSSID == ssid else { return }
-            DispatchQueue.main.async { self.startListener() }
+        guard !SharedStorage.shared.allowedSSID.isEmpty else {
+            stop()
+            return
         }
+        startPathMonitor()
     }
 
+    /// Stop the server and path monitor entirely.
     func stop() {
-        listener?.cancel()
-        listener = nil
-        endBackgroundTask()
+        pathMonitor?.cancel()
+        pathMonitor = nil
+        stopListener()
+    }
+
+    // MARK: - Wi-Fi path monitor
+
+    private func startPathMonitor() {
+        pathMonitor?.cancel()
+        let monitor = NWPathMonitor(requiredInterfaceType: .wifi)
+        pathMonitor = monitor
+        monitor.pathUpdateHandler = { [weak self] path in
+            DispatchQueue.main.async {
+                if path.status == .satisfied {
+                    self?.startListenerIfNeeded()
+                } else {
+                    self?.stopListener()
+                }
+            }
+        }
+        monitor.start(queue: .global(qos: .utility))
+    }
+
+    private func startListenerIfNeeded() {
+        guard !SharedStorage.shared.allowedSSID.isEmpty else { stopListener(); return }
+        guard listener == nil else { return }
+        startListener()
     }
 
     // MARK: - Listener lifecycle
 
     private func startListener() {
-        stop()
         let portNumber = UInt16(clamping: SharedStorage.shared.serverPort)
         let port = NWEndpoint.Port(rawValue: portNumber) ?? 8080
         guard let listener = try? NWListener(using: .tcp, on: port) else { return }
@@ -51,19 +69,22 @@ final class LocalActionServer {
         listener.newConnectionHandler = { [weak self] connection in
             self?.handle(connection: connection)
         }
-
         listener.stateUpdateHandler = { [weak self] state in
             switch state {
             case .failed, .cancelled:
                 self?.listener = nil
                 self?.endBackgroundTask()
-            default:
-                break
+            default: break
             }
         }
-
         renewBackgroundTask()
         listener.start(queue: .global(qos: .utility))
+    }
+
+    private func stopListener() {
+        listener?.cancel()
+        listener = nil
+        endBackgroundTask()
     }
 
     // MARK: - Connection handling
@@ -89,13 +110,13 @@ final class LocalActionServer {
         }
 
         guard let url = URL(string: "http://localhost\(parts[1])"),
-              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              components.path == "/execute-widget-action" else {
+              let comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              comps.path == "/execute-widget-action" else {
             send(status: 404, body: "Not Found", to: connection)
             return
         }
 
-        guard let commandID = components.queryItems?.first(where: { $0.name == "id" })?.value else {
+        guard let commandID = comps.queryItems?.first(where: { $0.name == "id" })?.value else {
             send(status: 400, body: "Missing id parameter", to: connection)
             return
         }
@@ -113,17 +134,17 @@ final class LocalActionServer {
     }
 
     private func send(status: Int, body: String, to connection: NWConnection) {
-        let statusText: String
+        let text: String
         switch status {
-        case 200: statusText = "OK"
-        case 400: statusText = "Bad Request"
-        case 404: statusText = "Not Found"
-        case 405: statusText = "Method Not Allowed"
-        default:  statusText = "Error"
+        case 200: text = "OK"
+        case 400: text = "Bad Request"
+        case 404: text = "Not Found"
+        case 405: text = "Method Not Allowed"
+        default:  text = "Error"
         }
-        let response = "HTTP/1.1 \(status) \(statusText)\r\nContent-Length: \(body.utf8.count)\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n\(body)"
-        let data = Data(response.utf8)
-        connection.send(content: data, completion: .contentProcessed { _ in connection.cancel() })
+        let response = "HTTP/1.1 \(status) \(text)\r\nContent-Length: \(body.utf8.count)\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n\(body)"
+        connection.send(content: Data(response.utf8),
+                        completion: .contentProcessed { _ in connection.cancel() })
     }
 
     // MARK: - Background task

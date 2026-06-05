@@ -11,6 +11,8 @@ struct WidgetListView: View {
     @State private var showAddClockSheet = false
     @State private var showAddLauncherSheet = false
     @State private var showSettingsSheet = false
+    @State private var showRemoteControlSheet = false
+    @State private var hasRemoteControl = !SharedStorage.shared.allowedSSID.isEmpty
 
     var body: some View {
         List {
@@ -46,7 +48,16 @@ struct WidgetListView: View {
                 }
             }
 
-            if viewModel.configurations.isEmpty && viewModel.launcherConfigs.isEmpty {
+            // Remote Control (shown once configured, always accessible via +)
+            if hasRemoteControl {
+                Section("Remote Control") {
+                    RemoteControlRowView()
+                        .contentShape(Rectangle())
+                        .onTapGesture { showRemoteControlSheet = true }
+                }
+            }
+
+            if viewModel.configurations.isEmpty && viewModel.launcherConfigs.isEmpty && !hasRemoteControl {
                 emptyView
             }
         }
@@ -102,6 +113,11 @@ struct WidgetListView: View {
                             Label("Launcher Grid", systemImage: "rectangle.grid.2x2")
                         }
                     }
+                    Button {
+                        showRemoteControlSheet = true
+                    } label: {
+                        Label("Remote Control", systemImage: "network")
+                    }
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.title3)
@@ -153,6 +169,13 @@ struct WidgetListView: View {
             NavigationStack {
                 LauncherEditorView(config: LauncherConfig(), isNew: true)
                     .environmentObject(viewModel)
+            }
+        }
+        .sheet(isPresented: $showRemoteControlSheet, onDismiss: {
+            hasRemoteControl = !SharedStorage.shared.allowedSSID.isEmpty
+        }) {
+            NavigationStack {
+                RemoteControlEditorView()
             }
         }
         .sheet(isPresented: $showSettingsSheet) {
@@ -295,7 +318,6 @@ struct WidgetPreviewView: View {
                     .opacity(configuration.backgroundOpacity)
 
                 if configuration.widgetKind == .imageSlideshow {
-                    // White background for Code widget (same as the real widget)
                     Color.white
                     let slides = configuration.slides ?? []
                     let idx = min(configuration.currentSlideIndex ?? 0, max(0, slides.count - 1))
@@ -319,7 +341,6 @@ struct WidgetPreviewView: View {
                         }
                     }
                 } else if configuration.widgetKind == .lockScreen {
-                    // Lock screen preview: selected icon centered on the canvas
                     if let item = configuration.items.first,
                        item.displayType == .icon, let symbolName = item.sfSymbolName {
                         if symbolName.hasPrefix("wi_") {

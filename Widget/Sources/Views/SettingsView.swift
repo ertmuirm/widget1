@@ -6,8 +6,6 @@ struct SettingsView: View {
 
     @EnvironmentObject var viewModel: WidgetViewModel
 
-    // MARK: - Launcher Settings (AppStorage for live updates)
-
     @AppStorage("launcherFontSize")  private var launcherFontSize: Double = 16
     @AppStorage("launcherRowHeight") private var launcherRowHeight: Double = 44
 
@@ -43,7 +41,6 @@ struct SettingsView: View {
 
     var body: some View {
         List {
-            // General
             Section("General") {
                 Picker("Default Widget Size", selection: $defaultWidgetSize) {
                     ForEach(WidgetSize.homeScreenCases, id: \.rawValue) { size in
@@ -70,7 +67,6 @@ struct SettingsView: View {
                 }
             }
 
-            // Widgets
             Section {
                 Toggle("Show Item Labels", isOn: showItemLabels)
                     .foregroundStyle(.white)
@@ -86,7 +82,6 @@ struct SettingsView: View {
                     .font(.caption)
             }
 
-            // Launcher Grid
             if !viewModel.launcherConfigs.isEmpty {
                 Section {
                     Stepper(value: $launcherFontSize, in: 10...30, step: 1) {
@@ -142,24 +137,6 @@ struct SettingsView: View {
                 }
             }
 
-            // Remote Control
-            Section {
-                NavigationLink(destination: ServerSettingsView()) {
-                    Label("Local Server", systemImage: "network")
-                }
-                .foregroundStyle(.white)
-                NavigationLink(destination: PushCommandView()) {
-                    Label("Command Mappings", systemImage: "terminal")
-                }
-                .foregroundStyle(.white)
-            } header: {
-                Text("Remote Control")
-            } footer: {
-                Text("Trigger widget actions from your PC via HTTP GET on the same Wi-Fi network.")
-                    .font(.caption)
-            }
-
-            // Backup & Restore
             Section("Backup & Restore") {
                 Button {
                     backupConfigs()
@@ -189,7 +166,6 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            // Debug (DEBUG only)
             #if DEBUG
             Section("Debug") {
                 Button(role: .destructive) {
@@ -211,8 +187,6 @@ struct SettingsView: View {
             Text(backupAlertMessage)
         }
     }
-
-    // MARK: - Backup / Restore
 
     private func backupConfigs() {
         do {
