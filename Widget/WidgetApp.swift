@@ -1,7 +1,10 @@
 import SwiftUI
+import UIKit
 
 @main
 struct WidgetApp: App {
+
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
         WindowGroup {
