@@ -39,8 +39,6 @@ struct SettingsView: View {
     @AppStorage("defaultWidgetSize") private var defaultWidgetSize = "systemMedium"
     @AppStorage("defaultTextFontSize") private var defaultTextFontSize = 10.0
     @AppStorage("defaultQRLabelSize") private var defaultQRLabelSize = 8.0
-    @AppStorage("defaultClockFontName") private var clockFontName = "SF Pro"
-    @AppStorage("defaultClockFontSize") private var clockFontSize: Double = 48
 
     @State private var backupAlertMessage = ""
     @State private var showBackupAlert = false
@@ -73,29 +71,6 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-            }
-            
-            // Clock Widget
-            Section {
-                Picker("Clock Font", selection: $clockFontName) {
-                    ForEach(ClockFont.predefinedFonts, id: \.self) { font in
-                        Text(font).tag(font)
-                    }
-                }
-                
-                Stepper(value: $clockFontSize, in: 24...96, step: 2) {
-                    HStack {
-                        Text("Font Size")
-                        Spacer()
-                        Text("\(Int(clockFontSize)) pt")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } header: {
-                Text("Clock Widget")
-            } footer: {
-                Text("Settings for Clock widget digits. Use 24-96pt font size for best display.")
-                    .font(.caption)
             }
 
             // Widgets
