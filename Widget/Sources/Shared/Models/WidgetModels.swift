@@ -11,55 +11,32 @@ struct WidgetItem: Codable, Identifiable, Equatable {
     var displayType: DisplayType
     var sfSymbolName: String?
     var customText: String?
-    var customImageFilename: String?  // used when displayType == .image
-    var qrCodeContent: String?        // used when displayType == .qrCode
-    var qrCodeLabel: String?          // optional center label on the QR code
-    var qrCodeLabelSize: CGFloat      // font size for the label
     var fontSize: CGFloat
     var foregroundColor: CodableColor
     var backgroundColor: CodableColor
     var backgroundOpacity: Double
     var action: WidgetAction?
-    /// In-memory image data for displayType == .image. Serialized in config JSON so it
-    /// crosses process boundaries on SideStore. Stripped from entity IDs in WidgetIntents.
-    var imageData: Data?
-
-    enum CodingKeys: CodingKey {
-        case id, displayType, sfSymbolName, customText, customImageFilename
-        case qrCodeContent, qrCodeLabel, qrCodeLabelSize, fontSize
-        case foregroundColor, backgroundColor, backgroundOpacity, action, imageData
-    }
-
+    
     init(
         id: UUID = UUID(),
         displayType: DisplayType = .icon,
         sfSymbolName: String? = "star.fill",
         customText: String? = nil,
-        customImageFilename: String? = nil,
-        qrCodeContent: String? = nil,
-        qrCodeLabel: String? = nil,
-        qrCodeLabelSize: CGFloat = 8,
-        fontSize: CGFloat = 10,
+        fontSize: CGFloat = 14,
         foregroundColor: CodableColor = CodableColor(.white),
         backgroundColor: CodableColor = CodableColor(.clear),
         backgroundOpacity: Double = 1.0,
-        action: WidgetAction? = nil,
-        imageData: Data? = nil
+        action: WidgetAction? = nil
     ) {
         self.id = id
         self.displayType = displayType
         self.sfSymbolName = sfSymbolName
         self.customText = customText
-        self.customImageFilename = customImageFilename
-        self.qrCodeContent = qrCodeContent
-        self.qrCodeLabel = qrCodeLabel
-        self.qrCodeLabelSize = qrCodeLabelSize
         self.fontSize = fontSize
         self.foregroundColor = foregroundColor
         self.backgroundColor = backgroundColor
         self.backgroundOpacity = backgroundOpacity
         self.action = action
-        self.imageData = imageData
     }
 }
 
@@ -68,95 +45,12 @@ struct WidgetItem: Codable, Identifiable, Equatable {
 enum DisplayType: String, Codable, CaseIterable {
     case icon
     case text
-    case image
-    case qrCode
-
-    var displayName: String {
-        switch self {
-        case .icon:   return "Icon"
-        case .text:   return "Text"
-        case .image:  return "Image"
-        case .qrCode: return "QR Code"
-        }
-    }
-}
-
-// MARK: - Widget Kind
-
-enum WidgetKind: String, Codable {
-    case grid
-    case imageSlideshow
-    case clock
-    case lockScreen
-
-    var displayName: String {
-        switch self {
-        case .grid:            return "Grid"
-        case .imageSlideshow:  return "Code"
-        case .clock:          return "Clock"
-        case .lockScreen:      return "Lock Screen"
-        }
-    }
-}
-
-// MARK: - Clock Digit Position
-
-enum ClockDigitPosition: String, Codable, CaseIterable {
-    case hour
-    case minute
     
     var displayName: String {
         switch self {
-        case .hour:    return "Hour (12h)"
-        case .minute:  return "Minute"
+        case .icon: return "Icon"
+        case .text: return "Text"
         }
-    }
-}
-
-// MARK: - Image Slide
-
-/// One image (or QR code) in an Image Slideshow widget
-struct ImageSlide: Codable, Identifiable, Equatable {
-    let id: UUID
-    var filename: String   // file stored in shared images directory (empty for QR/barcode slides)
-    var offsetX: Double    // -0.5 … 0.5 (fraction of widget width)
-    var offsetY: Double    // -0.5 … 0.5 (fraction of widget height)
-    var scale: Double      // 1.0 = fit, >1 = zoomed in
-    var action: WidgetAction?
-    /// QR code content — when non-nil this slide shows a QR code instead of a photo.
-    var qrCodeContent: String?
-    /// Optional label shown on the QR/barcode.
-    var qrCodeLabel: String?
-    /// Font size for the label.
-    var qrCodeLabelSize: CGFloat
-    /// Barcode content — when non-nil this slide shows a Code-128 barcode.
-    var barcodeContent: String?
-    /// In-memory JPEG data.
-    var imageData: Data?
-
-    enum CodingKeys: CodingKey {
-        case id, filename, offsetX, offsetY, scale, action, qrCodeContent, qrCodeLabel, qrCodeLabelSize, barcodeContent, imageData
-    }
-
-    var isQRCode: Bool { qrCodeContent != nil }
-    var isBarcode: Bool { barcodeContent != nil }
-
-    init(id: UUID = UUID(), filename: String,
-         offsetX: Double = 0, offsetY: Double = 0, scale: Double = 1.0,
-         action: WidgetAction? = nil, qrCodeContent: String? = nil,
-         qrCodeLabel: String? = nil, qrCodeLabelSize: CGFloat = 8,
-         barcodeContent: String? = nil, imageData: Data? = nil) {
-        self.id = id
-        self.filename = filename
-        self.offsetX = offsetX
-        self.offsetY = offsetY
-        self.scale = scale
-        self.action = action
-        self.qrCodeContent = qrCodeContent
-        self.qrCodeLabel = qrCodeLabel
-        self.qrCodeLabelSize = qrCodeLabelSize
-        self.barcodeContent = barcodeContent
-        self.imageData = imageData
     }
 }
 
@@ -172,23 +66,7 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
     var backgroundOpacity: Double
     var createdAt: Date
     var updatedAt: Date
-    /// nil means "use system default (true)" — handled gracefully by older saved configs.
-    var showItemLabels: Bool?
-    /// nil means .grid (backwards compatible)
-    var widgetKind: WidgetKind?
-    /// Images for .imageSlideshow widgets
-    var slides: [ImageSlide]?
-    /// Currently displayed slide index for .imageSlideshow widgets
-    var currentSlideIndex: Int?
-    /// Clock digit position for .clock widgets
-    var clockDigitPosition: ClockDigitPosition?
-    /// Clock font family name for .clock widgets (nil = system default)
-    var clockFontName: String?
-    /// Clock font size for .clock widgets
-    var clockFontSize: Double?
-    /// Actions for clock widget: first = tens digit, second = units digit
-    var clockActions: [WidgetItem]?
-
+    
     init(
         id: UUID = UUID(),
         name: String = "New Widget",
@@ -197,15 +75,7 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         backgroundColor: CodableColor = CodableColor(.black),
         backgroundOpacity: Double = 1.0,
         createdAt: Date = Date(),
-        updatedAt: Date = Date(),
-        showItemLabels: Bool? = nil,
-        widgetKind: WidgetKind? = nil,
-        slides: [ImageSlide]? = nil,
-        currentSlideIndex: Int? = nil,
-        clockDigitPosition: ClockDigitPosition? = nil,
-        clockFontName: String? = nil,
-        clockFontSize: Double? = nil,
-        clockActions: [WidgetItem]? = nil
+        updatedAt: Date = Date()
     ) {
         self.id = id
         self.name = name
@@ -215,27 +85,19 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
         self.backgroundOpacity = backgroundOpacity
         self.createdAt = createdAt
         self.updatedAt = updatedAt
-        self.showItemLabels = showItemLabels
-        self.widgetKind = widgetKind
-        self.slides = slides
-        self.currentSlideIndex = currentSlideIndex
-        self.clockDigitPosition = clockDigitPosition
-        self.clockFontName = clockFontName
-        self.clockFontSize = clockFontSize
-        self.clockActions = clockActions
     }
     
     /// Default configuration for placeholder
     static let defaultConfiguration = WidgetConfig(
         name: "My Widget",
-        size: .systemMedium,
+        size: .systemSmall,
         items: [
             WidgetItem(
                 id: UUID(),
                 displayType: .icon,
                 sfSymbolName: "star.fill",
                 customText: nil,
-                fontSize: 10,
+                fontSize: 14,
                 foregroundColor: CodableColor.white,
                 backgroundColor: CodableColor.clear,
                 backgroundOpacity: 1.0,
@@ -260,46 +122,43 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
 // MARK: - Widget Size
 
 enum WidgetSize: String, Codable, CaseIterable {
-    case systemSmall       // 3×3  (9 items)  — home screen Small
-    case systemMedium      // 6×3  (18 items) — home screen Medium
-    case systemLarge       // 6×6  (36 items) — home screen Large
-    case systemExtraLarge  // kept for Codable backwards-compat; hidden from UI
-
-    /// Sizes offered in the home-screen widget picker (excludes lock-screen-only / legacy sizes)
-    static let homeScreenCases: [WidgetSize] = [.systemSmall, .systemMedium, .systemLarge]
-
+    case systemSmall       // 1x1 (1 item)
+    case systemMedium     // 3x3 (9 items)
+    case systemLarge    // 6x3 (18 items)
+    case systemExtraLarge // 6x6 (36 items)
+    
     var displayName: String {
         switch self {
-        case .systemSmall:      return "Small (3×3)"
-        case .systemMedium:     return "Medium (6×3)"
-        case .systemLarge:      return "Large (6×6)"
+        case .systemSmall: return "Small (1×1)"
+        case .systemMedium: return "Medium (3×3)"
+        case .systemLarge: return "Large (6×3)"
         case .systemExtraLarge: return "Extra Large (6×6)"
         }
     }
-
+    
     var maxItems: Int {
         switch self {
-        case .systemSmall:      return 9
-        case .systemMedium:     return 18
-        case .systemLarge:      return 36
+        case .systemSmall: return 1
+        case .systemMedium: return 9
+        case .systemLarge: return 18
         case .systemExtraLarge: return 36
         }
     }
-
+    
     var columns: Int {
         switch self {
-        case .systemSmall:      return 3
-        case .systemMedium:     return 6
-        case .systemLarge:      return 6
+        case .systemSmall: return 1
+        case .systemMedium: return 3
+        case .systemLarge: return 6
         case .systemExtraLarge: return 6
         }
     }
-
+    
     var rows: Int {
         switch self {
-        case .systemSmall:      return 3
-        case .systemMedium:     return 3
-        case .systemLarge:      return 6
+        case .systemSmall: return 1
+        case .systemMedium: return 3
+        case .systemLarge: return 3
         case .systemExtraLarge: return 6
         }
     }
@@ -311,12 +170,10 @@ enum WidgetSize: String, Codable, CaseIterable {
 struct WidgetAction: Codable, Equatable {
     var type: ActionType
     var payload: String
-    var displayName: String?
-
-    init(type: ActionType = .urlScheme, payload: String = "", displayName: String? = nil) {
+    
+    init(type: ActionType = .urlScheme, payload: String = "") {
         self.type = type
         self.payload = payload
-        self.displayName = displayName
     }
 }
 
@@ -326,20 +183,20 @@ enum ActionType: String, Codable, CaseIterable {
     case urlScheme
     case appIntent
     case shortcut
-
+    
     var displayName: String {
         switch self {
-        case .urlScheme:  return "URL Scheme"
-        case .appIntent:  return "App Action"
-        case .shortcut:   return "Shortcut"
+        case .urlScheme: return "URL Scheme"
+        case .appIntent: return "App Intent"
+        case .shortcut: return "Shortcut"
         }
     }
-
+    
     var description: String {
         switch self {
-        case .urlScheme:  return "Enter a custom URL or deep link"
-        case .appIntent:  return "Pick from a list of supported apps"
-        case .shortcut:   return "Run a named Shortcut"
+        case .urlScheme: return "Open a URL"
+        case .appIntent: return "Run an App Intent"
+        case .shortcut: return "Run a Shortcut"
         }
     }
 }
@@ -427,7 +284,7 @@ struct CodableColor: Codable, Equatable {
 // MARK: - App Group Storage Keys
 
 enum StorageKeys {
-    static let appGroupIdentifier = "group.com.ioswidget"
+    static let appGroupIdentifier = "group.com.iosmirror"
     static let widgetConfigurations = "widgetConfigurations"
     static let hasCompletedOnboarding = "hasCompletedOnboarding"
     static let lastBackupDate = "lastBackupDate"
@@ -439,10 +296,32 @@ struct ExportData: Codable {
     let version: Int
     let exportedAt: Date
     let configurations: [WidgetConfig]
-    
+
     init(configurations: [WidgetConfig]) {
         self.version = 1
         self.exportedAt = Date()
         self.configurations = configurations
+    }
+}
+
+// MARK: - Push Command Entry
+
+/// Maps a plain-text command received via ntfy.sh to a WidgetAction to execute
+struct PushCommandEntry: Codable, Identifiable, Equatable {
+    let id: UUID
+    var command: String       // raw text trigger, e.g. "kill-bluetooth"
+    var label: String         // user-facing description
+    var action: WidgetAction
+
+    init(
+        id: UUID = UUID(),
+        command: String = "",
+        label: String = "",
+        action: WidgetAction = WidgetAction()
+    ) {
+        self.id = id
+        self.command = command
+        self.label = label
+        self.action = action
     }
 }

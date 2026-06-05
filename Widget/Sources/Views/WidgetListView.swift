@@ -2,61 +2,44 @@ import SwiftUI
 
 /// List of all widget configurations
 struct WidgetListView: View {
-
+    
     @EnvironmentObject var viewModel: WidgetViewModel
-    @AppStorage("defaultWidgetSize") private var defaultWidgetSize = WidgetSize.systemMedium.rawValue
     @State private var showAddSheet = false
-    @State private var showAddImageSheet = false
-    @State private var showAddLockScreenSheet = false
-    @State private var showAddClockSheet = false
-    @State private var showAddLauncherSheet = false
+    @State private var showPushCommandSheet = false
     @State private var showSettingsSheet = false
-
+    @State private var showDebugSheet = false
+    @State private var showDebugOverlay = false
+    
     var body: some View {
-        List {
-            // Widget configurations
-            if !viewModel.configurations.isEmpty {
-                Section("Home & Lock Screen Widgets") {
+        ZStack {
+            List {
+                if viewModel.configurations.isEmpty {
+                    emptyView
+                } else {
                     ForEach(viewModel.configurations) { config in
-                        ZStack {
-                            NavigationLink(value: config.id) { EmptyView() }.opacity(0)
-                            WidgetRowView(configuration: config) {
-                                if let idx = viewModel.configurations.firstIndex(where: { $0.id == config.id }) {
-                                    viewModel.deleteConfiguration(at: IndexSet([idx]))
-                                }
-                            }
+                        NavigationLink(destination: WidgetEditorView(configuration: config)) {
+                            WidgetRowView(configuration: config)
                         }
                     }
-                    .onMove { from, to in viewModel.moveConfiguration(from: from, to: to) }
+                    .onDelete(perform: viewModel.deleteConfiguration)
                 }
             }
-
-            // Launcher grids
-            if !viewModel.launcherConfigs.isEmpty {
-                Section("Launcher Grids") {
-                    ForEach(viewModel.launcherConfigs) { launcher in
-                        ZStack {
-                            NavigationLink(value: launcher.id) { EmptyView() }.opacity(0)
-                            LauncherRowView(config: launcher) {
-                                viewModel.deleteLauncherConfig(launcher)
-                            }
-                        }
+            .listStyle(.insetGrouped)
+            .navigationTitle("Widgets")
+            
+            // Floating debug overlay
+            if showDebugOverlay {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        DebugOverlayView()
+                            .padding()
+                        Spacer()
                     }
-                    .onMove { from, to in viewModel.moveLauncherConfig(from: from, to: to) }
+                    Spacer()
                 }
-            }
-
-            if viewModel.configurations.isEmpty && viewModel.launcherConfigs.isEmpty {
-                emptyView
-            }
-        }
-        .listStyle(.insetGrouped)
-        .navigationTitle("Widgets")
-        .navigationDestination(for: UUID.self) { id in
-            if let config = viewModel.configurations.first(where: { $0.id == id }) {
-                WidgetEditorView(configuration: config)
-            } else if let launcher = viewModel.launcherConfigs.first(where: { $0.id == id }) {
-                LauncherEditorView(config: launcher)
+                .background(.ultraThinMaterial)
             }
         }
         .toolbar {
@@ -68,110 +51,71 @@ struct WidgetListView: View {
                         .font(.title3)
                 }
             }
-
-            ToolbarItem(placement: .topBarTrailing) {
-                EditButton()
-            }
-
+            
             ToolbarItem(placement: .primaryAction) {
                 Menu {
                     Button {
                         showAddSheet = true
                     } label: {
-                        Label("Grid Widget", systemImage: "square.grid.2x2")
+                        Label("New Widget", systemImage: "plus.square")
                     }
+
                     Button {
-                        showAddImageSheet = true
+                        showPushCommandSheet = true
                     } label: {
-                        Label("Code Widget", systemImage: "qrcode")
-                    }
-                    Button {
-                        showAddLockScreenSheet = true
-                    } label: {
-                        Label("Lock Screen Widget", systemImage: "lock.display")
-                    }
-                    Button {
-                        showAddClockSheet = true
-                    } label: {
-                        Label("Clock Widget", systemImage: "clock")
-                    }
-                    if viewModel.launcherConfigs.count < LauncherConfig.maxConfigs {
-                        Button {
-                            showAddLauncherSheet = true
-                        } label: {
-                            Label("Launcher Grid", systemImage: "rectangle.grid.2x2")
-                        }
+                        Label("Push Notification", systemImage: "bell.badge.waveform")
                     }
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.title3)
                 }
             }
+            
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button("Debug Overlay") {
+                        showDebugOverlay.toggle()
+                    }
+                    Button("Debug Logs") {
+                        showDebugSheet = true
+                    }
+                } label: {
+                    Image(systemName: "doc.text")
+                        .font(.title3)
+                }
+            }
         }
         .sheet(isPresented: $showAddSheet) {
-            let size = WidgetSize(rawValue: defaultWidgetSize) ?? .systemMedium
-            let newConfig = WidgetConfig(size: size)
+            let newConfig = WidgetConfig()
             NavigationStack {
                 WidgetEditorView(configuration: newConfig, isNew: true)
             }
         }
-        .sheet(isPresented: $showAddImageSheet) {
-            let newConfig = WidgetConfig(
-                name: "Code Widget",
-                size: .systemSmall,
-                widgetKind: .imageSlideshow,
-                slides: []
-            )
-            NavigationStack {
-                WidgetEditorView(configuration: newConfig, isNew: true)
-            }
-        }
-        .sheet(isPresented: $showAddLockScreenSheet) {
-            let newConfig = WidgetConfig(
-                name: "Lock Screen Widget",
-                size: .systemSmall,
-                items: [WidgetItem()],
-                widgetKind: .lockScreen
-            )
-            NavigationStack {
-                WidgetEditorView(configuration: newConfig, isNew: true)
-            }
-        }
-        .sheet(isPresented: $showAddClockSheet) {
-            let newConfig = WidgetConfig(
-                name: "Clock Widget",
-                size: .systemSmall,
-                widgetKind: .clock,
-                clockDigitPosition: .hour,
-                clockFontSize: 80
-            )
-            NavigationStack {
-                WidgetEditorView(configuration: newConfig, isNew: true)
-            }
-        }
-        .sheet(isPresented: $showAddLauncherSheet) {
-            NavigationStack {
-                LauncherEditorView(config: LauncherConfig(), isNew: true)
-                    .environmentObject(viewModel)
-            }
+        .sheet(isPresented: $showPushCommandSheet) {
+            PushCommandView()
         }
         .sheet(isPresented: $showSettingsSheet) {
             NavigationStack {
                 SettingsView()
             }
         }
+        .sheet(isPresented: $showDebugSheet) {
+            NavigationStack {
+                DebugLogView()
+            }
+        }
     }
-
+    
     private var emptyView: some View {
         VStack(spacing: 16) {
             Image(systemName: "square.grid.2x2")
                 .font(.system(size: 60))
                 .foregroundStyle(.secondary)
-
+            
             Text("No Widgets Yet")
                 .font(.headline)
                 .foregroundStyle(.white)
-
+            
             Text("Tap + to create your first widget")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -182,99 +126,34 @@ struct WidgetListView: View {
     }
 }
 
-// MARK: - Launcher Row View
-
-struct LauncherRowView: View {
-    let config: LauncherConfig
-    var onDelete: (() -> Void)? = nil
-
-    var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Color.white.opacity(0.08)
-                Image(systemName: "rectangle.grid.2x2")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(width: 60, height: 60)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(config.name)
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                Text("Launcher Grid")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Text("\(config.items.count) item\(config.items.count == 1 ? "" : "s")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            if let onDelete {
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .foregroundStyle(.red)
-                        .padding(8)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.vertical, 4)
-    }
-}
-
 // MARK: - Widget Row View
 
 struct WidgetRowView: View {
     let configuration: WidgetConfig
-    var onDelete: (() -> Void)? = nil
-
+    
     var body: some View {
         HStack(spacing: 12) {
+            // Widget preview
             WidgetPreviewView(configuration: configuration, size: CGSize(width: 60, height: 60))
                 .frame(width: 60, height: 60)
                 .background(Color.gray.opacity(0.2))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-
+            
             VStack(alignment: .leading, spacing: 4) {
                 Text(configuration.name)
                     .font(.headline)
                     .foregroundStyle(.white)
-
-                Text(configuration.widgetKind?.displayName ?? configuration.size.displayName)
+                
+                Text(configuration.size.displayName)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-
-                if configuration.widgetKind == .lockScreen,
-                   let action = configuration.items.first?.action {
-                    Text(action.displayName ?? action.payload)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                } else {
-                    let itemCount = configuration.widgetKind == .imageSlideshow
-                        ? (configuration.slides?.count ?? 0)
-                        : configuration.items.count
-                    let unit = configuration.widgetKind == .imageSlideshow ? "code" : "item"
-                    Text("\(itemCount) \(unit)\(itemCount == 1 ? "" : "s")")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                
+                Text("\(configuration.items.count) item\(configuration.items.count == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-
+            
             Spacer()
-
-            if let onDelete {
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .foregroundStyle(.red)
-                        .padding(8)
-                }
-                .buttonStyle(.plain)
-            }
         }
         .padding(.vertical, 4)
     }
@@ -285,77 +164,34 @@ struct WidgetRowView: View {
 struct WidgetPreviewView: View {
     let configuration: WidgetConfig
     let size: CGSize
-
+    
     var body: some View {
         GeometryReader { geometry in
             let itemSize = calculateItemSize(containerSize: geometry.size)
-
+            
             ZStack {
+                // Background
                 configuration.backgroundColor.swiftUIColor
                     .opacity(configuration.backgroundOpacity)
-
-                if configuration.widgetKind == .imageSlideshow {
-                    // White background for Code widget (same as the real widget)
-                    Color.white
-                    let slides = configuration.slides ?? []
-                    let idx = min(configuration.currentSlideIndex ?? 0, max(0, slides.count - 1))
-                    if slides.isEmpty {
-                        Image(systemName: "qrcode")
-                            .font(.title2)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        let slide = slides[idx]
-                        if let content = slide.qrCodeContent, !content.isEmpty {
-                            QRCodeCanvasView(content: content)
-                        } else if let content = slide.barcodeContent, !content.isEmpty {
-                            BarcodeCanvasView(content: content)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: geometry.size.height * 0.5)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        } else {
-                            Image(systemName: "qrcode")
-                                .font(.title2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                } else if configuration.widgetKind == .lockScreen {
-                    // Lock screen preview: selected icon centered on the canvas
-                    if let item = configuration.items.first,
-                       item.displayType == .icon, let symbolName = item.sfSymbolName {
-                        if symbolName.hasPrefix("wi_") {
-                            Image(symbolName)
-                                .resizable()
-                                .renderingMode(.template)
-                                .scaledToFit()
-                                .frame(width: geometry.size.width * 0.5, height: geometry.size.height * 0.5)
-                                .foregroundStyle(item.foregroundColor.swiftUIColor)
-                        } else {
-                            Image(systemName: symbolName)
-                                .font(.system(size: geometry.size.width * 0.4))
-                                .foregroundStyle(item.foregroundColor.swiftUIColor)
-                        }
-                    } else {
-                        Image(systemName: "lock.display")
-                            .font(.title2)
-                            .foregroundStyle(.secondary)
-                    }
-                } else if configuration.items.isEmpty {
+                
+                // Items grid
+                if configuration.items.isEmpty {
                     Image(systemName: "plus")
                         .font(.title2)
                         .foregroundStyle(.secondary)
                 } else {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 1), count: configuration.size.columns), spacing: 1) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 2), count: configuration.size.columns), spacing: 2) {
                         ForEach(Array(configuration.truncatedItems.enumerated()), id: \.element.id) { _, item in
                             ItemPreviewView(item: item, size: itemSize)
-                                .aspectRatio(1, contentMode: .fit)
                         }
                     }
+                    .padding(4)
                 }
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
-
+    
     private func calculateItemSize(containerSize: CGSize) -> CGSize {
         let columns = configuration.size.columns
         let spacing: CGFloat = 2
@@ -368,41 +204,16 @@ struct WidgetPreviewView: View {
 struct ItemPreviewView: View {
     let item: WidgetItem
     let size: CGSize
-
+    
     var body: some View {
         ZStack {
             item.backgroundColor.swiftUIColor.opacity(item.backgroundOpacity)
-
-            if item.displayType == .qrCode, let content = item.qrCodeContent, !content.isEmpty,
-               let qr = UIImage.qrCode(from: content, size: max(size.width, 60) * 2) {
-                ZStack {
-                    Image(uiImage: qr).interpolation(.none).resizable().scaledToFit().padding(2)
-                    if let label = item.qrCodeLabel, !label.isEmpty {
-                        Text(label)
-                            .font(.system(size: max(item.qrCodeLabelSize * size.width / 40, 5), weight: .bold))
-                            .foregroundStyle(.white)
-                            .lineLimit(1).minimumScaleFactor(0.4)
-                            .padding(.horizontal, 2).padding(.vertical, 1)
-                            .background(Color.black)
-                            .clipShape(RoundedRectangle(cornerRadius: 2))
-                    }
-                }
-            } else if item.displayType == .image, let fn = item.customImageFilename,
-                      let img = (item.imageData.flatMap(UIImage.init) ?? SharedStorage.shared.loadWidgetImage(filename: fn)) {
-                Image(uiImage: img).resizable().scaledToFill()
-                    .frame(width: size.width, height: size.height).clipped()
-            } else if item.displayType == .icon {
+            
+            if item.displayType == .icon {
                 if let symbolName = item.sfSymbolName {
-                    if symbolName.hasPrefix("wi_") {
-                        Image(symbolName)
-                            .resizable().renderingMode(.template).scaledToFit()
-                            .frame(width: size.width * 0.55, height: size.width * 0.55)
-                            .foregroundStyle(item.foregroundColor.swiftUIColor)
-                    } else {
-                        Image(systemName: symbolName)
-                            .font(.system(size: size.width * 0.5))
-                            .foregroundStyle(item.foregroundColor.swiftUIColor)
-                    }
+                    Image(systemName: symbolName)
+                        .font(.system(size: size.width * 0.5))
+                        .foregroundStyle(item.foregroundColor.swiftUIColor)
                 }
             } else {
                 Text(item.customText ?? "")
