@@ -4,7 +4,6 @@ import NetworkExtension
 import UIKit
 
 final class LocalActionServer {
-
     static let shared = LocalActionServer()
     private init() {}
 
@@ -13,8 +12,6 @@ final class LocalActionServer {
     private let queue = DispatchQueue(label: "com.ioswidget.localserver", qos: .utility)
 
     var isRunning: Bool { listener != nil }
-
-    // MARK: - Lifecycle
 
     func start() {
         stop()
@@ -33,15 +30,8 @@ final class LocalActionServer {
         refreshBackgroundTask()
     }
 
-    func stop() {
-        listener?.cancel()
-        listener = nil
-        endBackgroundTask()
-    }
-
+    func stop() { listener?.cancel(); listener = nil; endBackgroundTask() }
     func restart() { stop(); start() }
-
-    // MARK: - Background Task
 
     private func refreshBackgroundTask() {
         endBackgroundTask()
@@ -56,13 +46,10 @@ final class LocalActionServer {
         bgTask = .invalid
     }
 
-    // MARK: - Connection Handling
-
     private func handle(connection: NWConnection) {
         connection.start(queue: queue)
         let saved = SharedStorage.shared.allowedSSID
         guard !saved.isEmpty else { receiveRequest(on: connection); return }
-        // If SSID cannot be read (entitlement absent → nil), allow the connection.
         NEHotspotNetwork.fetchCurrent { [weak self] network in
             guard let self else { return }
             if network == nil || network?.ssid == saved {

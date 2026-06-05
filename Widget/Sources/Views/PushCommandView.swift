@@ -1,157 +1,178 @@
 import SwiftUI
 
-// MARK: - Push Command List
-// Presented as a NavigationLink destination from SettingsView → Remote Control.
-
 struct PushCommandView: View {
-    @State private var entries: [PushCommandEntry] = []
+    @State private var entries: [PushCommandEntry] = SharedStorage.shared.loadPushCommandEntries()
+    @State private var editingEntry: PushCommandEntry?
+    @State private var showingEditor = false
 
     var body: some View {
         List {
             Section {
-                ForEach(entries.indices, id: \.self) { index in
-                    NavigationLink {
-                        PushCommandEditorView(entry: $entries[index], onChanged: saveEntries)
+                ForEach(entries) { entry in
+                    Button {
+                        editingEntry = entry
+                        showingEditor = true
                     } label: {
-                        PushCommandRowView(entry: entries[index])
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(entry.command.isEmpty ? "(no command)" : entry.command)
+                                .font(.subheadline).foregroundStyle(.white)
+                            Text(entry.label.isEmpty ? entry.action.payload : entry.label)
+                                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
                     }
                 }
-                .onDelete { indexSet in
-                    entries.remove(atOffsets: indexSet)
-                    saveEntries()
-                }
+                .onDelete(perform: deleteEntries)
+            } header: {
+                Text("Command Mappings")
+            } footer: {
+                Text("Each mapping links a command ID (e.g. \"lights_off\") to a widget action. Trigger via GET /execute-widget-action?id=<command>.")
+                    .font(.caption2)
+            }
 
+            Section {
                 Button {
-                    entries.append(PushCommandEntry())
-                    saveEntries()
+                    let entry = PushCommandEntry()
+                    entries.append(entry)
+                    SharedStorage.shared.savePushCommandEntries(entries)
+                    editingEntry = entry
+                    showingEditor = true
                 } label: {
-                    Label("Add Command", systemImage: "plus")
+                    Label("Add Mapping", systemImage: "plus.circle")
                 }
                 .foregroundStyle(.blue)
-
-            } header: {
-                Text("Commands (\(entries.count))")
-            } footer: {
-                Text("Each command maps a text ID to an action. Trigger with:\nGET http://<iPhone-IP>:<PORT>/execute-widget-action?id=YOUR_COMMAND\nCommands are case-sensitive.")
-                    .font(.caption2)
             }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Command Mappings")
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
-        .onAppear { entries = SharedStorage.shared.loadPushCommandEntries() }
-    }
-
-    private func saveEntries() { SharedStorage.shared.savePushCommandEntries(entries) }
-}
-
-// MARK: - Row
-
-struct PushCommandRowView: View {
-    let entry: PushCommandEntry
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(entry.command.isEmpty ? "(no command set)" : entry.command)
-                .font(.headline)
-                .foregroundStyle(entry.command.isEmpty ? .secondary : .white)
-            if !entry.label.isEmpty {
-                Text(entry.label).font(.subheadline).foregroundStyle(.secondary)
+        .toolbar { EditButton() }
+        .sheet(isPresented: $showingEditor, onDismiss: { editingEntry = nil }) {
+            if let entry = editingEntry {
+                NavigationStack {
+                    PushCommandEditorView(entry: entry) { updated in
+                        if let idx = entries.firstIndex(where: { $0.id == updated.id }) {
+                            entries[idx] = updated
+                        }
+                        SharedStorage.shared.savePushCommandEntries(entries)
+                        showingEditor = false
+                    }
+                }
             }
-            let suffix = entry.action.payload.isEmpty ? "" : ": \(entry.action.payload)"
-            Text(entry.action.type.displayName + suffix).font(.caption).foregroundStyle(.secondary)
         }
-        .padding(.vertical, 2)
+    }
+
+    private func deleteEntries(at offsets: IndexSet) {
+        entries.remove(atOffsets: offsets)
+        SharedStorage.shared.savePushCommandEntries(entries)
     }
 }
-
-// MARK: - Editor
 
 struct PushCommandEditorView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Binding var entry: PushCommandEntry
-    let onChanged: () -> Void
-    @State private var showActionTypePicker = false
+    @State private var entry: PushCommandEntry
+    @State private var showActionPicker = false
+    let onSave: (PushCommandEntry) -> Void
+
+    init(entry: PushCommandEntry, onSave: @escaping (PushCommandEntry) -> Void) {
+        _entry = State(initialValue: entry)
+        self.onSave = onSave
+    }
 
     var body: some View {
         List {
-            Section("Trigger") {
-                TextField("Command ID (e.g. kill-bluetooth)", text: $entry.command)
-                    .foregroundStyle(.white)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                TextField("Label (optional description)", text: $entry.label)
-                    .foregroundStyle(.white)
+            Section("Identity") {
+                HStack {
+                    Text("Command ID")
+                    Spacer()
+                    TextField("e.g. lights_off", text: $entry.command)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.white)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                }
+                HStack {
+                    Text("Label")
+                    Spacer()
+                    TextField("Optional description", text: $entry.label)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.white)
+                }
             }
+
             Section("Action") {
                 Button {
-                    showActionTypePicker = true
+                    showActionPicker = true
                 } label: {
                     HStack {
                         Text("Type")
                         Spacer()
-                        Text(entry.action.type.displayName).foregroundStyle(.secondary)
-                        Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
+                        Text(entry.action.type.displayName)
+                            .foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                 }
                 .foregroundStyle(.white)
 
-                if entry.action.type == .urlScheme {
-                    TextField("URL Scheme (e.g. myapp://action)", text: $entry.action.payload)
-                        .foregroundStyle(.white).textInputAutocapitalization(.never).autocorrectionDisabled()
-                } else {
-                    TextField(
-                        entry.action.type == .appIntent ? "Intent Name" : "Shortcut Name",
-                        text: $entry.action.payload
-                    ).foregroundStyle(.white)
+                HStack {
+                    Text("Payload")
+                    Spacer()
+                    TextField("URL or shortcut name", text: $entry.action.payload)
+                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.white)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
                 }
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Command")
+        .navigationTitle("Edit Mapping")
         .navigationBarTitleDisplayMode(.inline)
+        .preferredColorScheme(.dark)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("Done") { onChanged(); dismiss() }
+                Button("Save") { onSave(entry) }
             }
         }
-        .sheet(isPresented: $showActionTypePicker) {
-            PushActionTypePicker(selectedType: $entry.action.type)
+        .sheet(isPresented: $showActionPicker) {
+            NavigationStack {
+                PushActionTypePicker(selected: $entry.action.type)
+            }
         }
     }
 }
 
-// MARK: - Action Type Picker
-
 struct PushActionTypePicker: View {
+    @Binding var selected: ActionType
     @Environment(\.dismiss) private var dismiss
-    @Binding var selectedType: ActionType
 
     var body: some View {
-        NavigationStack {
-            List {
-                ForEach(ActionType.allCases, id: \.self) { type in
-                    Button {
-                        selectedType = type; dismiss()
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(type.displayName).font(.headline).foregroundStyle(.white)
-                                Text(type.description).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if type == selectedType {
-                                Image(systemName: "checkmark").foregroundStyle(.blue)
-                            }
+        List {
+            ForEach(ActionType.allCases, id: \.self) { type in
+                Button {
+                    selected = type
+                    dismiss()
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(type.displayName).foregroundStyle(.white)
+                            Text(type.description).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if selected == type {
+                            Image(systemName: "checkmark").foregroundStyle(.blue)
                         }
                     }
                 }
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Action Type")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Action Type")
+        .navigationBarTitleDisplayMode(.inline)
+        .preferredColorScheme(.dark)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Cancel") { dismiss() }
             }
         }
     }

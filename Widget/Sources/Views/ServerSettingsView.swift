@@ -13,34 +13,25 @@ struct ServerSettingsView: View {
         List {
             Section {
                 HStack {
-                    Text("Current Wi-Fi SSID")
-                        .foregroundStyle(.secondary)
+                    Text("Current Wi-Fi SSID").foregroundStyle(.secondary)
                     Spacer()
-                    Text(currentSSID)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(currentSSID).font(.caption).foregroundStyle(.secondary)
                 }
                 HStack {
                     Text("Allowed SSID")
                     Spacer()
                     TextField("Any network", text: $ssid)
-                        .multilineTextAlignment(.trailing)
-                        .foregroundStyle(.white)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
+                        .multilineTextAlignment(.trailing).foregroundStyle(.white)
+                        .autocorrectionDisabled().textInputAutocapitalization(.never)
                 }
                 HStack {
                     Text("Listen Port")
                     Spacer()
                     TextField("8080", text: $portText)
-                        .multilineTextAlignment(.trailing)
-                        .foregroundStyle(.white)
-                        .keyboardType(.numberPad)
-                        .frame(width: 80)
+                        .multilineTextAlignment(.trailing).foregroundStyle(.white)
+                        .keyboardType(.numberPad).frame(width: 80)
                 }
-            } header: {
-                Text("Configuration")
-            } footer: {
+            } header: { Text("Configuration") } footer: {
                 Text("Leave Allowed SSID blank to accept connections from any Wi-Fi. If the SSID entitlement is unavailable the check is skipped.")
                     .font(.caption2)
             }
@@ -51,30 +42,22 @@ struct ServerSettingsView: View {
                     Spacer()
                     Text("GET /execute-widget-action?id=CMD")
                         .font(.system(.caption2, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.trailing)
+                        .foregroundStyle(.secondary).multilineTextAlignment(.trailing)
                 }
                 HStack {
                     Text("Status")
                     Spacer()
-                    Circle()
-                        .fill(isRunning ? Color.green : Color.red)
-                        .frame(width: 8, height: 8)
-                    Text(isRunning ? "Running" : "Stopped")
-                        .foregroundStyle(isRunning ? .green : .red)
+                    Circle().fill(isRunning ? Color.green : Color.red).frame(width: 8, height: 8)
+                    Text(isRunning ? "Running" : "Stopped").foregroundStyle(isRunning ? .green : .red)
                 }
-                Button("Save & Restart") { saveAndRestart() }
-                    .foregroundStyle(.blue)
-            } header: {
-                Text("Server")
-            } footer: {
-                Text("Find your iPhone IP in Settings → Wi-Fi → your network. Example: http://<iPhone-IP>:\(effectivePort)/execute-widget-action?id=YOUR_COMMAND")
+                Button("Save & Restart") { saveAndRestart() }.foregroundStyle(.blue)
+            } header: { Text("Server") } footer: {
+                Text("Find your iPhone IP in Settings → Wi-Fi. Example: http://<iPhone-IP>:\(effectivePort)/execute-widget-action?id=YOUR_COMMAND")
                     .font(.caption2)
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Local Server")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("Local Server").navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.dark)
         .onAppear {
             isRunning = LocalActionServer.shared.isRunning
@@ -86,14 +69,8 @@ struct ServerSettingsView: View {
 
     private func saveAndRestart() {
         SharedStorage.shared.allowedSSID = ssid
-        if let port = Int(portText), port > 0, port < 65536 {
-            SharedStorage.shared.serverPort = port
-        }
+        if let port = Int(portText), port > 0, port < 65536 { SharedStorage.shared.serverPort = port }
         LocalActionServer.shared.restart()
         isRunning = LocalActionServer.shared.isRunning
     }
-}
-
-#Preview {
-    NavigationStack { ServerSettingsView() }.preferredColorScheme(.dark)
 }

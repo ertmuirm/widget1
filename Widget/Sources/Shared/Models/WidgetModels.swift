@@ -449,7 +449,6 @@ struct ExportData: Codable {
 
 // MARK: - Push Command Entry
 
-/// Maps a plain-text command ID to a widget action, used by LocalActionServer.
 struct PushCommandEntry: Codable, Identifiable, Equatable {
     let id: UUID
     var command: String
