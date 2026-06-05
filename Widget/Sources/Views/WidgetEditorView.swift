@@ -1,6 +1,7 @@
 import SwiftUI
 import PhotosUI
 import Vision
+import UniformTypeIdentifiers
 
 /// Widget editor for creating and editing widget configurations
 struct WidgetEditorView: View {
@@ -23,9 +24,10 @@ struct WidgetEditorView: View {
     // Single fileImporter state — SwiftUI only supports one .fileImporter per view;
     // multiple modifiers cause all but the last to be silently ignored.
     @State private var showFileImporter = false
-    private enum FileImportMode { case barcode, qr }
+    private enum FileImportMode { case barcode, qr, shortcut }
     @State private var fileImportMode: FileImportMode = .barcode
     @State private var barcodeScanError: String?
+    @State private var importAlertMessage: String?
 
     private var isImageWidget: Bool { configuration.widgetKind == .imageSlideshow }
     private var isLockScreenWidget: Bool { configuration.widgetKind == .lockScreen }
@@ -82,6 +84,14 @@ struct WidgetEditorView: View {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { dismiss() }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    fileImportMode = .shortcut
+                    showFileImporter = true
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
+                }
+            }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") { saveConfiguration(); dismiss() }
             }
@@ -113,16 +123,27 @@ struct WidgetEditorView: View {
                 SlideEditorView(slide: bindingForSlide(sel.id))
             }
         }
-        // Single fileImporter handles both barcode and QR scan from Files.
+        // Single fileImporter handles barcode, QR, and shortcut imports.
         .fileImporter(isPresented: $showFileImporter,
-                      allowedContentTypes: [.image],
+                      allowedContentTypes: fileImportMode == .shortcut
+                          ? [UTType(filenameExtension: "shortcut") ?? .data]
+                          : [.image],
                       allowsMultipleSelection: false) { result in
             if case .success(let urls) = result, let url = urls.first {
                 switch fileImportMode {
-                case .barcode: scanBarcodeFromFile(url)
-                case .qr:      scanQRFromFile(url)
+                case .barcode:  scanBarcodeFromFile(url)
+                case .qr:       scanQRFromFile(url)
+                case .shortcut: handleShortcutImport(url)
                 }
             }
+        }
+        .alert("Import", isPresented: Binding(
+            get: { importAlertMessage != nil },
+            set: { if !$0 { importAlertMessage = nil } }
+        )) {
+            Button("OK") { importAlertMessage = nil }
+        } message: {
+            Text(importAlertMessage ?? "")
         }
     }
 
@@ -592,6 +613,53 @@ struct WidgetEditorView: View {
                 self.editingSlideIndex = EditingItemIndex(id: newIndex)
                 self.barcodeScanError = nil
             }
+        }
+    }
+
+    private func handleShortcutImport(_ url: URL) {
+        guard url.startAccessingSecurityScopedResource() else {
+            importAlertMessage = "Could not access file."
+            return
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+        do {
+            let data = try Data(contentsOf: url)
+            let items = try ShortcutFileService.importItems(from: data)
+            guard !items.isEmpty else {
+                importAlertMessage = "No items found in shortcut."
+                return
+            }
+            if isImageWidget || isLockScreenWidget {
+                if configuration.items.isEmpty { configuration.items.append(WidgetItem()) }
+                configuration.items[0].action = items[0].action
+                importAlertMessage = "Imported action from \"\(items[0].name)\"."
+            } else if isClockWidget {
+                var actions = configuration.clockActions ?? []
+                let toFill = items.prefix(2)
+                for (i, item) in toFill.enumerated() {
+                    while actions.count <= i {
+                        actions.append(WidgetItem(displayType: .icon, sfSymbolName: "star.fill"))
+                    }
+                    actions[i].action = item.action
+                }
+                configuration.clockActions = actions
+                importAlertMessage = "Imported \(toFill.count) action\(toFill.count == 1 ? "" : "s")."
+            } else {
+                let remaining = configuration.maxItems - configuration.items.count
+                let toImport = Array(items.prefix(remaining))
+                for item in toImport {
+                    configuration.items.append(WidgetItem(
+                        displayType: .text,
+                        sfSymbolName: nil,
+                        customText: item.name,
+                        fontSize: CGFloat(defaultTextFontSize),
+                        action: item.action
+                    ))
+                }
+                importAlertMessage = "Imported \(toImport.count) item\(toImport.count == 1 ? "" : "s")."
+            }
+        } catch {
+            importAlertMessage = error.localizedDescription
         }
     }
 

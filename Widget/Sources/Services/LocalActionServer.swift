@@ -6,14 +6,15 @@ import UIKit
 ///
 /// Background/locked-screen lifecycle:
 ///   - UIBackgroundModes: voip keeps the socket alive at the kernel level.
-///   - pendingRemoteCommandID is written synchronously the moment a matching
-///     command arrives, before any async dispatch, guaranteeing the fallback
-///     is persisted even if the main queue doesn't process during this wakeup.
-///   - AppDelegate observes didBecomeActiveNotification and drains the pending
-///     command the instant the app enters active state (foreground).
-///   - If the Swift concurrency scheduler runs the Task while still in
-///     background, it executes immediately and clears the pending slot so the
-///     drain skips it. Only one path fires per command.
+///   - pendingRemoteCommandID is written synchronously on serverQueue before
+///     any async dispatch, guaranteeing the fallback is persisted even if the
+///     main queue is delayed during the background wakeup.
+///   - DispatchQueue.main.async (not Task { @MainActor in }) is used to call
+///     ActionExecutionService.executeBackground(), which uses callback-based
+///     UIApplication.open() — immune to Swift concurrency scheduler throttling.
+///   - AppDelegate observes didBecomeActiveNotification as a guaranteed fallback
+///     for the rare case where the main queue dispatch doesn't fire in time.
+///   - Ownership check on pendingRemoteCommandID ensures exactly one path fires.
 final class LocalActionServer {
     static let shared = LocalActionServer()
 
@@ -148,14 +149,15 @@ final class LocalActionServer {
         let capturedCommandID = commandID
         let capturedEntry = entry
         DispatchQueue.main.async {
-            // Claim the pending slot: if drain already consumed it, exit without
-            // executing (prevents double-fire when both paths run on the main actor).
-            Task { @MainActor in
-                guard SharedStorage.shared.pendingRemoteCommandID == capturedCommandID else {
-                    task.end(); return
-                }
-                SharedStorage.shared.pendingRemoteCommandID = nil
-                try? await ActionExecutionService.shared.execute(action: capturedEntry.action)
+            // Claim the pending slot. If drain already ran (app became active first),
+            // skip to avoid double-fire.
+            guard SharedStorage.shared.pendingRemoteCommandID == capturedCommandID else {
+                task.end(); return
+            }
+            SharedStorage.shared.pendingRemoteCommandID = nil
+            // Use callback-based open — no Swift concurrency scheduler, executes
+            // immediately on main thread during voip wakeup without throttling.
+            ActionExecutionService.shared.executeBackground(capturedEntry.action) {
                 task.end()
             }
         }

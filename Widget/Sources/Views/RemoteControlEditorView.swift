@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Row view (shown in WidgetListView)
 
@@ -70,6 +71,8 @@ struct RemoteControlEditorView: View {
     @State private var showEntryEditor = false
     @State private var isRunning: Bool
     @State private var isReordering = false
+    @State private var showShortcutImport = false
+    @State private var importAlertMessage: String?
 
     init() {
         _ssid      = State(initialValue: SharedStorage.shared.allowedSSID)
@@ -154,6 +157,13 @@ struct RemoteControlEditorView: View {
                         Label("Add Command", systemImage: "plus")
                     }
                     .foregroundStyle(.gray)
+
+                    Button {
+                        showShortcutImport = true
+                    } label: {
+                        Label("Import from Shortcut", systemImage: "square.and.arrow.down")
+                    }
+                    .foregroundStyle(.gray)
                 }
             } header: {
                 HStack {
@@ -200,6 +210,50 @@ struct RemoteControlEditorView: View {
             if !showing {
                 entries = SharedStorage.shared.loadPushCommandEntries()
             }
+        }
+        .fileImporter(
+            isPresented: $showShortcutImport,
+            allowedContentTypes: [UTType(filenameExtension: "shortcut") ?? .data],
+            allowsMultipleSelection: false
+        ) { result in
+            handleShortcutImport(result)
+        }
+        .alert("Import", isPresented: Binding(
+            get: { importAlertMessage != nil },
+            set: { if !$0 { importAlertMessage = nil } }
+        )) {
+            Button("OK") { importAlertMessage = nil }
+        } message: {
+            Text(importAlertMessage ?? "")
+        }
+    }
+
+    private func handleShortcutImport(_ result: Result<[URL], Error>) {
+        guard case .success(let urls) = result, let url = urls.first else { return }
+        guard url.startAccessingSecurityScopedResource() else {
+            importAlertMessage = "Could not access file."
+            return
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+        do {
+            let data = try Data(contentsOf: url)
+            let items = try ShortcutFileService.importItems(from: data)
+            guard !items.isEmpty else {
+                importAlertMessage = "No items found in shortcut."
+                return
+            }
+            for item in items {
+                let commandID = item.name
+                    .lowercased()
+                    .components(separatedBy: CharacterSet.alphanumerics.inverted)
+                    .filter { !$0.isEmpty }
+                    .joined(separator: "-")
+                entries.append(PushCommandEntry(command: commandID, label: item.name, action: item.action))
+            }
+            SharedStorage.shared.savePushCommandEntries(entries)
+            importAlertMessage = "Imported \(items.count) command\(items.count == 1 ? "" : "s")."
+        } catch {
+            importAlertMessage = error.localizedDescription
         }
     }
 

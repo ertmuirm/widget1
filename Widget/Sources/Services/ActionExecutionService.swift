@@ -93,6 +93,37 @@ final class ActionExecutionService {
     }
 }
 
+// MARK: - Background Execution (voip wakeup, no async/await)
+
+extension ActionExecutionService {
+
+    /// Executes an action using the callback-based UIApplication.open() API.
+    /// Must be called on the main thread. Safe to call during voip background wakeup
+    /// because it does not go through the Swift concurrency scheduler.
+    func executeBackground(_ action: WidgetAction, completion: @escaping () -> Void) {
+        guard let url = backgroundActionURL(for: action) else { completion(); return }
+        UIApplication.shared.open(url, options: [:]) { _ in completion() }
+    }
+
+    private func backgroundActionURL(for action: WidgetAction) -> URL? {
+        switch action.type {
+        case .urlScheme:
+            return URL(string: action.payload)
+        case .shortcut:
+            let encoded = action.payload.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? action.payload
+            return URL(string: "shortcuts://run shortcut?name=\(encoded)")
+        case .appIntent:
+            guard let intent = IntentDiscoveryService.shared.getIntent(byId: action.payload) else { return nil }
+            switch intent.id {
+            case "playMusic":  return URL(string: "music://play")
+            case "pauseMusic": return URL(string: "music://pause")
+            case "takePhoto":  return URL(string: "camera://")
+            default:           return nil
+            }
+        }
+    }
+}
+
 // MARK: - URL Scheme Validation
 
 extension ActionExecutionService {
