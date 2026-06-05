@@ -170,6 +170,19 @@ struct SettingsView: View {
                 }
             }
 
+            // Remote Control
+            Section {
+                NavigationLink(destination: ServerSettingsView()) {
+                    Label("Local Server", systemImage: "network")
+                }
+                .foregroundStyle(.white)
+            } header: {
+                Text("Remote Control")
+            } footer: {
+                Text("Configure a local TCP server to trigger widget actions from your PC via HTTP GET requests on the same Wi-Fi network.")
+                    .font(.caption)
+            }
+
             // Backup & Restore
             Section("Backup & Restore") {
                 Button {

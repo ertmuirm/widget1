@@ -6,18 +6,14 @@ struct PushCommandView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var entries: [PushCommandEntry] = []
-    @State private var lastPollDate: Date?
-
-    private var topic: String { SharedStorage.shared.ntfyTopic }
 
     var body: some View {
         NavigationStack {
             List {
-                ntfySection
                 commandsSection
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("Push Notification")
+            .navigationTitle("Command Mappings")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -25,60 +21,6 @@ struct PushCommandView: View {
                 }
             }
             .onAppear { reload() }
-        }
-    }
-
-    // MARK: - ntfy Topic Section
-
-    private var ntfySection: some View {
-        Section {
-            VStack(alignment: .leading, spacing: 8) {
-                Label("ntfy Topic", systemImage: "antenna.radiowaves.left.and.right")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-
-                HStack(alignment: .top, spacing: 8) {
-                    Text(topic)
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                    Spacer()
-                    Button {
-                        UIPasteboard.general.string = topic
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                            .font(.caption)
-                    }
-                    .foregroundStyle(.blue)
-                }
-            }
-            .padding(.vertical, 4)
-
-            HStack {
-                Text("Publish URL")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("https://ntfy.sh/\(topic)")
-                    .font(.system(.caption2, design: .monospaced))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.trailing)
-            }
-
-            HStack(spacing: 6) {
-                Image(systemName: "clock.arrow.2.circlepath")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(lastPollText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-        } header: {
-            Text("ntfy.sh Configuration")
-        } footer: {
-            Text("iOS polls ntfy.sh during background refresh — typically every 15–30 minutes depending on device usage patterns. POST your command as the message body to trigger an action.")
-                .font(.caption2)
         }
     }
 
@@ -112,24 +54,15 @@ struct PushCommandView: View {
         } header: {
             Text("Commands (\(entries.count))")
         } footer: {
-            Text("Each command maps one incoming text string to a single action. Commands are case-sensitive.")
+            Text("Each command maps a text ID to an action. Trigger via GET http://<iPhone-IP>:<PORT>/execute-widget-action?id=YOUR_COMMAND — commands are case-sensitive.")
                 .font(.caption2)
         }
     }
 
     // MARK: - Helpers
 
-    private var lastPollText: String {
-        guard let date = lastPollDate else { return "Not yet polled" }
-        let seconds = Int(-date.timeIntervalSinceNow)
-        if seconds < 60  { return "Last polled \(seconds)s ago" }
-        if seconds < 3600 { return "Last polled \(seconds / 60)m ago" }
-        return "Last polled \(seconds / 3600)h ago"
-    }
-
     private func reload() {
         entries = SharedStorage.shared.loadPushCommandEntries()
-        lastPollDate = SharedStorage.shared.ntfyLastPollDate
     }
 
     private func saveEntries() {
@@ -176,7 +109,7 @@ struct PushCommandEditorView: View {
     var body: some View {
         List {
             Section("Trigger") {
-                TextField("Command (e.g. kill-bluetooth)", text: $entry.command)
+                TextField("Command ID (e.g. kill-bluetooth)", text: $entry.command)
                     .foregroundStyle(.white)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
