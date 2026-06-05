@@ -51,9 +51,14 @@ struct WidgetListView: View {
             // Remote Control (shown once configured, always accessible via +)
             if hasRemoteControl {
                 Section("Remote Control") {
-                    RemoteControlRowView()
-                        .contentShape(Rectangle())
-                        .onTapGesture { showRemoteControlSheet = true }
+                    RemoteControlRowView(onDelete: {
+                        SharedStorage.shared.allowedSSID = ""
+                        SharedStorage.shared.savePushCommandEntries([])
+                        LocalActionServer.shared.stop()
+                        hasRemoteControl = false
+                    })
+                    .contentShape(Rectangle())
+                    .onTapGesture { showRemoteControlSheet = true }
                 }
             }
 

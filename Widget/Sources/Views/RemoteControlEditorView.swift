@@ -3,6 +3,8 @@ import SwiftUI
 // MARK: - Row view (shown in WidgetListView)
 
 struct RemoteControlRowView: View {
+    var onDelete: (() -> Void)? = nil
+
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
@@ -42,6 +44,15 @@ struct RemoteControlRowView: View {
             }
 
             Spacer()
+
+            if let onDelete {
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .foregroundStyle(.red)
+                        .padding(8)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(.vertical, 4)
     }
