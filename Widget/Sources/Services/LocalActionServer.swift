@@ -15,9 +15,9 @@ import UIKit
 ///   - AppDelegate observes didBecomeActiveNotification as a guaranteed fallback
 ///     for the rare case where the main queue dispatch doesn't fire in time.
 ///   - Ownership check on pendingRemoteCommandID ensures exactly one path fires.
-///   - When backgrounded, LSApplicationWorkspace.openApplicationWithBundleID: is
-///     used to bring the app to foreground via SpringBoard (same private API used
-///     elsewhere in the app), which then triggers the didBecomeActive drain.
+///   - When backgrounded, the voip mode keeps the app in active background execution
+///     (not suspended), so UIApplication.open() works the same as from foreground.
+///     executeBackground() is called directly regardless of applicationState.
 final class LocalActionServer {
     static let shared = LocalActionServer()
 
@@ -158,39 +158,15 @@ final class LocalActionServer {
                 task.end(); return
             }
 
-            if UIApplication.shared.applicationState == .active {
-                // Foreground: execute immediately.
-                SharedStorage.shared.pendingRemoteCommandID = nil
-                ActionExecutionService.shared.executeBackground(capturedEntry.action) {
-                    task.end()
-                }
-            } else {
-                // Background/locked: ask SpringBoard to bring this app to the foreground
-                // via LSApplicationWorkspace — the same private API already used elsewhere
-                // in the app (URLOpener.swift / WidgetApp.swift). This bypasses the normal
-                // UIApplication.open() restriction on backgrounded apps because the call
-                // goes directly to SpringBoard. Once active, didBecomeActiveNotification
-                // fires and drainPendingRemoteCommand() executes the action.
-                // pendingRemoteCommandID remains set for that drain.
-                LocalActionServer.foregroundSelf()
+            // Execute immediately. voip mode gives real background execution time —
+            // the app is NOT suspended here, so UIApplication.open() works for URL
+            // schemes the same as it does from the foreground. Clearing the pending
+            // slot first prevents a double-fire if didBecomeActive also drains.
+            SharedStorage.shared.pendingRemoteCommandID = nil
+            ActionExecutionService.shared.executeBackground(capturedEntry.action) {
                 task.end()
             }
         }
-    }
-
-    // MARK: - SpringBoard foreground request
-
-    /// Asks SpringBoard to bring this app to the foreground via LSApplicationWorkspace.
-    /// Called during a voip background wakeup so the pending command can be drained
-    /// once the app becomes active.
-    private static func foregroundSelf() {
-        guard let bundleID = Bundle.main.bundleIdentifier,
-              let cls = NSClassFromString("LSApplicationWorkspace") as? NSObject.Type,
-              let ws = cls.perform(NSSelectorFromString("defaultWorkspace"))?.takeUnretainedValue() as? NSObject
-        else { return }
-        let sel = NSSelectorFromString("openApplicationWithBundleID:")
-        guard ws.responds(to: sel) else { return }
-        ws.perform(sel, with: bundleID)
     }
 
     private func send(status: Int, body: String, to connection: NWConnection) {

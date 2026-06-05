@@ -60,7 +60,8 @@ struct WidgetEntryView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(-16)
+            .padding(.horizontal, -20)
+            .padding(.vertical, -16)
         } else {
             let value = position == .hour ? displayHour : minute
             let tens = String((value / 10) % 10)
@@ -72,8 +73,9 @@ struct WidgetEntryView: View {
                 clockDigitCell(digit: units, url: unitsAction, fontSize: fontSize)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(-16)
-            .offset(x: -5)
+            .padding(.horizontal, -20)
+            .padding(.vertical, -16)
+            .offset(x: -2)
         }
     }
 
