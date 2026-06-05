@@ -4,24 +4,22 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         LocalActionServer.shared.start()
+        // UIApplicationDelegate.applicationDidBecomeActive is intercepted by SwiftUI's
+        // scene lifecycle and does not fire reliably. NotificationCenter fires in all cases.
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            AppDelegate.drainPendingRemoteCommand()
+        }
         return true
     }
 
     /// Execute any command that arrived while the app was backgrounded.
-    func applicationDidBecomeActive(_ application: UIApplication) {
-        drainPendingRemoteCommand()
-    }
-
-    /// Called when iOS routes openapp:// back into this app (triggered by LocalActionServer
-    /// to bring the app to foreground after a background command is received).
-    func application(_ app: UIApplication, open url: URL,
-                     options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        guard url.scheme == "openapp" else { return false }
-        drainPendingRemoteCommand()
-        return true
-    }
-
-    private func drainPendingRemoteCommand() {
+    /// Static so it can be called from the NotificationCenter closure without
+    /// capturing self (AppDelegate lifetime is tied to the process).
+    static func drainPendingRemoteCommand() {
         guard let commandID = SharedStorage.shared.pendingRemoteCommandID else { return }
         SharedStorage.shared.pendingRemoteCommandID = nil
         let entries = SharedStorage.shared.loadPushCommandEntries()
