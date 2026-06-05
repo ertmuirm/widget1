@@ -36,18 +36,42 @@ struct WidgetEntryView: View {
         let hour24 = calendar.component(.hour, from: entry.date)
         let minute = calendar.component(.minute, from: entry.date)
         let displayHour = hour24 == 0 ? 12 : (hour24 > 12 ? hour24 - 12 : hour24)
-        let value = position == .hour ? displayHour : minute
-        let tens = String((value / 10) % 10)
-        let units = String(value % 10)
         let actions = entry.configuration.clockActions ?? []
-        let tensAction = actions.first.flatMap { resolveItemURL($0) }
-        let unitsAction = actions.count > 1 ? resolveItemURL(actions[1]) : nil
 
-        HStack(spacing: 0) {
-            clockDigitCell(digit: tens, url: tensAction, fontSize: fontSize)
-            clockDigitCell(digit: units, url: unitsAction, fontSize: fontSize)
+        if position == .time {
+            let hourTens  = String((displayHour / 10) % 10)
+            let hourUnits = String(displayHour % 10)
+            let minTens   = String((minute / 10) % 10)
+            let minUnits  = String(minute % 10)
+            let a0 = actions.count > 0 ? resolveItemURL(actions[0]) : nil
+            let a1 = actions.count > 1 ? resolveItemURL(actions[1]) : nil
+            let a2 = actions.count > 2 ? resolveItemURL(actions[2]) : nil
+            let a3 = actions.count > 3 ? resolveItemURL(actions[3]) : nil
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    clockDigitCell(digit: hourTens,  url: a0, fontSize: fontSize)
+                    clockDigitCell(digit: hourUnits, url: a1, fontSize: fontSize)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                HStack(spacing: 0) {
+                    clockDigitCell(digit: minTens,  url: a2, fontSize: fontSize)
+                    clockDigitCell(digit: minUnits, url: a3, fontSize: fontSize)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            let value = position == .hour ? displayHour : minute
+            let tens = String((value / 10) % 10)
+            let units = String(value % 10)
+            let tensAction = actions.first.flatMap { resolveItemURL($0) }
+            let unitsAction = actions.count > 1 ? resolveItemURL(actions[1]) : nil
+            HStack(spacing: 0) {
+                clockDigitCell(digit: tens,  url: tensAction,  fontSize: fontSize)
+                clockDigitCell(digit: units, url: unitsAction, fontSize: fontSize)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     @ViewBuilder

@@ -249,6 +249,7 @@ struct WidgetEditorView: View {
             Picker("Position", selection: $configuration.clockDigitPosition) {
                 Text("Hour (12h)").tag(ClockDigitPosition.hour as ClockDigitPosition?)
                 Text("Minute").tag(ClockDigitPosition.minute as ClockDigitPosition?)
+                Text("Time (HH/MM)").tag(ClockDigitPosition.time as ClockDigitPosition?)
             }
         }
         Section("Font") {
@@ -274,14 +275,24 @@ struct WidgetEditorView: View {
     @ViewBuilder
     private var clockActionsSection: some View {
         let actions = configuration.clockActions ?? []
+        let isTime = configuration.clockDigitPosition == .time
         Section {
-            Text("Each digit can have its own tap action (first digit = tens, second digit = units).")
+            Text(isTime
+                 ? "Each digit can have its own tap action (hour tens, hour units, minute tens, minute units)."
+                 : "Each digit can have its own tap action (first digit = tens, second digit = units).")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
         Section("Digit Actions") {
-            clockActionRow(label: "Tens Digit", index: 0, actions: actions)
-            clockActionRow(label: "Units Digit", index: 1, actions: actions)
+            if isTime {
+                clockActionRow(label: "Hour Tens",   index: 0, actions: actions)
+                clockActionRow(label: "Hour Units",  index: 1, actions: actions)
+                clockActionRow(label: "Minute Tens", index: 2, actions: actions)
+                clockActionRow(label: "Minute Units",index: 3, actions: actions)
+            } else {
+                clockActionRow(label: "Tens Digit",  index: 0, actions: actions)
+                clockActionRow(label: "Units Digit", index: 1, actions: actions)
+            }
         }
     }
 
@@ -635,7 +646,8 @@ struct WidgetEditorView: View {
                 importAlertMessage = "Imported action from \"\(items[0].name)\"."
             } else if isClockWidget {
                 var actions = configuration.clockActions ?? []
-                let toFill = items.prefix(2)
+                let slotCount = configuration.clockDigitPosition == .time ? 4 : 2
+                let toFill = items.prefix(slotCount)
                 for (i, item) in toFill.enumerated() {
                     while actions.count <= i {
                         actions.append(WidgetItem(displayType: .icon, sfSymbolName: "star.fill"))

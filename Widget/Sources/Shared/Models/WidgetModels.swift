@@ -104,11 +104,13 @@ enum WidgetKind: String, Codable {
 enum ClockDigitPosition: String, Codable, CaseIterable {
     case hour
     case minute
-    
+    case time
+
     var displayName: String {
         switch self {
         case .hour:    return "Hour (12h)"
         case .minute:  return "Minute"
+        case .time:    return "Time (HH/MM)"
         }
     }
 }

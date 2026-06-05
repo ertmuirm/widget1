@@ -392,21 +392,56 @@ struct WidgetPreviewView: View {
         let h24 = cal.component(.hour, from: now)
         let min = cal.component(.minute, from: now)
         let displayHour = h24 == 0 ? 12 : (h24 > 12 ? h24 - 12 : h24)
-        let value = position == .hour ? displayHour : min
-        let tens = String((value / 10) % 10)
-        let units = String(value % 10)
         let fontSize = configuration.clockFontSize ?? 80
-        HStack(spacing: 0) {
-            Text(tens)
-                .font(clockPreviewFont(size: fontSize))
-                .foregroundStyle(.white)
-                .minimumScaleFactor(0.3)
+        if position == .time {
+            let hourTens  = String((displayHour / 10) % 10)
+            let hourUnits = String(displayHour % 10)
+            let minTens   = String((min / 10) % 10)
+            let minUnits  = String(min % 10)
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    Text(hourTens)
+                        .font(clockPreviewFont(size: fontSize))
+                        .foregroundStyle(.white)
+                        .minimumScaleFactor(0.3)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Text(hourUnits)
+                        .font(clockPreviewFont(size: fontSize))
+                        .foregroundStyle(.white)
+                        .minimumScaleFactor(0.3)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            Text(units)
-                .font(clockPreviewFont(size: fontSize))
-                .foregroundStyle(.white)
-                .minimumScaleFactor(0.3)
+                HStack(spacing: 0) {
+                    Text(minTens)
+                        .font(clockPreviewFont(size: fontSize))
+                        .foregroundStyle(.white)
+                        .minimumScaleFactor(0.3)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Text(minUnits)
+                        .font(clockPreviewFont(size: fontSize))
+                        .foregroundStyle(.white)
+                        .minimumScaleFactor(0.3)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        } else {
+            let value = position == .hour ? displayHour : min
+            let tens = String((value / 10) % 10)
+            let units = String(value % 10)
+            HStack(spacing: 0) {
+                Text(tens)
+                    .font(clockPreviewFont(size: fontSize))
+                    .foregroundStyle(.white)
+                    .minimumScaleFactor(0.3)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                Text(units)
+                    .font(clockPreviewFont(size: fontSize))
+                    .foregroundStyle(.white)
+                    .minimumScaleFactor(0.3)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
     }
 
