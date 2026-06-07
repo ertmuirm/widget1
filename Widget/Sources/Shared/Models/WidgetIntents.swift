@@ -212,11 +212,16 @@ func resolveURL(for action: WidgetAction) -> URL? {
     let raw = action.payload.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !raw.isEmpty else { return nil }
     switch action.type {
-    case .urlScheme, .appIntent:
-        let normalized = raw
-        return URL(string: normalized)
-            ?? URL(string: normalized.addingPercentEncoding(
-                withAllowedCharacters: .urlFragmentAllowed) ?? normalized)
+    case .urlScheme:
+        return URL(string: raw)
+            ?? URL(string: raw.addingPercentEncoding(
+                withAllowedCharacters: .urlFragmentAllowed) ?? raw)
+    case .appIntent:
+        // Bundle IDs are not valid URL strings; route through the app's openapp:// handler
+        // so LSApplicationWorkspace can launch the target app.
+        guard let encoded = raw.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+        else { return nil }
+        return URL(string: "openapp://launch?bundle=\(encoded)")
     case .shortcut:
         guard let encoded = raw.addingPercentEncoding(
             withAllowedCharacters: .urlQueryAllowed) else { return nil }
