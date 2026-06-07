@@ -12,6 +12,7 @@ struct WidgetListView: View {
     @State private var showAddLauncherSheet = false
     @State private var showSettingsSheet = false
     @State private var showRemoteControlSheet = false
+    @State private var showBLESheet = false
     @State private var hasRemoteControl = !SharedStorage.shared.allowedSSID.isEmpty
 
     var body: some View {
@@ -123,6 +124,11 @@ struct WidgetListView: View {
                     } label: {
                         Label("Remote Control", systemImage: "network")
                     }
+                    Button {
+                        showBLESheet = true
+                    } label: {
+                        Label("Bluetooth", systemImage: "antenna.radiowaves.left.and.right")
+                    }
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.title3)
@@ -186,6 +192,11 @@ struct WidgetListView: View {
         .sheet(isPresented: $showSettingsSheet) {
             NavigationStack {
                 SettingsView()
+            }
+        }
+        .sheet(isPresented: $showBLESheet) {
+            NavigationStack {
+                BLEDebugView()
             }
         }
     }

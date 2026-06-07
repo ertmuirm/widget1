@@ -61,6 +61,8 @@
 	<array>
 		<string>voip</string>
 	</array>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Used to communicate with and debug BLE smartwatch devices.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Used to listen for command triggers from your PC on the local network.</string>
 	<key>NSAppTransportSecurity</key>
