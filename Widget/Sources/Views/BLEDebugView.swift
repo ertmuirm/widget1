@@ -387,7 +387,7 @@ struct BLEDebugView: View {
             }
         } header: { Text("Save to Shortcuts") }
         footer: {
-            Text("After saving, find "Send Watch Command" in the Shortcuts app under this app's actions.")
+        Text("After saving, find \u{201C}Send Watch Command\u{201D} in the Shortcuts app under this app\u{2019}s actions.")
                 .font(.caption)
         }
     }

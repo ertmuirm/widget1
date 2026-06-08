@@ -85,10 +85,7 @@ struct WatchCommandQuery: EntityQuery {
 
 struct SendWatchCommandIntent: AppIntent {
     static var title: LocalizedStringResource = "Send Watch Command"
-    static var description = IntentDescription(
-        "Send a Vibration or Notification command to a saved smartwatch over Bluetooth. " +
-        "The watch must be nearby. Save devices in the app's Bluetooth menu first."
-    )
+    static var description = IntentDescription("Send a Vibration or Notification command to a paired smartwatch over Bluetooth. The watch must be nearby. Save devices in the app's Bluetooth menu first.")
     static var openAppWhenRun: Bool = false
 
     @Parameter(title: "Device", description: "The saved watch to send the command to")
@@ -104,12 +101,12 @@ struct SendWatchCommandIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         guard let savedDevice = BLEDeviceStore.shared.device(withIDString: device.id) else {
-            return .result(dialog: "Device '\(device.name)' not found. Open the app and save the device first.")
+            return .result(dialog: IntentDialog(stringLiteral: "Device \(device.name) not found. Open the app and save the device first."))
         }
         let allPresets = savedDevice.vibrationPresets + savedDevice.notificationPresets
         guard let preset = allPresets.first(where: { $0.id.uuidString == command.id }),
               !preset.hexSequence.isEmpty else {
-            return .result(dialog: "Command not found. Open the app and re-save the device.")
+            return .result(dialog: IntentDialog(stringLiteral: "Command not found. Open the app and re-save the device."))
         }
         do {
             let executor = BLECommandExecutor()
@@ -118,11 +115,11 @@ struct SendWatchCommandIntent: AppIntent {
                 writeCharUUID: savedDevice.writeTargetUUID,
                 hexSequence: preset.hexSequence
             )
-            return .result(dialog: "\(preset.label) sent to \(savedDevice.name).")
+            return .result(dialog: IntentDialog(stringLiteral: "\(preset.label) sent to \(savedDevice.name)."))
         } catch let err as BLECommandError {
-            return .result(dialog: err.errorDescription ?? "Command failed.")
+            return .result(dialog: IntentDialog(stringLiteral: err.errorDescription ?? "Command failed."))
         } catch {
-            return .result(dialog: "Bluetooth error: \(error.localizedDescription)")
+            return .result(dialog: IntentDialog(stringLiteral: "Bluetooth error: \(error.localizedDescription)"))
         }
     }
 }
