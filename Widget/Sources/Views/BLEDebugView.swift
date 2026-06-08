@@ -9,17 +9,18 @@ struct BLEDebugView: View {
     @State private var logFilter: BLELogCategory? = nil   // nil = all
     @State private var showStateDetail: WatchStateSnapshot? = nil
 
-    private let presets: [(label: String, category: String, hex: String)] = [
+    private let presets: [(label: String, category: String, hex: [String])] = [
         // Vibration — confirmed working via 6E400002
-        ("Vibration OFF",   "Vibration", "df0006f1020108000100"),
-        ("Vibration ON",    "Vibration", "df0006f2020108000101"),
-        // DND toggle — byte[67] in state packet; send via 6E400002
-        // Primary candidate: param byte 08 (matches vibration format)
-        ("DND OFF",         "DND",       "df0006f3050108000100"),
-        ("DND ON",          "DND",       "df0006f4050108000101"),
-        // Alternate candidate: param byte 06 (original attempt, acked but unconfirmed)
-        ("DND OFF (06)",    "DND",       "df0006f3050106000100"),
-        ("DND ON (06)",     "DND",       "df0006f4050106000101"),
+        ("Vibration OFF",   "Vibration",    ["df0006f1020108000100"]),
+        ("Vibration ON",    "Vibration",    ["df0006f2020108000101"]),
+        // DND — confirmed Laxasfit format (close Laxasfit before testing)
+        ("DND OFF",         "DND",          ["df0006f2050106000100"]),
+        ("DND ON",          "DND",          ["df0006f3050106000101"]),
+        // Notification forwarding — 2-packet sequence, confirmed from Wireshark
+        ("Notif ALL ON",    "Notification", ["df00199502012200143333333333333333333333",
+                                             "330000000000000000"]),
+        ("Notif ALL OFF",   "Notification", ["df0019fd02012200141111111111111111111111",
+                                             "110000000000000000"]),
     ]
 
     var body: some View {
@@ -311,13 +312,17 @@ struct BLEDebugView: View {
             ForEach(presets, id: \.label) { preset in
                 Button {
                     if ble.isRecordingStream { ble.stopStreamRecording() }
-                    ble.writeHex(preset.hex)
+                    ble.writeHexSequence(preset.hex)
                     ble.startStreamRecording()
                 } label: {
                     HStack {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(preset.label).foregroundStyle(.white)
-                            Text(preset.hex.uppercased()).font(.caption.monospaced()).foregroundStyle(.secondary)
+                            Text(preset.hex[0].uppercased()).font(.caption.monospaced()).foregroundStyle(.secondary)
+                            if preset.hex.count > 1 {
+                                Text("+ \(preset.hex.count - 1) more packet(s)")
+                                    .font(.caption2).foregroundStyle(.tertiary)
+                            }
                         }
                         Spacer()
                         Image(systemName: "arrow.up.circle.fill").foregroundStyle(categoryColor(preset.category))
@@ -335,9 +340,10 @@ struct BLEDebugView: View {
 
     private func categoryColor(_ cat: String) -> Color {
         switch cat {
-        case "Vibration": return .orange
-        case "DND":       return .blue
-        default:          return .purple
+        case "Vibration":    return .orange
+        case "DND":          return .blue
+        case "Notification": return .green
+        default:             return .purple
         }
     }
 

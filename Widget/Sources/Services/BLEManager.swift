@@ -267,6 +267,18 @@ final class BLEManager: NSObject, ObservableObject {
         return writeData(data)
     }
 
+    func writeHexSequence(_ hexStrings: [String]) {
+        for (i, hex) in hexStrings.enumerated() {
+            if i == 0 {
+                writeHex(hex)
+            } else {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.05) { [weak self] in
+                    self?.writeHex(hex)
+                }
+            }
+        }
+    }
+
     @discardableResult
     func writeData(_ data: Data) -> Bool {
         guard let target = selectedWriteTarget, let p = activePeripheral else {
