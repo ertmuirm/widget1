@@ -13,9 +13,9 @@ struct BLEDebugView: View {
         // Vibration — confirmed working via 6E400002
         ("Vibration OFF",   "Vibration",    ["df0006f1020108000100"]),
         ("Vibration ON",    "Vibration",    ["df0006f2020108000101"]),
-        // DND — confirmed Laxasfit format (close Laxasfit before testing)
-        ("DND OFF",         "DND",          ["df0006f2050106000100"]),
-        ("DND ON",          "DND",          ["df0006f3050106000101"]),
+        // DND — df000a opcode with embedded schedule (10pm–8:01am). seq byte varies; 13/14 used here.
+        ("DND OFF",         "DND",          ["df000a13020114000500052801e1"]),
+        ("DND ON",          "DND",          ["df000a14020114000501052801e1"]),
         // Notification forwarding — 2-packet sequence, confirmed from Wireshark
         ("Notif ALL ON",    "Notification", ["df00199502012200143333333333333333333333",
                                              "330000000000000000"]),
