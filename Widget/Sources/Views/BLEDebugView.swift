@@ -10,12 +10,16 @@ struct BLEDebugView: View {
     @State private var showStateDetail: WatchStateSnapshot? = nil
 
     private let presets: [(label: String, category: String, hex: String)] = [
-        ("Vibration A",    "Vibration",    "df0006f1020108000100"),
-        ("Vibration B",    "Vibration",    "df0006f2020108000101"),
-        ("DND A",          "DND",          "df0006f3050106000101"),
-        ("DND B",          "DND",          "df0006f2050106000100"),
-        ("Notification A", "Notification", "df0006f502010b000101"),
-        ("Notification B", "Notification", "df0006fb130101000100"),
+        // Vibration — confirmed working via 6E400002
+        ("Vibration OFF",   "Vibration", "df0006f1020108000100"),
+        ("Vibration ON",    "Vibration", "df0006f2020108000101"),
+        // DND toggle — byte[67] in state packet; send via 6E400002
+        // Primary candidate: param byte 08 (matches vibration format)
+        ("DND OFF",         "DND",       "df0006f3050108000100"),
+        ("DND ON",          "DND",       "df0006f4050108000101"),
+        // Alternate candidate: param byte 06 (original attempt, acked but unconfirmed)
+        ("DND OFF (06)",    "DND",       "df0006f3050106000100"),
+        ("DND ON (06)",     "DND",       "df0006f4050106000101"),
     ]
 
     var body: some View {
