@@ -2,32 +2,24 @@ import SwiftUI
 import CoreBluetooth
 
 struct BLEDebugView: View {
-    @ObservedObject private var ble = BLEManager.shared
-    @State private var hexInput = ""
-    @State private var showExportSheet = false
-    @State private var exportText = ""
-    @State private var logFilter: BLELogCategory? = nil   // nil = all
-    @State private var showStateDetail: WatchStateSnapshot? = nil
+    @ObservedObject private var ble   = BLEManager.shared
+    @ObservedObject private var store = BLEDeviceStore.shared
 
-    private let presets: [(label: String, category: String, hex: [String])] = [
-        // Vibration — confirmed working via 6E400002
-        ("Vibration OFF",   "Vibration",    ["df0006f1020108000100"]),
-        ("Vibration ON",    "Vibration",    ["df0006f2020108000101"]),
-        // DND — df000a opcode with embedded schedule (10pm–8:01am). seq byte varies; 13/14 used here.
-        ("DND OFF",         "DND",          ["df000a13020114000500052801e1"]),
-        ("DND ON",          "DND",          ["df000a14020114000501052801e1"]),
-        // Notification forwarding — 2-packet sequence, confirmed from Wireshark
-        ("Notif ALL ON",    "Notification", ["df00199502012200143333333333333333333333",
-                                             "330000000000000000"]),
-        ("Notif ALL OFF",   "Notification", ["df0019fd02012200141111111111111111111111",
-                                             "110000000000000000"]),
-    ]
+    @State private var vibrationPresets     = BLEDeviceStore.defaultVibrationPresets
+    @State private var notificationPresets  = BLEDeviceStore.defaultNotificationPresets
+
+    @State private var hexInput         = ""
+    @State private var showExportSheet  = false
+    @State private var exportText       = ""
+    @State private var logFilter: BLELogCategory? = nil
+    @State private var showStateDetail: WatchStateSnapshot? = nil
+    @State private var savedToast       = false
 
     var body: some View {
         List {
             diagnosticsSection
+            savedDevicesSection
             systemConnectedSection
-            retrievedSection
             scanSection
             if ble.connectionState == .connected || ble.connectionState == .connecting {
                 connectionInfoSection
@@ -36,7 +28,9 @@ struct BLEDebugView: View {
                 writeTargetSection
                 watchStateSection
                 senderSection
-                presetsSection
+                presetSection(title: "Vibration",    presets: $vibrationPresets,    color: .orange)
+                presetSection(title: "Notification",  presets: $notificationPresets, color: .green)
+                saveDeviceSection
                 streamSection
                 servicesSection
             }
@@ -52,6 +46,16 @@ struct BLEDebugView: View {
         .sheet(item: $showStateDetail) { snap in
             WatchStateDetailView(snapshot: snap)
         }
+        .onChange(of: ble.connectionState) { _, newState in
+            guard newState == .connected, let p = ble.connectedPeripheral else { return }
+            if let saved = store.device(withID: p.identifier) {
+                vibrationPresets    = saved.vibrationPresets
+                notificationPresets = saved.notificationPresets
+            } else {
+                vibrationPresets    = BLEDeviceStore.defaultVibrationPresets
+                notificationPresets = BLEDeviceStore.defaultNotificationPresets
+            }
+        }
     }
 
     // MARK: - Toolbar
@@ -61,10 +65,8 @@ struct BLEDebugView: View {
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
                 Button {
-                    exportText = ble.exportText()
-                    showExportSheet = true
+                    exportText = ble.exportText(); showExportSheet = true
                 } label: { Label("Export Session Log", systemImage: "square.and.arrow.up") }
-
                 Button { ble.dumpCharacteristics() } label: {
                     Label("Dump Characteristics", systemImage: "doc.text.magnifyingglass")
                 }
@@ -88,15 +90,13 @@ struct BLEDebugView: View {
 
     private var diagnosticsSection: some View {
         Section("Diagnostics") {
-            DiagRow(label: "Bluetooth",      value: ble.bluetoothStateLabel,
+            DiagRow(label: "Bluetooth",     value: ble.bluetoothStateLabel,
                     color: ble.bluetoothState == .poweredOn ? .green : .red)
-            DiagRow(label: "Authorization",  value: ble.authorizationLabel,
+            DiagRow(label: "Authorization", value: ble.authorizationLabel,
                     color: ble.authState == .allowedAlways ? .green : .orange)
-            DiagRow(label: "Scanning",       value: ble.isScanning ? "Active" : "Stopped",
+            DiagRow(label: "Scanning",      value: ble.isScanning ? "Active" : "Stopped",
                     color: ble.isScanning ? .green : .secondary)
-            DiagRow(label: "Found",          value: "\(ble.scannedDevices.count) scanned · \(ble.systemConnectedDevices.count) system · \(ble.retrievedDevices.count) cached",
-                    color: .secondary)
-            DiagRow(label: "Connection",     value: ble.connectionState.label,
+            DiagRow(label: "Connection",    value: ble.connectionState.label,
                     color: connectionStateColor)
             if ble.authState == .denied {
                 Button("Open Bluetooth Settings") {
@@ -109,7 +109,47 @@ struct BLEDebugView: View {
         }
     }
 
-    // MARK: - System Connected
+    // MARK: - Saved Devices
+
+    private var savedDevicesSection: some View {
+        Section {
+            if store.devices.isEmpty {
+                Text("No saved devices. Connect a device and tap Save.")
+                    .foregroundStyle(.secondary).italic().font(.caption)
+            } else {
+                ForEach(store.devices) { device in
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(device.name).fontWeight(.medium)
+                            Text(device.id.uuidString)
+                                .font(.caption2.monospaced()).foregroundStyle(.secondary)
+                            HStack(spacing: 8) {
+                                Text("TX: \(String(device.writeTargetUUID.prefix(8)))…")
+                                    .font(.caption2.monospaced()).foregroundStyle(.secondary)
+                                Text("\(device.vibrationPresets.count + device.notificationPresets.count) presets")
+                                    .font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        Button("Connect") { ble.connect(peripheralID: device.id) }
+                            .buttonStyle(.borderedProminent).font(.caption)
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) { store.delete(id: device.id) } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                }
+            }
+        } header: {
+            Text("Saved Devices")
+        } footer: {
+            Text("Saved devices retain their write target and preset commands for use in the Shortcuts app.")
+                .font(.caption)
+        }
+    }
+
+    // MARK: - System-Connected
 
     private var systemConnectedSection: some View {
         Section {
@@ -122,25 +162,11 @@ struct BLEDebugView: View {
                 }
             }
         } header: {
-            Text("System-Connected (Laxasfit / other app)")
+            Text("System-Connected")
         } footer: {
-            Text("Peripherals the iPhone is already connected to via any app. Connect here if your watch doesn't appear in the scan list.")
+            Text("Peripherals the iPhone is already connected to. Connect here if your watch doesn't appear in the scan list.")
                 .font(.caption)
         }
-    }
-
-    // MARK: - Previously Retrieved
-
-    private var retrievedSection: some View {
-        Section {
-            if ble.retrievedDevices.isEmpty {
-                Text("None stored yet").foregroundStyle(.secondary).italic().font(.caption)
-            } else {
-                ForEach(ble.retrievedDevices) { dev in
-                    DeviceRow(device: dev, badge: "Cached", badgeColor: .purple) { ble.connect(dev) }
-                }
-            }
-        } header: { Text("Previously Connected") }
     }
 
     // MARK: - Scan
@@ -149,9 +175,13 @@ struct BLEDebugView: View {
         Section {
             HStack {
                 if ble.isScanning {
-                    HStack(spacing: 8) { ProgressView().scaleEffect(0.75); Text("Scanning…").foregroundStyle(.secondary) }
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.75)
+                        Text("Scanning…").foregroundStyle(.secondary)
+                    }
                 } else {
-                    Text(ble.scannedDevices.isEmpty ? "No devices" : "\(ble.scannedDevices.count) found").foregroundStyle(.secondary)
+                    Text(ble.scannedDevices.isEmpty ? "No devices" : "\(ble.scannedDevices.count) found")
+                        .foregroundStyle(.secondary)
                 }
                 Spacer()
                 if ble.isScanning {
@@ -165,7 +195,7 @@ struct BLEDebugView: View {
             ForEach(ble.scannedDevices.sorted { $0.rssi > $1.rssi }) { dev in
                 ExpandableDeviceRow(device: dev) { ble.connect(dev) }
             }
-        } header: { Text("BLE Scan (withServices: nil)") }
+        } header: { Text("BLE Scan") }
     }
 
     // MARK: - Connection Info
@@ -190,14 +220,11 @@ struct BLEDebugView: View {
                 Text("No writable characteristics found").foregroundStyle(.secondary).italic()
             } else {
                 ForEach(ble.writableChars) { wc in
-                    Button {
-                        ble.selectedWriteTarget = wc
-                    } label: {
+                    Button { ble.selectedWriteTarget = wc } label: {
                         HStack(spacing: 10) {
                             Image(systemName: ble.selectedWriteTarget == wc
                                   ? "checkmark.circle.fill" : "circle")
                                 .foregroundStyle(ble.selectedWriteTarget == wc ? .green : .secondary)
-
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(wc.uuid).font(.caption.monospaced()).foregroundStyle(.white)
                                 Text(wc.serviceUUID).font(.caption2.monospaced()).foregroundStyle(.secondary)
@@ -213,7 +240,7 @@ struct BLEDebugView: View {
             Text("Write Target")
         } footer: {
             if let t = ble.selectedWriteTarget {
-                Text("All sends go to: \(t.uuid) (\(t.supportsWithoutResponse ? "withoutResponse" : "withResponse"))")
+                Text("Sending to: \(t.uuid) (\(t.supportsWithoutResponse ? "withoutResponse" : "withResponse"))")
                     .font(.caption)
             }
         }
@@ -227,19 +254,14 @@ struct BLEDebugView: View {
                 Text("No DF 00 4C state packets received yet")
                     .foregroundStyle(.secondary).italic().font(.caption)
             } else {
-                // Latest state
                 if let latest = ble.watchStateHistory.last {
-                    Button {
-                        showStateDetail = latest
-                    } label: {
+                    Button { showStateDetail = latest } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text("Latest state — \(latest.bytes.count) bytes")
                                     .foregroundStyle(.white).font(.subheadline)
                                 Text(latest.bytes.map { String(format: "%02X", $0) }.joined(separator: " "))
-                                    .font(.caption2.monospaced())
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
+                                    .font(.caption2.monospaced()).foregroundStyle(.secondary).lineLimit(2)
                             }
                             Spacer()
                             Image(systemName: "chevron.right").foregroundStyle(.secondary).font(.caption)
@@ -247,8 +269,6 @@ struct BLEDebugView: View {
                     }
                     .buttonStyle(.plain)
                 }
-
-                // Change history (last 5)
                 let changes = ble.watchStateHistory.filter { !$0.changedIndices.isEmpty }
                 if !changes.isEmpty {
                     ForEach(changes.suffix(5).reversed()) { snap in
@@ -257,8 +277,7 @@ struct BLEDebugView: View {
                                 Text(snap.formattedTimestamp)
                                     .font(.caption2.monospaced()).foregroundStyle(.secondary)
                                 Text(snap.diffSummary)
-                                    .font(.caption.monospaced()).foregroundStyle(.orange)
-                                    .lineLimit(1)
+                                    .font(.caption.monospaced()).foregroundStyle(.orange).lineLimit(1)
                                 Spacer()
                                 Image(systemName: "chevron.right").foregroundStyle(.secondary).font(.caption2)
                             }
@@ -271,12 +290,10 @@ struct BLEDebugView: View {
             HStack {
                 Text("Watch State Parser (DF 00 4C)")
                 Spacer()
-                Text("\(ble.watchStateHistory.count) packet(s)")
-                    .font(.caption).foregroundStyle(.secondary)
+                Text("\(ble.watchStateHistory.count) packet(s)").font(.caption).foregroundStyle(.secondary)
             }
         } footer: {
-            Text("Tap any row for full byte table with changed-byte highlighting.")
-                .font(.caption)
+            Text("Tap any row for full byte table with changed-byte highlighting.").font(.caption)
         }
     }
 
@@ -295,55 +312,83 @@ struct BLEDebugView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(ble.selectedWriteTarget == nil || hexInput.trimmingCharacters(in: .whitespaces).isEmpty)
             }
-        } header: {
-            Text("Manual Hex Sender")
-        } footer: {
-            if let t = ble.selectedWriteTarget {
-                Text("Sends to \(t.uuid)")
-                    .font(.caption)
-            }
+        } header: { Text("Manual Hex Sender") }
+        footer: {
+            if let t = ble.selectedWriteTarget { Text("Sends to \(t.uuid)").font(.caption) }
         }
     }
 
-    // MARK: - Preset Commands
+    // MARK: - Editable Preset Sections
 
-    private var presetsSection: some View {
+    @ViewBuilder
+    private func presetSection(title: String, presets: Binding<[BLEPreset]>, color: Color) -> some View {
         Section {
-            ForEach(presets, id: \.label) { preset in
-                Button {
-                    if ble.isRecordingStream { ble.stopStreamRecording() }
-                    ble.writeHexSequence(preset.hex)
-                    ble.startStreamRecording()
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(preset.label).foregroundStyle(.white)
-                            Text(preset.hex[0].uppercased()).font(.caption.monospaced()).foregroundStyle(.secondary)
-                            if preset.hex.count > 1 {
-                                Text("+ \(preset.hex.count - 1) more packet(s)")
-                                    .font(.caption2).foregroundStyle(.tertiary)
-                            }
-                        }
-                        Spacer()
-                        Image(systemName: "arrow.up.circle.fill").foregroundStyle(categoryColor(preset.category))
-                    }
-                }
+            ForEach(presets) { $preset in
+                PresetRow(
+                    preset: $preset,
+                    accentColor: color,
+                    onSend: {
+                        if ble.isRecordingStream { ble.stopStreamRecording() }
+                        ble.writeHexSequence(preset.hexSequence)
+                        ble.startStreamRecording()
+                    },
+                    onDelete: { presets.wrappedValue.removeAll { $0.id == preset.id } }
+                )
                 .disabled(ble.selectedWriteTarget == nil)
             }
-        } header: {
-            Text("Preset Commands")
-        } footer: {
-            Text("Presets send to the selected write target above. Switch target to 6E400002 for NUS commands.")
-                .font(.caption)
-        }
+            Button {
+                presets.wrappedValue.append(BLEPreset(label: "New Command", hexSequence: [""]))
+            } label: {
+                Label("Add Preset", systemImage: "plus").font(.subheadline)
+            }
+        } header: { Text(title) }
     }
 
-    private func categoryColor(_ cat: String) -> Color {
-        switch cat {
-        case "Vibration":    return .orange
-        case "DND":          return .blue
-        case "Notification": return .green
-        default:             return .purple
+    // MARK: - Save Device
+
+    private var saveDeviceSection: some View {
+        Section {
+            if let p = ble.connectedPeripheral, let target = ble.selectedWriteTarget {
+                LabeledContent("Device", value: p.name ?? "Unknown")
+                LabeledContent("Write Target") {
+                    Text(String(target.uuid.prefix(18)) + "…")
+                        .font(.caption.monospaced()).foregroundStyle(.secondary)
+                }
+                LabeledContent("Presets",
+                    value: "\(vibrationPresets.count) vibration · \(notificationPresets.count) notification")
+
+                Button {
+                    let device = SavedBLEDevice(
+                        id: p.identifier,
+                        name: p.name ?? "Unknown",
+                        writeTargetUUID: target.uuid,
+                        vibrationPresets: vibrationPresets,
+                        notificationPresets: notificationPresets
+                    )
+                    store.upsert(device)
+                    withAnimation { savedToast = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation { savedToast = false }
+                    }
+                } label: {
+                    Label("Save Device Configuration", systemImage: "square.and.arrow.down")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+
+                if savedToast {
+                    Label("Saved!", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .transition(.opacity)
+                }
+            } else {
+                Text("Connect a device to save its configuration.")
+                    .foregroundStyle(.secondary).italic().font(.caption)
+            }
+        } header: { Text("Save to Shortcuts") }
+        footer: {
+            Text("After saving, find "Send Watch Command" in the Shortcuts app under this app's actions.")
+                .font(.caption)
         }
     }
 
@@ -361,7 +406,8 @@ struct BLEDebugView: View {
                 }
                 Spacer()
                 if ble.isRecordingStream {
-                    Button("Stop") { ble.stopStreamRecording() }.buttonStyle(.bordered).tint(.red).font(.caption)
+                    Button("Stop") { ble.stopStreamRecording() }
+                        .buttonStyle(.bordered).tint(.red).font(.caption)
                 }
             }
         } header: { Text("Notification Stream Recorder") }
@@ -395,15 +441,14 @@ struct BLEDebugView: View {
 
     private var logSection: some View {
         Section {
-            // Filter chips
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    FilterChip(label: "All", active: logFilter == nil) { logFilter = nil }
-                    FilterChip(label: "RX",   active: logFilter == .rx,    color: .green)  { logFilter = .rx }
-                    FilterChip(label: "TX",   active: logFilter == .tx,    color: .blue)   { logFilter = .tx }
-                    FilterChip(label: "STATE",active: logFilter == .state, color: .orange) { logFilter = .state }
-                    FilterChip(label: "CONN", active: logFilter == .conn,  color: .purple) { logFilter = .conn }
-                    FilterChip(label: "ERR",  active: logFilter == .error, color: .red)    { logFilter = .error }
+                    FilterChip(label: "All",   active: logFilter == nil)              { logFilter = nil }
+                    FilterChip(label: "RX",    active: logFilter == .rx,    color: .green)  { logFilter = .rx }
+                    FilterChip(label: "TX",    active: logFilter == .tx,    color: .blue)   { logFilter = .tx }
+                    FilterChip(label: "STATE", active: logFilter == .state, color: .orange) { logFilter = .state }
+                    FilterChip(label: "CONN",  active: logFilter == .conn,  color: .purple) { logFilter = .conn }
+                    FilterChip(label: "ERR",   active: logFilter == .error, color: .red)    { logFilter = .error }
                 }
                 .padding(.vertical, 4)
             }
@@ -415,12 +460,10 @@ struct BLEDebugView: View {
             } else {
                 ForEach(filtered.reversed()) { entry in
                     HStack(alignment: .top, spacing: 8) {
-                        // Category badge
                         Text(entry.category.rawValue)
                             .font(.system(size: 9, weight: .bold, design: .monospaced))
                             .foregroundStyle(categoryBadgeColor(entry.category))
                             .frame(width: 36)
-
                         VStack(alignment: .leading, spacing: 1) {
                             Text(entry.formattedTimestamp)
                                 .font(.caption2.monospaced()).foregroundStyle(.secondary)
@@ -437,15 +480,14 @@ struct BLEDebugView: View {
                 Text("BLE Log (\(ble.logEntries.count))")
                 Spacer()
                 Button {
-                    exportText = ble.exportText()
-                    showExportSheet = true
-                } label: {
-                    Label("Export", systemImage: "square.and.arrow.up").font(.caption)
-                }
+                    exportText = ble.exportText(); showExportSheet = true
+                } label: { Label("Export", systemImage: "square.and.arrow.up").font(.caption) }
                 Button("Clear") { ble.clearLog() }.font(.caption).foregroundStyle(.red)
             }
         }
     }
+
+    // MARK: - Helpers
 
     private func categoryBadgeColor(_ cat: BLELogCategory) -> Color {
         switch cat {
@@ -468,6 +510,91 @@ struct BLEDebugView: View {
     }
 }
 
+// MARK: - Preset Row (inline-editable)
+
+private struct PresetRow: View {
+    @Binding var preset: BLEPreset
+    let accentColor: Color
+    let onSend: () -> Void
+    let onDelete: () -> Void
+
+    @State private var isEditing  = false
+    @State private var editLabel  = ""
+    @State private var editHex    = ""
+
+    var body: some View {
+        if isEditing {
+            VStack(alignment: .leading, spacing: 8) {
+                TextField("Label", text: $editLabel)
+                    .font(.body)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Hex packets (one per line)").font(.caption).foregroundStyle(.secondary)
+                    TextEditor(text: $editHex)
+                        .font(.system(.caption, design: .monospaced))
+                        .frame(minHeight: 64)
+                        .scrollContentBackground(.hidden)
+                        .background(Color.gray.opacity(0.12))
+                        .cornerRadius(6)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                }
+
+                HStack(spacing: 12) {
+                    Button("Done") { commitEdit() }
+                        .buttonStyle(.borderedProminent).font(.caption)
+                    Button("Cancel", role: .cancel) { isEditing = false }
+                        .font(.caption)
+                    Spacer()
+                    Button(role: .destructive) { onDelete() } label: {
+                        Image(systemName: "trash")
+                    }
+                    .font(.caption).foregroundStyle(.red)
+                }
+            }
+            .padding(.vertical, 4)
+            .onAppear {
+                editLabel = preset.label
+                editHex   = preset.hexSequence.joined(separator: "\n")
+            }
+        } else {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(preset.label).foregroundStyle(.white)
+                    if let first = preset.hexSequence.first, !first.isEmpty {
+                        Text(first.uppercased()).font(.caption.monospaced()).foregroundStyle(.secondary)
+                    }
+                    if preset.hexSequence.count > 1 {
+                        Text("+ \(preset.hexSequence.count - 1) more packet(s)")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
+                }
+                Spacer()
+                Button { onSend() } label: {
+                    Image(systemName: "arrow.up.circle.fill").foregroundStyle(accentColor)
+                }
+                .buttonStyle(.plain)
+
+                Button { isEditing = true } label: {
+                    Image(systemName: "pencil").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func commitEdit() {
+        let trimmed = editLabel.trimmingCharacters(in: .whitespaces)
+        if !trimmed.isEmpty { preset.label = trimmed }
+        let lines = editHex
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        if !lines.isEmpty { preset.hexSequence = lines }
+        isEditing = false
+    }
+}
+
 // MARK: - Watch State Detail Sheet
 
 struct WatchStateDetailView: View {
@@ -479,17 +606,13 @@ struct WatchStateDetailView: View {
             List {
                 Section {
                     LabeledContent("Timestamp", value: snapshot.formattedTimestamp)
-                    LabeledContent("Source", value: snapshot.sourceCharUUID)
-                        .font(.caption.monospaced())
+                    LabeledContent("Source", value: snapshot.sourceCharUUID).font(.caption.monospaced())
                     LabeledContent("Bytes", value: "\(snapshot.bytes.count)")
                     if !snapshot.changedIndices.isEmpty {
-                        LabeledContent("Changed", value: snapshot.diffSummary)
-                            .foregroundStyle(.orange)
+                        LabeledContent("Changed", value: snapshot.diffSummary).foregroundStyle(.orange)
                     }
                 }
-
                 Section("Byte Table") {
-                    // Header
                     HStack {
                         Text("IDX").frame(width: 36, alignment: .leading)
                         Text("HEX").frame(width: 36, alignment: .leading)
@@ -497,46 +620,35 @@ struct WatchStateDetailView: View {
                         Text("CHR").frame(width: 24, alignment: .leading)
                         Text("Δ").frame(width: 16, alignment: .center)
                     }
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(.secondary)
+                    .font(.caption2.monospaced()).foregroundStyle(.secondary)
 
                     ForEach(snapshot.byteRows, id: \.index) { row in
                         let changed = snapshot.changedIndices.contains(row.index)
                         HStack {
-                            Text(String(format: "%03d", row.index))
-                                .frame(width: 36, alignment: .leading)
-                            Text(row.hex)
-                                .frame(width: 36, alignment: .leading)
+                            Text(String(format: "%03d", row.index)).frame(width: 36, alignment: .leading)
+                            Text(row.hex).frame(width: 36, alignment: .leading)
                                 .foregroundStyle(changed ? .orange : .white)
                             Text(String(UInt8(row.hex, radix: 16) ?? 0))
-                                .frame(width: 36, alignment: .leading)
-                                .foregroundStyle(.secondary)
+                                .frame(width: 36, alignment: .leading).foregroundStyle(.secondary)
                             Text(row.ascii.map { String($0) } ?? "·")
-                                .frame(width: 24, alignment: .leading)
-                                .foregroundStyle(.secondary)
-                            Text(changed ? "◄" : "")
-                                .frame(width: 16, alignment: .center)
+                                .frame(width: 24, alignment: .leading).foregroundStyle(.secondary)
+                            Text(changed ? "◄" : "").frame(width: 16, alignment: .center)
                                 .foregroundStyle(.orange)
                         }
                         .font(.caption.monospaced())
                         .listRowBackground(changed ? Color.orange.opacity(0.08) : Color.clear)
                     }
                 }
-
                 Section("Raw Hex") {
                     Text(snapshot.bytes.map { String(format: "%02X", $0) }.joined(separator: " "))
-                        .font(.caption.monospaced())
-                        .textSelection(.enabled)
-                        .foregroundStyle(.white)
+                        .font(.caption.monospaced()).textSelection(.enabled).foregroundStyle(.white)
                 }
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Watch State")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
+                ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } }
             }
         }
         .preferredColorScheme(.dark)
@@ -560,8 +672,7 @@ private struct FilterChip: View {
     let label: String; let active: Bool; var color: Color = .secondary; let action: () -> Void
     var body: some View {
         Button(action: action) {
-            Text(label)
-                .font(.caption.bold())
+            Text(label).font(.caption.bold())
                 .padding(.horizontal, 10).padding(.vertical, 4)
                 .background(active ? color.opacity(0.25) : Color.gray.opacity(0.15))
                 .foregroundStyle(active ? color : .secondary)
@@ -617,8 +728,10 @@ private struct ExpandableDeviceRow: View {
                 Spacer()
                 Button("Connect", action: onConnect).buttonStyle(.borderedProminent).font(.caption)
                 Button { withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() } } label: {
-                    Image(systemName: expanded ? "chevron.up" : "chevron.down").font(.caption).foregroundStyle(.secondary)
-                }.buttonStyle(.plain)
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
             }
             .padding(.vertical, 4)
 
@@ -627,16 +740,19 @@ private struct ExpandableDeviceRow: View {
                     Text(device.id.uuidString).font(.caption2.monospaced()).foregroundStyle(.secondary)
                     if let ln = device.localName { Text("Local: \(ln)").font(.caption2).foregroundStyle(.secondary) }
                     if !device.advertisementKeys.isEmpty {
-                        Text("Ad keys: \(device.advertisementKeys.joined(separator: ", "))").font(.caption2).foregroundStyle(.secondary)
+                        Text("Ad keys: \(device.advertisementKeys.joined(separator: ", "))")
+                            .font(.caption2).foregroundStyle(.secondary)
                     }
                     if !device.serviceUUIDs.isEmpty {
-                        Text("Services: \(device.serviceUUIDs.joined(separator: ", "))").font(.caption2.monospaced()).foregroundStyle(.secondary)
+                        Text("Services: \(device.serviceUUIDs.joined(separator: ", "))")
+                            .font(.caption2.monospaced()).foregroundStyle(.secondary)
                     }
                 }
                 .padding(.leading, 30).padding(.bottom, 6)
             }
         }
     }
+
     private var rssiColor: Color { device.rssi >= -60 ? .green : device.rssi >= -80 ? .yellow : .red }
 }
 

@@ -256,6 +256,16 @@ final class BLEManager: NSObject, ObservableObject {
         if let p = activePeripheral { central.cancelPeripheralConnection(p) }
     }
 
+    func connect(peripheralID: UUID) {
+        let peripherals = central.retrievePeripherals(withIdentifiers: [peripheralID])
+        if let p = peripherals.first {
+            connect(makeDeviceInfo(p, source: .retrieved))
+        } else {
+            log("Peripheral \(peripheralID) not in cache — starting scan", category: .info)
+            startScan()
+        }
+    }
+
     // MARK: - Write (uses selectedWriteTarget)
 
     @discardableResult
