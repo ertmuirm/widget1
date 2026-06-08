@@ -1,12 +1,22 @@
 import Foundation
 import CoreBluetooth
 
-// MARK: - Models
+// MARK: - Log entry
+
+enum BLELogCategory: String {
+    case conn  = "CONN"
+    case rx    = "RX"
+    case tx    = "TX"
+    case state = "STATE"
+    case error = "ERR"
+    case info  = "INFO"
+}
 
 struct BLELogEntry: Identifiable {
     let id = UUID()
     let timestamp: Date
     let message: String
+    var category: BLELogCategory = .info
 
     var formattedTimestamp: String {
         let f = DateFormatter()
@@ -14,6 +24,8 @@ struct BLELogEntry: Identifiable {
         return f.string(from: timestamp)
     }
 }
+
+// MARK: - Device models
 
 struct BLEDeviceInfo: Identifiable {
     let id: UUID
@@ -26,11 +38,7 @@ struct BLEDeviceInfo: Identifiable {
     let peripheral: CBPeripheral
     var source: DeviceSource
 
-    enum DeviceSource {
-        case scan
-        case retrieved         // retrievePeripherals(withIdentifiers:)
-        case systemConnected   // retrieveConnectedPeripherals(withServices:)
-    }
+    enum DeviceSource { case scan, retrieved, systemConnected }
 }
 
 struct BLEServiceInfo: Identifiable {
@@ -55,6 +63,55 @@ struct BLECharInfo: Identifiable {
     }
 }
 
+// MARK: - Writable characteristic (write target selector)
+
+struct BLEWritableChar: Identifiable, Equatable {
+    var id: String { serviceUUID + "." + uuid }
+    let serviceUUID: String
+    let uuid: String
+    let characteristic: CBCharacteristic
+    let supportsWithoutResponse: Bool
+
+    var shortLabel: String { String(uuid.prefix(8)) + "…" }
+
+    var writeType: CBCharacteristicWriteType {
+        supportsWithoutResponse ? .withoutResponse : .withResponse
+    }
+
+    static func == (lhs: BLEWritableChar, rhs: BLEWritableChar) -> Bool { lhs.id == rhs.id }
+}
+
+// MARK: - Watch state snapshot
+
+struct WatchStateSnapshot: Identifiable {
+    let id = UUID()
+    let timestamp: Date
+    let sourceCharUUID: String
+    let bytes: [UInt8]
+    let changedIndices: Set<Int>   // relative to previous snapshot
+
+    /// Byte indices that differ between two states.
+    static func diff(previous: [UInt8]?, current: [UInt8]) -> Set<Int> {
+        guard let prev = previous else { return [] }
+        var changed = Set<Int>()
+        let maxLen = max(prev.count, current.count)
+        for i in 0..<maxLen {
+            let a: UInt8 = i < prev.count    ? prev[i]    : 0
+            let b: UInt8 = i < current.count ? current[i] : 0
+            if a != b { changed.insert(i) }
+        }
+        return changed
+    }
+
+    /// Human-readable row for each byte.
+    var byteRows: [(index: Int, hex: String, ascii: Character?)] {
+        bytes.enumerated().map { i, byte in
+            let ascii: Character? = (byte >= 32 && byte < 127) ? Character(Unicode.Scalar(byte)) : nil
+            return (i, String(format: "%02X", byte), ascii)
+        }
+    }
+}
+
 // MARK: - BLEManager
 
 final class BLEManager: NSObject, ObservableObject {
@@ -63,22 +120,17 @@ final class BLEManager: NSObject, ObservableObject {
 
     private let targetFFF1 = CBUUID(string: "0000FFF1-0000-1000-8000-00805F9B34FB")
 
-    // Service UUIDs commonly seen on Chinese fitness/smartwatch devices.
-    // Used for retrieveConnectedPeripherals — must be non-empty.
     private let knownServiceUUIDs: [CBUUID] = [
-        CBUUID(string: "FFF0"),  // common custom service (FFF1/FFF2 live here)
-        CBUUID(string: "FFE0"),  // alternative custom service
-        CBUUID(string: "180D"),  // Heart Rate
-        CBUUID(string: "180A"),  // Device Information
-        CBUUID(string: "1800"),  // Generic Access
-        CBUUID(string: "1801"),  // Generic Attribute
-        CBUUID(string: "180F"),  // Battery Service
+        CBUUID(string: "FFF0"), CBUUID(string: "FFE0"),
+        CBUUID(string: "180D"), CBUUID(string: "180A"),
+        CBUUID(string: "1800"), CBUUID(string: "1801"),
+        CBUUID(string: "180F"),
+        CBUUID(string: "6E400001-B5A3-F393-E0A9-E50E24DCCA9F"),
     ]
 
     private let storedIdentifiersKey = "ble_prev_connected_ids"
 
-    // MARK: Published state
-
+    // State
     @Published var bluetoothState: CBManagerState = .unknown
     @Published var authState: CBManagerAuthorization = .notDetermined
     @Published var isScanning = false
@@ -93,19 +145,21 @@ final class BLEManager: NSObject, ObservableObject {
     @Published var isRecordingStream = false
     @Published var streamCountdown = 0
 
-    // MARK: Internal
+    // Write target
+    @Published var writableChars: [BLEWritableChar] = []
+    @Published var selectedWriteTarget: BLEWritableChar?
+
+    // Watch state parser
+    @Published var watchStateHistory: [WatchStateSnapshot] = []
 
     private var central: CBCentralManager!
     private var activePeripheral: CBPeripheral?
-    private var fff1Characteristic: CBCharacteristic?
     private var allChars: [CBCharacteristic] = []
     private var streamTimer: Timer?
-    // Set when startScan() is called before BT is ready; fires scan once poweredOn fires.
     private var pendingScan = false
 
     enum ConnectionState {
         case disconnected, connecting, connected, failed
-
         var label: String {
             switch self {
             case .disconnected: return "Disconnected"
@@ -118,14 +172,8 @@ final class BLEManager: NSObject, ObservableObject {
 
     private override init() {
         super.init()
-        // queue: nil → CoreBluetooth dispatches delegate callbacks on the main queue.
-        // This is the correct documented default and avoids manual DispatchQueue.main
-        // wrapping while keeping @Published mutations on the right thread.
-        central = CBCentralManager(
-            delegate: self,
-            queue: nil,
-            options: [CBCentralManagerOptionShowPowerAlertKey: true]
-        )
+        central = CBCentralManager(delegate: self, queue: nil,
+                                   options: [CBCentralManagerOptionShowPowerAlertKey: true])
         authState = CBCentralManager.authorization
     }
 
@@ -134,24 +182,20 @@ final class BLEManager: NSObject, ObservableObject {
     func startScan() {
         authState = CBCentralManager.authorization
         guard authState == .allowedAlways else {
-            log("⚠️ Bluetooth not authorized (state: \(authorizationLabel)) — cannot scan")
+            log("⚠️ Bluetooth not authorized (\(authorizationLabel))", category: .error)
             return
         }
-        if central.state != .poweredOn {
-            log("Bluetooth not yet ready (state: \(bluetoothStateLabel)) — scan queued, will start when ready")
+        guard central.state == .poweredOn else {
+            log("Bluetooth not ready (\(bluetoothStateLabel)) — scan queued", category: .info)
             pendingScan = true
             return
         }
         pendingScan = false
         scannedDevices = []
         isScanning = true
-        central.scanForPeripherals(
-            withServices: nil,
-            options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
-        )
-        log("Scan started — no service filter, duplicates allowed")
-
-        // Also refresh system-connected list each time scan starts
+        central.scanForPeripherals(withServices: nil,
+                                   options: [CBCentralManagerScanOptionAllowDuplicatesKey: true])
+        log("Scan started — withServices:nil, duplicates allowed", category: .conn)
         refreshSystemConnected()
     }
 
@@ -160,28 +204,24 @@ final class BLEManager: NSObject, ObservableObject {
         guard isScanning else { return }
         central.stopScan()
         isScanning = false
-        log("Scan stopped — \(scannedDevices.count) device(s) found")
+        log("Scan stopped — \(scannedDevices.count) device(s) found", category: .conn)
     }
 
-    // MARK: - Previously connected (retrievePeripherals)
+    // MARK: - Previously connected
 
     private func loadPreviouslyConnected() {
         let ids = (UserDefaults.standard.stringArray(forKey: storedIdentifiersKey) ?? [])
             .compactMap { UUID(uuidString: $0) }
-        guard !ids.isEmpty else {
-            log("retrievePeripherals: no stored identifiers")
-            return
-        }
-        log("retrievePeripherals: querying \(ids.count) stored identifier(s)")
+        guard !ids.isEmpty else { log("retrievePeripherals: no stored identifiers"); return }
+        log("retrievePeripherals: querying \(ids.count) identifier(s)")
         let peripherals = central.retrievePeripherals(withIdentifiers: ids)
         log("retrievePeripherals: returned \(peripherals.count) peripheral(s)")
         retrievedDevices = peripherals.map { makeDeviceInfo($0, source: .retrieved) }
-        for d in retrievedDevices { log("  Previously seen: \(d.name) (\(d.id))") }
     }
 
     func refreshSystemConnected() {
         let peripherals = central.retrieveConnectedPeripherals(withServices: knownServiceUUIDs)
-        log("retrieveConnectedPeripherals: \(peripherals.count) system-connected peripheral(s)")
+        log("retrieveConnectedPeripherals: \(peripherals.count) peripheral(s)")
         systemConnectedDevices = peripherals.map { makeDeviceInfo($0, source: .systemConnected) }
         for d in systemConnectedDevices { log("  System-connected: \(d.name) (\(d.id))") }
     }
@@ -189,73 +229,87 @@ final class BLEManager: NSObject, ObservableObject {
     private func storeConnectedIdentifier(_ uuid: UUID) {
         var ids = UserDefaults.standard.stringArray(forKey: storedIdentifiersKey) ?? []
         let s = uuid.uuidString
-        if !ids.contains(s) {
-            ids.append(s)
-            UserDefaults.standard.set(ids, forKey: storedIdentifiersKey)
-        }
+        if !ids.contains(s) { ids.append(s); UserDefaults.standard.set(ids, forKey: storedIdentifiersKey) }
     }
 
     private func makeDeviceInfo(_ p: CBPeripheral, source: BLEDeviceInfo.DeviceSource) -> BLEDeviceInfo {
-        BLEDeviceInfo(id: p.identifier,
-                      name: p.name ?? "Unknown",
-                      rssi: 0,
-                      advertisementKeys: [],
-                      localName: nil,
-                      serviceUUIDs: [],
-                      manufacturerDataLength: 0,
-                      peripheral: p,
-                      source: source)
+        BLEDeviceInfo(id: p.identifier, name: p.name ?? "Unknown", rssi: 0,
+                      advertisementKeys: [], localName: nil, serviceUUIDs: [],
+                      manufacturerDataLength: 0, peripheral: p, source: source)
     }
 
     // MARK: - Connect / Disconnect
 
     func connect(_ device: BLEDeviceInfo) {
         stopScan()
-        services = []
-        fff1Characteristic = nil
-        fff1Found = false
-        allChars = []
+        services = []; allChars = []
+        writableChars = []; selectedWriteTarget = nil
+        fff1Found = false; watchStateHistory = []
         activePeripheral = device.peripheral
         activePeripheral?.delegate = self
         connectionState = .connecting
         central.connect(device.peripheral, options: nil)
-        log("Connecting to \(device.name) (\(device.id))…")
+        log("Connecting to \(device.name) (\(device.id))…", category: .conn)
     }
 
     func disconnect() {
         if let p = activePeripheral { central.cancelPeripheralConnection(p) }
     }
 
-    // MARK: - Write to FFF1
+    // MARK: - Write (uses selectedWriteTarget)
 
     @discardableResult
     func writeHex(_ hex: String) -> Bool {
         let stripped = hex.replacingOccurrences(of: " ", with: "")
         guard let data = Data(hexString: stripped), !data.isEmpty else {
-            log("TX failed: invalid hex '\(hex)'")
-            return false
+            log("TX failed: invalid hex '\(hex)'", category: .error); return false
         }
         return writeData(data)
     }
 
     @discardableResult
     func writeData(_ data: Data) -> Bool {
-        guard let char = fff1Characteristic, let p = activePeripheral else {
-            log("TX failed: FFF1 not available")
-            return false
+        guard let target = selectedWriteTarget, let p = activePeripheral else {
+            log("TX failed: no write target selected", category: .error); return false
         }
-        p.writeValue(data, for: char, type: .withoutResponse)
-        log("TX → FFF1: \(data.hexString)")
+        p.writeValue(data, for: target.characteristic, type: target.writeType)
+        log("TX → \(target.uuid): \(data.hexString)", category: .tx)
         return true
+    }
+
+    // MARK: - Watch state parser
+
+    private func handleIncomingPacket(_ data: Data, charUUID: String) {
+        let bytes = [UInt8](data)
+
+        // Detect DF 00 4C state broadcast from watch
+        if bytes.count >= 4 && bytes[0] == 0xDF && bytes[1] == 0x00 && bytes[2] == 0x4C {
+            let prevBytes = watchStateHistory.last?.bytes
+            let changed = WatchStateSnapshot.diff(previous: prevBytes, current: bytes)
+            let snapshot = WatchStateSnapshot(timestamp: Date(), sourceCharUUID: charUUID,
+                                              bytes: bytes, changedIndices: changed)
+            watchStateHistory.append(snapshot)
+
+            if changed.isEmpty {
+                log("State packet — no change from previous", category: .state)
+            } else {
+                let diffs = changed.sorted().map { i -> String in
+                    let prev = (prevBytes != nil && i < prevBytes!.count)
+                        ? String(format: "%02X", prevBytes![i]) : "--"
+                    let cur  = String(format: "%02X", bytes[i])
+                    return "[\(i)]\(prev)→\(cur)"
+                }.joined(separator: " ")
+                log("State change: \(diffs)", category: .state)
+            }
+        }
     }
 
     // MARK: - Stream recording
 
     func startStreamRecording() {
         streamTimer?.invalidate()
-        streamCountdown = 10
-        isRecordingStream = true
-        log("Stream recording started (10 s)")
+        streamCountdown = 10; isRecordingStream = true
+        log("Stream recording started (10 s)", category: .info)
         streamTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self else { return }
             self.streamCountdown -= 1
@@ -264,24 +318,22 @@ final class BLEManager: NSObject, ObservableObject {
     }
 
     func stopStreamRecording() {
-        streamTimer?.invalidate()
-        streamTimer = nil
-        isRecordingStream = false
-        streamCountdown = 0
-        log("Stream recording ended")
+        streamTimer?.invalidate(); streamTimer = nil
+        isRecordingStream = false; streamCountdown = 0
+        log("Stream recording ended", category: .info)
     }
 
     // MARK: - Diagnostics
 
     func dumpCharacteristics() {
-        log("--- Dump Characteristics ---")
+        log("--- Dump Characteristics ---", category: .info)
         for char in allChars where char.properties.contains(.read) {
             activePeripheral?.readValue(for: char)
         }
     }
 
     func subscribeToAll() {
-        log("--- Subscribe To All ---")
+        log("--- Subscribe To All ---", category: .info)
         for char in allChars {
             if char.properties.contains(.notify) || char.properties.contains(.indicate) {
                 activePeripheral?.setNotifyValue(true, for: char)
@@ -289,19 +341,66 @@ final class BLEManager: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - Export
+    // MARK: - Export (structured for analysis)
 
     func exportText() -> String {
-        logEntries.map { "[\($0.formattedTimestamp)] \($0.message)" }.joined(separator: "\n")
+        var out = [String]()
+        let now = DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .medium)
+        let device = connectedPeripheral.map { "\($0.name ?? "Unknown") (\($0.identifier))" } ?? "—"
+
+        out.append("=== BLE SESSION ===")
+        out.append("Generated : \(now)")
+        out.append("Device    : \(device)")
+        out.append("BT State  : \(bluetoothStateLabel)")
+        out.append("Auth      : \(authorizationLabel)")
+        out.append("")
+
+        func section(_ title: String, _ cat: BLELogCategory?) {
+            let entries = cat == nil
+                ? logEntries
+                : logEntries.filter { $0.category == cat }
+            guard !entries.isEmpty else { return }
+            out.append("=== \(title) ===")
+            for e in entries { out.append("[\(e.formattedTimestamp)] \(e.message)") }
+            out.append("")
+        }
+
+        section("RECEIVED PACKETS (RX)", .rx)
+        section("TRANSMITTED COMMANDS (TX)", .tx)
+        section("WATCH STATE CHANGES", .state)
+        section("CONNECTION EVENTS", .conn)
+        section("ERRORS", .error)
+
+        // Watch state snapshots as byte tables
+        if !watchStateHistory.isEmpty {
+            out.append("=== WATCH STATE SNAPSHOTS ===")
+            for snap in watchStateHistory {
+                let f = DateFormatter(); f.dateFormat = "HH:mm:ss.SSS"
+                out.append("[\(f.string(from: snap.timestamp))] \(snap.sourceCharUUID)")
+                out.append("IDX  HEX  ASCII  CHANGED")
+                for row in snap.byteRows {
+                    let mark = snap.changedIndices.contains(row.index) ? " ◄" : ""
+                    let asc  = row.ascii.map { String($0) } ?? "."
+                    out.append(String(format: "%03d  %@   %-5@%@", row.index, row.hex, asc, mark))
+                }
+                out.append("")
+            }
+        }
+
+        section("FULL CHRONOLOGICAL LOG", nil)
+
+        return out.joined(separator: "\n")
     }
 
-    func log(_ message: String) {
-        logEntries.append(BLELogEntry(timestamp: Date(), message: message))
+    // MARK: - Logging
+
+    func log(_ message: String, category: BLELogCategory = .info) {
+        logEntries.append(BLELogEntry(timestamp: Date(), message: message, category: category))
     }
 
     func clearLog() { logEntries = [] }
 
-    // MARK: - State label helpers
+    // MARK: - State labels
 
     var bluetoothStateLabel: String {
         switch bluetoothState {
@@ -319,7 +418,7 @@ final class BLEManager: NSObject, ObservableObject {
         switch authState {
         case .notDetermined: return "Not Determined"
         case .restricted:    return "Restricted"
-        case .denied:        return "Denied — open Settings to allow"
+        case .denied:        return "Denied — open Settings"
         case .allowedAlways: return "Allowed ✓"
         @unknown default:    return "Unknown"
         }
@@ -333,8 +432,7 @@ extension BLEManager: CBCentralManagerDelegate {
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         bluetoothState = central.state
         authState = CBCentralManager.authorization
-        log("centralManagerDidUpdateState: \(bluetoothStateLabel) | auth: \(authorizationLabel)")
-
+        log("centralManagerDidUpdateState: \(bluetoothStateLabel) | auth: \(authorizationLabel)", category: .conn)
         if central.state == .poweredOn {
             loadPreviouslyConnected()
             refreshSystemConnected()
@@ -342,42 +440,24 @@ extension BLEManager: CBCentralManagerDelegate {
         }
     }
 
-    func centralManager(_ central: CBCentralManager,
-                        didDiscover peripheral: CBPeripheral,
-                        advertisementData: [String: Any],
-                        rssi RSSI: NSNumber) {
-        let name = peripheral.name
-            ?? advertisementData[CBAdvertisementDataLocalNameKey] as? String
-            ?? "Unknown"
-        let localName    = advertisementData[CBAdvertisementDataLocalNameKey] as? String
-        let serviceUUIDs = (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID])?
-                               .map { $0.uuidString } ?? []
-        let mfrData      = advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data
-        let adKeys       = advertisementData.keys.sorted()
+    func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
+                        advertisementData: [String: Any], rssi RSSI: NSNumber) {
+        let name        = peripheral.name ?? advertisementData[CBAdvertisementDataLocalNameKey] as? String ?? "Unknown"
+        let localName   = advertisementData[CBAdvertisementDataLocalNameKey] as? String
+        let serviceUUIDs = (advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID])?.map { $0.uuidString } ?? []
+        let mfrData     = advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data
+        let adKeys      = advertisementData.keys.sorted()
 
-        // Verbose discovery log
-        var parts = [
-            "didDiscover: \(name)",
-            peripheral.identifier.uuidString,
-            "RSSI:\(RSSI)",
-        ]
-        if !serviceUUIDs.isEmpty { parts.append("services:[\(serviceUUIDs.joined(separator:","))]") }
+        var parts = ["didDiscover: \(name)", peripheral.identifier.uuidString, "RSSI:\(RSSI)"]
+        if !serviceUUIDs.isEmpty { parts.append("svc:[\(serviceUUIDs.joined(separator:","))]") }
         if let mfr = mfrData, !mfr.isEmpty { parts.append("mfr:\(mfr.count)B(\(mfr.hexString))") }
-        if let ln = localName { parts.append("localName:\(ln)") }
-        if !adKeys.isEmpty { parts.append("adKeys:[\(adKeys.joined(separator:","))]") }
-        log(parts.joined(separator: " | "))
+        if let ln = localName { parts.append("local:\(ln)") }
+        log(parts.joined(separator: " | "), category: .info)
 
-        let dev = BLEDeviceInfo(
-            id: peripheral.identifier,
-            name: name,
-            rssi: RSSI.intValue,
-            advertisementKeys: adKeys,
-            localName: localName,
-            serviceUUIDs: serviceUUIDs,
-            manufacturerDataLength: mfrData?.count ?? 0,
-            peripheral: peripheral,
-            source: .scan
-        )
+        let dev = BLEDeviceInfo(id: peripheral.identifier, name: name, rssi: RSSI.intValue,
+                                advertisementKeys: adKeys, localName: localName,
+                                serviceUUIDs: serviceUUIDs, manufacturerDataLength: mfrData?.count ?? 0,
+                                peripheral: peripheral, source: .scan)
         if let idx = scannedDevices.firstIndex(where: { $0.id == peripheral.identifier }) {
             scannedDevices[idx] = dev
         } else {
@@ -385,34 +465,24 @@ extension BLEManager: CBCentralManagerDelegate {
         }
     }
 
-    func centralManager(_ central: CBCentralManager,
-                        didConnect peripheral: CBPeripheral) {
-        connectionState = .connected
-        connectedPeripheral = peripheral
+    func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        connectionState = .connected; connectedPeripheral = peripheral
         storeConnectedIdentifier(peripheral.identifier)
-        log("Connected to \(peripheral.name ?? peripheral.identifier.uuidString)")
-        log("Discovering all services…")
+        log("Connected to \(peripheral.name ?? peripheral.identifier.uuidString)", category: .conn)
         peripheral.discoverServices(nil)
     }
 
-    func centralManager(_ central: CBCentralManager,
-                        didFailToConnect peripheral: CBPeripheral,
-                        error: Error?) {
+    func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
         connectionState = .failed
-        log("Failed to connect: \(error?.localizedDescription ?? "unknown error")")
+        log("Failed to connect: \(error?.localizedDescription ?? "unknown")", category: .error)
     }
 
-    func centralManager(_ central: CBCentralManager,
-                        didDisconnectPeripheral peripheral: CBPeripheral,
-                        error: Error?) {
-        connectionState = .disconnected
-        connectedPeripheral = nil
-        fff1Characteristic = nil
-        fff1Found = false
+    func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        connectionState = .disconnected; connectedPeripheral = nil; fff1Found = false
         if let error {
-            log("Disconnected with error: \(error.localizedDescription)")
+            log("Disconnected with error: \(error.localizedDescription)", category: .error)
         } else {
-            log("Disconnected from \(peripheral.name ?? peripheral.identifier.uuidString)")
+            log("Disconnected from \(peripheral.name ?? peripheral.identifier.uuidString)", category: .conn)
         }
     }
 }
@@ -422,69 +492,73 @@ extension BLEManager: CBCentralManagerDelegate {
 extension BLEManager: CBPeripheralDelegate {
 
     func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        if let error { log("Service discovery error: \(error.localizedDescription)"); return }
-        guard let srvList = peripheral.services else { return }
-        log("Discovered \(srvList.count) service(s)")
-        for srv in srvList {
-            log("Service: \(srv.uuid.uuidString)")
-            peripheral.discoverCharacteristics(nil, for: srv)
-        }
+        if let error { log("Service discovery error: \(error.localizedDescription)", category: .error); return }
+        guard let srvs = peripheral.services else { return }
+        log("Discovered \(srvs.count) service(s)", category: .conn)
+        for srv in srvs { log("Service: \(srv.uuid.uuidString)"); peripheral.discoverCharacteristics(nil, for: srv) }
     }
 
     func peripheral(_ peripheral: CBPeripheral,
-                    didDiscoverCharacteristicsFor service: CBService,
-                    error: Error?) {
-        if let error { log("Char discovery error [\(service.uuid)]: \(error.localizedDescription)"); return }
+                    didDiscoverCharacteristicsFor service: CBService, error: Error?) {
+        if let error { log("Char discovery error [\(service.uuid)]: \(error.localizedDescription)", category: .error); return }
         guard let chars = service.characteristics else { return }
 
         var charInfos: [BLECharInfo] = []
         for char in chars {
             let info = BLECharInfo(uuid: char.uuid.uuidString, properties: char.properties)
-            charInfos.append(info)
-            allChars.append(char)
+            charInfos.append(info); allChars.append(char)
             log("Char: \(char.uuid.uuidString) [\(info.propertiesString)]")
 
-            if char.uuid == targetFFF1 {
-                fff1Characteristic = char
-                fff1Found = true
-                log("FFF1 Found ✓")
+            // Track FFF1
+            if char.uuid == targetFFF1 { fff1Found = true; log("FFF1 detected") }
+
+            // Build writable list
+            if char.properties.contains(.write) || char.properties.contains(.writeWithoutResponse) {
+                let wc = BLEWritableChar(
+                    serviceUUID: service.uuid.uuidString,
+                    uuid: char.uuid.uuidString,
+                    characteristic: char,
+                    supportsWithoutResponse: char.properties.contains(.writeWithoutResponse)
+                )
+                writableChars.append(wc)
+                // Auto-select: prefer FFF1, else first writable
+                if char.uuid == targetFFF1 || selectedWriteTarget == nil {
+                    selectedWriteTarget = wc
+                }
             }
+
             if char.properties.contains(.notify) || char.properties.contains(.indicate) {
                 peripheral.setNotifyValue(true, for: char)
             }
         }
 
         let srvInfo = BLEServiceInfo(uuid: service.uuid.uuidString, characteristics: charInfos)
-        if let idx = services.firstIndex(where: { $0.uuid == srvInfo.uuid }) {
-            services[idx] = srvInfo
-        } else {
-            services.append(srvInfo)
-        }
+        if let idx = services.firstIndex(where: { $0.uuid == srvInfo.uuid }) { services[idx] = srvInfo }
+        else { services.append(srvInfo) }
     }
 
     func peripheral(_ peripheral: CBPeripheral,
-                    didUpdateValueFor characteristic: CBCharacteristic,
-                    error: Error?) {
-        if let error { log("Value error [\(characteristic.uuid)]: \(error.localizedDescription)"); return }
+                    didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+        if let error { log("Value error [\(characteristic.uuid)]: \(error.localizedDescription)", category: .error); return }
         guard let data = characteristic.value else { return }
+        let uuid = characteristic.uuid.uuidString
         if characteristic.isNotifying {
-            log("RX ← \(characteristic.uuid.uuidString): \(data.hexString)")
+            log("RX ← \(uuid): \(data.hexString)", category: .rx)
+            handleIncomingPacket(data, charUUID: uuid)
         } else {
             let ascii = data.printableASCII
-            log("READ \(characteristic.uuid.uuidString): \(data.hexString)\(ascii.isEmpty ? "" : " [\(ascii)]")")
+            log("READ \(uuid): \(data.hexString)\(ascii.isEmpty ? "" : " [\(ascii)]")", category: .info)
         }
     }
 
     func peripheral(_ peripheral: CBPeripheral,
-                    didWriteValueFor characteristic: CBCharacteristic,
-                    error: Error?) {
-        if let error { log("Write error [\(characteristic.uuid)]: \(error.localizedDescription)") }
+                    didWriteValueFor characteristic: CBCharacteristic, error: Error?) {
+        if let error { log("Write error [\(characteristic.uuid)]: \(error.localizedDescription)", category: .error) }
     }
 
     func peripheral(_ peripheral: CBPeripheral,
-                    didUpdateNotificationStateFor characteristic: CBCharacteristic,
-                    error: Error?) {
-        if let error { log("Notify error [\(characteristic.uuid)]: \(error.localizedDescription)"); return }
+                    didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+        if let error { log("Notify error [\(characteristic.uuid)]: \(error.localizedDescription)", category: .error); return }
         log("Notify \(characteristic.isNotifying ? "ON" : "OFF"): \(characteristic.uuid.uuidString)")
     }
 }
@@ -498,17 +572,12 @@ extension Data {
         var bytes: [UInt8] = []
         bytes.reserveCapacity(hex.count / 2)
         while !hex.isEmpty {
-            let prefix = hex.prefix(2)
-            hex = String(hex.dropFirst(2))
+            let prefix = hex.prefix(2); hex = String(hex.dropFirst(2))
             guard let byte = UInt8(prefix, radix: 16) else { return nil }
             bytes.append(byte)
         }
         self = Data(bytes)
     }
-
     var hexString: String { map { String(format: "%02X", $0) }.joined() }
-
-    var printableASCII: String {
-        String(bytes: filter { $0 >= 32 && $0 < 127 }, encoding: .ascii) ?? ""
-    }
+    var printableASCII: String { String(bytes: filter { $0 >= 32 && $0 < 127 }, encoding: .ascii) ?? "" }
 }
