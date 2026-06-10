@@ -49,13 +49,13 @@ struct WidgetEntryView: View {
             let a3 = actions.count > 3 ? resolveItemURL(actions[3]) : nil
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
-                    clockDigitCell(digit: hourTens,  url: a0, fontSize: fontSize, frameAlignment: .trailing)
-                    clockDigitCell(digit: hourUnits, url: a1, fontSize: fontSize, frameAlignment: .leading)
+                    clockDigitCell(digit: hourTens,  url: a0, fontSize: fontSize, side: .left)
+                    clockDigitCell(digit: hourUnits, url: a1, fontSize: fontSize, side: .right)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 HStack(spacing: 0) {
-                    clockDigitCell(digit: minTens,  url: a2, fontSize: fontSize, frameAlignment: .trailing)
-                    clockDigitCell(digit: minUnits, url: a3, fontSize: fontSize, frameAlignment: .leading)
+                    clockDigitCell(digit: minTens,  url: a2, fontSize: fontSize, side: .left)
+                    clockDigitCell(digit: minUnits, url: a3, fontSize: fontSize, side: .right)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -69,8 +69,8 @@ struct WidgetEntryView: View {
             let tensAction = actions.first.flatMap { resolveItemURL($0) }
             let unitsAction = actions.count > 1 ? resolveItemURL(actions[1]) : nil
             HStack(spacing: 0) {
-                clockDigitCell(digit: tens,  url: tensAction,  fontSize: fontSize, frameAlignment: .trailing)
-                clockDigitCell(digit: units, url: unitsAction, fontSize: fontSize, frameAlignment: .leading)
+                clockDigitCell(digit: tens,  url: tensAction,  fontSize: fontSize, side: .left)
+                clockDigitCell(digit: units, url: unitsAction, fontSize: fontSize, side: .right)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, -20)
@@ -79,24 +79,37 @@ struct WidgetEntryView: View {
         }
     }
 
+    private enum ClockCellSide { case left, right }
+
     @ViewBuilder
     private func clockDigitCell(digit: String, url: URL?, fontSize: CGFloat,
-                                frameAlignment: Alignment = .center) -> some View {
+                                side: ClockCellSide) -> some View {
         let foreground: Color = widgetRenderingMode == .vibrant ? .primary : .white
-        // "1" is much narrower than other digits; with .trailing/.leading it sits at the
-        // inner edge of its cell making it appear too close to the widget centre.
-        // Use .center so both sides carry equal padding, moving it outward.
-        let effectiveAlignment: Alignment = (digit == "1") ? .center : frameAlignment
-        let label = Text(digit)
-            .font(clockFont(size: fontSize))
-            .minimumScaleFactor(0.3)
-            .foregroundStyle(foreground)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: effectiveAlignment)
-
-        if let url = url {
-            Link(destination: url) { label }
-        } else {
-            label
+        // All digits are centered in their cells. The cells are then shifted inward
+        // (left cell right, right cell left) by half the gap between cell width and a
+        // typical digit width. This keeps wide digits (2-9, 0) in the same position as
+        // the old trailing/leading layout while moving the narrow "1" toward the centre.
+        GeometryReader { geo in
+            let inset = max(0, (geo.size.width - fontSize * 0.575) / 2)
+            let offsetX: CGFloat = side == .left ? inset : -inset
+            ZStack {
+                if let url = url {
+                    Link(destination: url) {
+                        Text(digit)
+                            .font(clockFont(size: fontSize))
+                            .minimumScaleFactor(0.3)
+                            .foregroundStyle(foreground)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    }
+                } else {
+                    Text(digit)
+                        .font(clockFont(size: fontSize))
+                        .minimumScaleFactor(0.3)
+                        .foregroundStyle(foreground)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                }
+            }
+            .offset(x: offsetX)
         }
     }
 
