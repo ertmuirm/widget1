@@ -83,11 +83,15 @@ struct WidgetEntryView: View {
     private func clockDigitCell(digit: String, url: URL?, fontSize: CGFloat,
                                 frameAlignment: Alignment = .center) -> some View {
         let foreground: Color = widgetRenderingMode == .vibrant ? .primary : .white
+        // "1" is much narrower than other digits; with .trailing/.leading it sits at the
+        // inner edge of its cell making it appear too close to the widget centre.
+        // Use .center so both sides carry equal padding, moving it outward.
+        let effectiveAlignment: Alignment = (digit == "1") ? .center : frameAlignment
         let label = Text(digit)
             .font(clockFont(size: fontSize))
             .minimumScaleFactor(0.3)
             .foregroundStyle(foreground)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: frameAlignment)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: effectiveAlignment)
 
         if let url = url {
             Link(destination: url) { label }
