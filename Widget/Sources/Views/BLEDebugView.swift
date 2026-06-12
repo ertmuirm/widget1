@@ -19,6 +19,7 @@ struct BLEDebugView: View {
         List {
             diagnosticsSection
             savedDevicesSection
+            shortcutsSettingsSection
             systemConnectedSection
             scanSection
             if ble.connectionState == .connected || ble.connectionState == .connecting {
@@ -145,6 +146,26 @@ struct BLEDebugView: View {
             Text("Saved Devices")
         } footer: {
             Text("Saved devices retain their write target and preset commands for use in the Shortcuts app.")
+                .font(.caption)
+        }
+    }
+
+    // MARK: - Shortcuts Settings
+
+    private var shortcutsSettingsSection: some View {
+        Section {
+            Stepper(value: $store.scanTimeoutSeconds, in: 0...60) {
+                HStack {
+                    Text("Scan timeout")
+                    Spacer()
+                    Text(store.scanTimeoutSeconds == 0 ? "Off" : "\(store.scanTimeoutSeconds)s")
+                        .foregroundStyle(.secondary).monospacedDigit()
+                }
+            }
+        } header: {
+            Text("Shortcuts Settings")
+        } footer: {
+            Text("How long to scan for the watch if it is not already connected. Set to Off to skip scanning — the command will only be sent if the watch is already paired and cached by iOS.")
                 .font(.caption)
         }
     }

@@ -24,8 +24,12 @@ final class BLEDeviceStore: ObservableObject {
     static let shared = BLEDeviceStore()
 
     @Published private(set) var devices: [SavedBLEDevice] = []
+    @Published var scanTimeoutSeconds: Int = 10 {
+        didSet { UserDefaults.standard.set(scanTimeoutSeconds, forKey: Self.timeoutKey) }
+    }
 
     private static let storageKey = "ble_saved_devices_v2"
+    private static let timeoutKey = "ble_scan_timeout_v1"
 
     static let defaultVibrationPresets: [BLEPreset] = [
         BLEPreset(label: "Vibration OFF", hexSequence: ["df0006f1020108000100"]),
@@ -43,7 +47,11 @@ final class BLEDeviceStore: ObservableObject {
         ]),
     ]
 
-    private init() { load() }
+    private init() {
+        let stored = UserDefaults.standard.integer(forKey: Self.timeoutKey)
+        scanTimeoutSeconds = stored > 0 ? stored : 10
+        load()
+    }
 
     func upsert(_ device: SavedBLEDevice) {
         if let idx = devices.firstIndex(where: { $0.id == device.id }) {

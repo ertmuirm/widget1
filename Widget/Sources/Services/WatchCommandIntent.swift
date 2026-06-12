@@ -110,10 +110,12 @@ struct SendWatchCommandIntent: AppIntent {
         }
         do {
             let executor = BLECommandExecutor()
+            let timeout = TimeInterval(BLEDeviceStore.shared.scanTimeoutSeconds)
             try await executor.execute(
                 peripheralID: savedDevice.id,
                 writeCharUUID: savedDevice.writeTargetUUID,
-                hexSequence: preset.hexSequence
+                hexSequence: preset.hexSequence,
+                timeout: timeout
             )
             return .result(dialog: IntentDialog(stringLiteral: "\(preset.label) sent to \(savedDevice.name)."))
         } catch let err as BLECommandError {
