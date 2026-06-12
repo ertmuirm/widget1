@@ -33,8 +33,8 @@ final class BLECommandExecutor: NSObject {
     private var hexSequence: [String] = []
 
     private var continuation: CheckedContinuation<Void, Error>?
-    private var scanTimeoutWork: DispatchWorkItem?
-    private var scanTimeout: TimeInterval = 10
+    private var overallTimeoutWork: DispatchWorkItem?
+    private var commandTimeout: TimeInterval = 10
     private var didWrite = false
     private var pendingServiceCount = 0
     private var discoveredServiceCount = 0
@@ -50,13 +50,25 @@ final class BLECommandExecutor: NSObject {
         targetPeripheralID = peripheralID
         targetCharUUID = CBUUID(string: writeCharUUID)
         self.hexSequence = hexSequence
-        self.scanTimeout = max(0, timeout)
+        self.commandTimeout = max(0, timeout)
         didWrite = false
         pendingServiceCount = 0
         discoveredServiceCount = 0
 
         try await withCheckedThrowingContinuation { [self] (cont: CheckedContinuation<Void, Error>) in
             continuation = cont
+            // One timer covers every phase: BT init, scan, connect, discovery, write.
+            // Started before CBCentralManager is created so even a slow BT init is bounded.
+            if commandTimeout > 0 {
+                let work = DispatchWorkItem { [weak self] in
+                    guard let self else { return }
+                    self.central?.stopScan()
+                    if let p = self.peripheral { self.central?.cancelPeripheralConnection(p) }
+                    self.resume(.failure(BLECommandError.timeout))
+                }
+                overallTimeoutWork = work
+                queue.asyncAfter(deadline: .now() + commandTimeout, execute: work)
+            }
             central = CBCentralManager(delegate: self, queue: queue,
                                        options: [CBCentralManagerOptionShowPowerAlertKey: false])
         }
@@ -64,8 +76,8 @@ final class BLECommandExecutor: NSObject {
 
     // Must be called on self.queue.
     private func resume(_ result: Result<Void, Error>) {
-        scanTimeoutWork?.cancel()
-        scanTimeoutWork = nil
+        overallTimeoutWork?.cancel()
+        overallTimeoutWork = nil
         let cont = continuation
         continuation = nil
         cont?.resume(with: result)
@@ -127,26 +139,19 @@ extension BLECommandExecutor: CBCentralManagerDelegate {
             central.connect(found, options: nil)
             return
         }
-        // Fall back to scan. If timeout is 0, skip scan and fail immediately.
-        guard scanTimeout > 0 else {
+        // Fall back to scan. If timeout is 0, skip scan — only fire if already cached.
+        guard commandTimeout > 0 else {
             resume(.failure(BLECommandError.deviceNotFound)); return
         }
+        // The overall timer started in execute() will end the scan if it expires.
         central.scanForPeripherals(withServices: nil, options: nil)
-        let work = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            self.central?.stopScan()
-            self.resume(.failure(BLECommandError.deviceNotFound))
-        }
-        scanTimeoutWork = work
-        queue.asyncAfter(deadline: .now() + scanTimeout, execute: work)
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
                         advertisementData: [String: Any], rssi RSSI: NSNumber) {
         guard peripheral.identifier == targetPeripheralID else { return }
         central.stopScan()
-        scanTimeoutWork?.cancel()
-        scanTimeoutWork = nil
+        // Overall timer remains active — still need to connect, discover, and write.
         peripheral.delegate = self
         self.peripheral = peripheral
         central.connect(peripheral, options: nil)

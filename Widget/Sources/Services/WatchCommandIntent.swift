@@ -110,7 +110,7 @@ struct SendWatchCommandIntent: AppIntent {
         }
         do {
             let executor = BLECommandExecutor()
-            let timeout = TimeInterval(BLEDeviceStore.shared.scanTimeoutSeconds)
+            let timeout = TimeInterval(BLEDeviceStore.shared.commandTimeoutSeconds)
             try await executor.execute(
                 peripheralID: savedDevice.id,
                 writeCharUUID: savedDevice.writeTargetUUID,

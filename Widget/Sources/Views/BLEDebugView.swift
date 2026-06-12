@@ -154,18 +154,18 @@ struct BLEDebugView: View {
 
     private var shortcutsSettingsSection: some View {
         Section {
-            Stepper(value: $store.scanTimeoutSeconds, in: 0...60) {
+            Stepper(value: $store.commandTimeoutSeconds, in: 0...60) {
                 HStack {
-                    Text("Scan timeout")
+                    Text("Command timeout")
                     Spacer()
-                    Text(store.scanTimeoutSeconds == 0 ? "Off" : "\(store.scanTimeoutSeconds)s")
+                    Text(store.commandTimeoutSeconds == 0 ? "Off" : "\(store.commandTimeoutSeconds)s")
                         .foregroundStyle(.secondary).monospacedDigit()
                 }
             }
         } header: {
             Text("Shortcuts Settings")
         } footer: {
-            Text("How long to scan for the watch if it is not already connected. Set to Off to skip scanning — the command will only be sent if the watch is already paired and cached by iOS.")
+            Text("Maximum time the Send Watch Command action will wait across all phases — connecting, scanning, and service discovery. Set to Off to skip scanning and only send if the watch is already cached by iOS.")
                 .font(.caption)
         }
     }
