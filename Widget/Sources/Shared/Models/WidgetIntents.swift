@@ -331,6 +331,18 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     }
     if let v = slideOverride { finalConfig.currentSlideIndex = v }
 
+    // Apply item-order override written by SwapWidgetItemsIntent. Fires when the full
+    // config didn't cross the process boundary so finalConfig still has the old order.
+    let orderKey = "itemOrder_\(entityUUID)"
+    if let orderStr = SharedStorage.shared.gatherReadOverride(forKey: orderKey) {
+        let uuids = orderStr.split(separator: ",").map(String.init)
+        let byUUID = Dictionary(uniqueKeysWithValues: finalConfig.items.map { ($0.id.uuidString, $0) })
+        let reordered = uuids.compactMap { byUUID[$0] }
+        if reordered.count == finalConfig.items.count {
+            finalConfig.items = reordered
+        }
+    }
+
     // Only keep imageData for the ACTIVE slide. loadConfigurations() eagerly loads
     // every slide's image; holding them all decoded simultaneously easily blows the
     // 30 MB WidgetKit process memory limit and causes a silent blank-widget kill.

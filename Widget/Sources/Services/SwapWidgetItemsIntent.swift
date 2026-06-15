@@ -121,13 +121,13 @@ struct SwapWidgetItemsIntent: AppIntent {
 
         try SharedStorage.shared.saveConfigurations(configs)
 
-        let kind: String
-        switch config.size {
-        case .systemSmall:  kind = "BroadcastSmall"
-        case .systemMedium: kind = "BroadcastMedium"
-        default:            kind = "BroadcastLarge"
-        }
-        WidgetCenter.shared.reloadTimelines(ofKind: kind)
+        // Write a lightweight item-order override so the widget extension can apply the
+        // new order even when cross-process SharedStorage reads fail (e.g. on SideStore).
+        let orderKey = "itemOrder_\(widget.id)"
+        let orderValue = config.items.map { $0.id.uuidString }.joined(separator: ",")
+        SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
+
+        WidgetCenter.shared.reloadAllTimelines()
 
         return .result(dialog: IntentDialog(stringLiteral:
             "Swapped \(nameA) (position \(positionA)) with \(nameB) (position \(positionB)) in \"\(widget.name)\"."))

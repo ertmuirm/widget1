@@ -217,6 +217,46 @@ final class SharedStorage {
         UserDefaults.standard.synchronize()
     }
 
+    // MARK: - Lightweight string override (used by SwapWidgetItemsIntent for itemOrder)
+
+    func scatterWriteOverride(_ value: String, forKey key: String) {
+        guard let data = value.data(using: .utf8) else { return }
+        keychainWrite(data, forKey: key)
+        for id in Self.appGroupCandidates {
+            if let ud = UserDefaults(suiteName: id) {
+                ud.set(value, forKey: key)
+                ud.synchronize()
+            }
+        }
+        for id in Self.appGroupCandidates {
+            if let container = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: id) {
+                let url = container.appendingPathComponent("\(key).dat")
+                try? data.write(to: url, options: .atomicWrite)
+            }
+        }
+        UserDefaults.standard.set(value, forKey: key)
+        UserDefaults.standard.synchronize()
+    }
+
+    func gatherReadOverride(forKey key: String) -> String? {
+        if let data = keychainRead(forKey: key),
+           let s = String(data: data, encoding: .utf8), !s.isEmpty { return s }
+        for id in Self.appGroupCandidates {
+            if let s = UserDefaults(suiteName: id)?.string(forKey: key), !s.isEmpty { return s }
+        }
+        for id in Self.appGroupCandidates {
+            if let container = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: id) {
+                let url = container.appendingPathComponent("\(key).dat")
+                if let data = try? Data(contentsOf: url),
+                   let s = String(data: data, encoding: .utf8), !s.isEmpty { return s }
+            }
+        }
+        if let s = UserDefaults.standard.string(forKey: key), !s.isEmpty { return s }
+        return nil
+    }
+
     // MARK: - GATHER read helper
 
     private func gatherRead(forKey key: String) -> Data? {
