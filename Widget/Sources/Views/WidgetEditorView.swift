@@ -380,7 +380,13 @@ struct WidgetEditorView: View {
     }
 
     private var gridItemsSection: some View {
-        Section {
+        let maxShown  = configuration.maxItems
+        let maxConfig = configuration.maxConfiguredItems
+        let totalCount = configuration.items.count
+        let shownCount = min(totalCount, maxShown)
+        let benchCount = max(0, totalCount - maxShown)
+
+        return Section {
             if configuration.items.isEmpty {
                 Button { addItem() } label: {
                     Label("Add Item", systemImage: "plus")
@@ -388,14 +394,27 @@ struct WidgetEditorView: View {
                 .foregroundStyle(.gray)
             } else {
                 ForEach($configuration.items) { $item in
-                    ItemRowView(item: item) {
-                        configuration.items.removeAll { $0.id == item.id }
+                    let idx = configuration.items.firstIndex(where: { $0.id == item.id }) ?? 0
+                    let isBench = idx >= maxShown
+                    HStack(spacing: 8) {
+                        ItemRowView(item: item) {
+                            configuration.items.removeAll { $0.id == item.id }
+                        }
+                        if isBench {
+                            Text("bench")
+                                .font(.caption2)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.7))
+                                .clipShape(Capsule())
+                        }
                     }
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if !isReordering,
-                           let idx = configuration.items.firstIndex(where: { $0.id == item.id }) {
-                            editingItemIndex = EditingItemIndex(id: idx)
+                           let i = configuration.items.firstIndex(where: { $0.id == item.id }) {
+                            editingItemIndex = EditingItemIndex(id: i)
                         }
                     }
                 }
@@ -403,17 +422,25 @@ struct WidgetEditorView: View {
                     configuration.items.move(fromOffsets: from, toOffset: to)
                 }
 
-                if !isReordering && configuration.items.count < configuration.maxItems {
+                if !isReordering && totalCount < maxConfig {
                     Button { addItem() } label: {
-                        Label("Add Item", systemImage: "plus")
+                        Label(
+                            totalCount < maxShown ? "Add Item" : "Add Bench Item",
+                            systemImage: "plus"
+                        )
                     }
                     .foregroundStyle(.gray)
                 }
             }
         } header: {
             HStack {
-                Text("Items (\(configuration.items.count)/\(configuration.maxItems))")
-                    .textCase(nil)
+                if benchCount > 0 {
+                    Text("Items (\(shownCount)/\(maxShown) shown · \(benchCount) bench)")
+                        .textCase(nil)
+                } else {
+                    Text("Items (\(shownCount)/\(maxShown))")
+                        .textCase(nil)
+                }
                 Spacer()
                 if !configuration.items.isEmpty {
                     Button(isReordering ? "Done" : "Reorder") {
@@ -423,6 +450,12 @@ struct WidgetEditorView: View {
                     .foregroundStyle(.secondary)
                     .textCase(nil)
                 }
+            }
+        } footer: {
+            if benchCount == 0 && totalCount == maxShown {
+                Text("Add more items to create a bench — a pool of pre-configured items you can swap in via Shortcuts without editing the widget.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .environment(\.editMode, .constant(isReordering ? .active : .inactive))

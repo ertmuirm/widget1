@@ -249,10 +249,11 @@ struct WidgetConfig: Codable, Identifiable, Equatable {
     )
     
     /// Computed property for max items based on widget size
-    var maxItems: Int {
-        size.maxItems
-    }
-    
+    var maxItems: Int { size.maxItems }
+
+    /// Maximum total items that can be pre-configured (displayed + bench).
+    var maxConfiguredItems: Int { size.maxConfiguredItems }
+
     /// Returns items truncated to maxItems
     var truncatedItems: [WidgetItem] {
         Array(items.prefix(maxItems))
@@ -287,6 +288,10 @@ enum WidgetSize: String, Codable, CaseIterable {
         case .systemExtraLarge: return 36
         }
     }
+
+    /// Maximum total items a user can pre-configure (displayed + bench).
+    /// Items beyond maxItems are "bench" items available for Shortcuts-driven swaps.
+    var maxConfiguredItems: Int { maxItems * 2 }
 
     var columns: Int {
         switch self {
