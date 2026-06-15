@@ -59,10 +59,7 @@ struct GridWidgetQuery: EntityQuery {
 
 struct SwapWidgetItemsIntent: AppIntent {
     static var title: LocalizedStringResource = "Swap Widget Items"
-    static var description = IntentDescription(
-        "Swaps two items in a Grid Widget by their positions. Position 1 is the top-left cell. " +
-        "Positions beyond the grid size (e.g. position 10 in a 3×3 widget) refer to pre-configured bench items. " +
-        "The widget updates instantly on the home screen.")
+    static var description = IntentDescription("Swaps two items in a Grid Widget by their positions. Position 1 is the top-left cell. Positions beyond the grid size (e.g. position 10 in a 3x3 widget) refer to pre-configured bench items. The widget updates instantly on the home screen.")
     static var openAppWhenRun: Bool = false
 
     @Parameter(title: "Widget",
