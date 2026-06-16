@@ -1,7 +1,110 @@
 import AppIntents
 import WidgetKit
 
-// MARK: - Entity
+// MARK: - Code Widget Entity (for AdvanceCodeSlideIntent)
+
+struct CodeWidgetEntity: AppEntity, Hashable {
+    static var typeDisplayRepresentation: TypeDisplayRepresentation {
+        TypeDisplayRepresentation(name: "Code Widget")
+    }
+    static var defaultQuery = CodeWidgetQuery()
+
+    var id: String      // UUID string of the WidgetConfig
+    var name: String
+
+    var displayRepresentation: DisplayRepresentation {
+        DisplayRepresentation(title: "\(name)")
+    }
+
+    init(id: String, name: String) { self.id = id; self.name = name }
+}
+
+struct CodeWidgetQuery: EntityQuery {
+    func entities(for identifiers: [String]) async throws -> [CodeWidgetEntity] {
+        let configs = codeWidgetConfigs()
+        return identifiers.compactMap { id in
+            configs.first(where: { $0.id.uuidString == id })
+                .map { CodeWidgetEntity(id: $0.id.uuidString, name: $0.name) }
+        }
+    }
+    func suggestedEntities() async throws -> [CodeWidgetEntity] {
+        let list = codeWidgetConfigs()
+        guard !list.isEmpty else {
+            return [CodeWidgetEntity(id: "none", name: "No Code Widgets saved")]
+        }
+        return list.map { CodeWidgetEntity(id: $0.id.uuidString, name: $0.name) }
+    }
+    func defaultResult() async -> CodeWidgetEntity? {
+        codeWidgetConfigs().first.map { CodeWidgetEntity(id: $0.id.uuidString, name: $0.name) }
+    }
+    private func codeWidgetConfigs() -> [WidgetConfig] {
+        ((try? SharedStorage.shared.loadConfigurations()) ?? [])
+            .filter { $0.widgetKind == .imageSlideshow }
+    }
+}
+
+// MARK: - Advance Code Slide Intent (Shortcuts action)
+
+struct AdvanceCodeSlideIntent: AppIntent {
+    static var title: LocalizedStringResource = "Advance Code Widget Slide"
+    static var description = IntentDescription("Advances or reverses the current slide in a Code Widget.")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Widget",
+               description: "The Code Widget whose slide to advance.")
+    var widget: CodeWidgetEntity
+
+    @Parameter(title: "Forward",
+               description: "Advance forward (true) or backward (false).",
+               default: true)
+    var forward: Bool
+
+    init() { widget = CodeWidgetEntity(id: "none", name: ""); forward = true }
+    init(widget: CodeWidgetEntity, forward: Bool) {
+        self.widget = widget; self.forward = forward
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard widget.id != "none" else {
+            return .result(dialog: "No code widgets found. Create one in the app first.")
+        }
+
+        var configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
+        guard let idx = configs.firstIndex(where: { $0.id.uuidString == widget.id }) else {
+            return .result(dialog: "Widget \"\(widget.name)\" not found. It may have been deleted.")
+        }
+
+        let slides = configs[idx].slides ?? []
+        let count = slides.count
+        guard count > 1 else {
+            return .result(dialog: "\"\(widget.name)\" has only one slide — nothing to advance.")
+        }
+
+        let current = configs[idx].currentSlideIndex ?? 0
+        let next = forward
+            ? (current + 1) % count
+            : (current - 1 + count) % count
+        configs[idx].currentSlideIndex = next
+
+        // Write lightweight slideIdx override to all cross-process stores (Int).
+        let idxKey = "slideIdx_\(widget.id)"
+        for id in SharedStorage.appGroupCandidates {
+            UserDefaults(suiteName: id)?.set(next, forKey: idxKey)
+            UserDefaults(suiteName: id)?.synchronize()
+        }
+        UserDefaults.standard.set(next, forKey: idxKey)
+        UserDefaults.standard.synchronize()
+
+        try SharedStorage.shared.saveConfigurations(configs)
+        WidgetCenter.shared.reloadTimelines(ofKind: "BroadcastImage")
+
+        let direction = forward ? "advanced to" : "reversed to"
+        return .result(dialog: IntentDialog(stringLiteral:
+            "\"\(widget.name)\": \(direction) slide \(next + 1) of \(count)."))
+    }
+}
+
+// MARK: - Grid Widget Entity
 
 struct GridWidgetEntity: AppEntity, Hashable {
     static var typeDisplayRepresentation: TypeDisplayRepresentation {

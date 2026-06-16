@@ -845,39 +845,30 @@ struct NoOpIntent: AppIntent {
     func perform() async throws -> some IntentResult { .result() }
 }
 
-// MARK: - Advance Image Intent (cycles slides in an image slideshow widget)
+// MARK: - Advance Image Intent (widget Button only — cycles slides in an image slideshow widget)
+//
+// This intent is compiled into both targets so the widget's Button(intent:) can run it
+// inside the extension process. For Shortcuts use, see AdvanceCodeSlideIntent (main app only).
 
 struct AdvanceImageIntent: AppIntent {
-    static var title: LocalizedStringResource = "Advance Code Widget Slide"
-    static var description = IntentDescription("Advances or reverses the current slide in a Code Widget.")
+    static var title: LocalizedStringResource = "Advance Slide (Widget Button)"
     static var openAppWhenRun: Bool = false
 
-    @Parameter(title: "Widget",
-               description: "The Code Widget whose slide to advance.")
-    var widget: ImageWidgetEntity
+    @Parameter(title: "Widget ID")   var widgetID: String
+    @Parameter(title: "Forward")     var forward: Bool
+    /// Total number of slides — embedded by the widget view so perform() never needs
+    /// to call loadConfigurations() from within the extension.
+    @Parameter(title: "Slide Count") var slideCount: Int
 
-    @Parameter(title: "Forward")
-    var forward: Bool
-
-    /// Used only by the in-widget Button — supplies slide count without requiring
-    /// loadConfigurations() inside the extension. Ignored when running as a Shortcut
-    /// (slide count is decoded from the entity ID instead).
-    @Parameter(title: "Slide Count")
-    var slideCount: Int
-
-    init() { widget = ImageWidgetEntity(id: "", name: ""); forward = true; slideCount = 0 }
-    init(widget: ImageWidgetEntity, forward: Bool, slideCount: Int) {
-        self.widget = widget; self.forward = forward; self.slideCount = slideCount
+    init() { widgetID = ""; forward = true; slideCount = 0 }
+    init(widgetID: String, forward: Bool, slideCount: Int) {
+        self.widgetID = widgetID; self.forward = forward; self.slideCount = slideCount
     }
 
     func perform() async throws -> some IntentResult {
-        let uuid  = uuidFromEntityID(widget.id)
-        // Prefer slide count from the embedded entity config (Shortcut use);
-        // fall back to the parameter (Button use, where entity ID is a bare UUID).
-        let count = decodeConfigFromID(widget.id)?.slides?.count ?? slideCount
-        guard count > 1 else { return .result() }
+        guard slideCount > 1 else { return .result() }
 
-        let idxKey = "slideIdx_\(uuid)"
+        let idxKey = "slideIdx_\(widgetID)"
         var currentIndex = 0
         for id in SharedStorage.appGroupCandidates {
             if let v = UserDefaults(suiteName: id)?.object(forKey: idxKey) as? Int {
@@ -889,16 +880,18 @@ struct AdvanceImageIntent: AppIntent {
         }
 
         let nextIndex = forward
-            ? (currentIndex + 1) % count
-            : (currentIndex - 1 + count) % count
+            ? (currentIndex + 1) % slideCount
+            : (currentIndex - 1 + slideCount) % slideCount
 
         for id in SharedStorage.appGroupCandidates {
             UserDefaults(suiteName: id)?.set(nextIndex, forKey: idxKey)
+            UserDefaults(suiteName: id)?.synchronize()
         }
         UserDefaults.standard.set(nextIndex, forKey: idxKey)
+        UserDefaults.standard.synchronize()
 
         if var configs = try? SharedStorage.shared.loadConfigurations(),
-           let idx = configs.firstIndex(where: { $0.id.uuidString == uuid }) {
+           let idx = configs.firstIndex(where: { $0.id.uuidString == widgetID }) {
             configs[idx].currentSlideIndex = nextIndex
             try? SharedStorage.shared.saveConfigurations(configs)
         }
