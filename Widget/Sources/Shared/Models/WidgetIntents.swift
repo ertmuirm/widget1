@@ -848,32 +848,36 @@ struct NoOpIntent: AppIntent {
 // MARK: - Advance Image Intent (cycles slides in an image slideshow widget)
 
 struct AdvanceImageIntent: AppIntent {
-    static var title: LocalizedStringResource = "Advance Image"
-    /// Without this, tapping the button opens the host app instead of running
-    /// the intent in-place inside the extension process.
+    static var title: LocalizedStringResource = "Advance Code Widget Slide"
+    static var description = IntentDescription("Advances or reverses the current slide in a Code Widget.")
     static var openAppWhenRun: Bool = false
 
-    @Parameter(title: "Widget ID")   var widgetID: String
-    @Parameter(title: "Forward")     var forward: Bool
-    /// Total number of slides — embedded in the intent so perform() never needs
-    /// to call SharedStorage.loadConfigurations(), which returns [] on SideStore
-    /// (app group entitlement stripped) and would cause an early return.
-    @Parameter(title: "Slide Count") var slideCount: Int
+    @Parameter(title: "Widget",
+               description: "The Code Widget whose slide to advance.")
+    var widget: ImageWidgetEntity
 
-    init() { widgetID = ""; forward = true; slideCount = 0 }
-    init(widgetID: String, forward: Bool, slideCount: Int) {
-        self.widgetID = widgetID; self.forward = forward; self.slideCount = slideCount
+    @Parameter(title: "Forward")
+    var forward: Bool
+
+    /// Used only by the in-widget Button — supplies slide count without requiring
+    /// loadConfigurations() inside the extension. Ignored when running as a Shortcut
+    /// (slide count is decoded from the entity ID instead).
+    @Parameter(title: "Slide Count")
+    var slideCount: Int
+
+    init() { widget = ImageWidgetEntity(id: "", name: ""); forward = true; slideCount = 0 }
+    init(widget: ImageWidgetEntity, forward: Bool, slideCount: Int) {
+        self.widget = widget; self.forward = forward; self.slideCount = slideCount
     }
 
     func perform() async throws -> some IntentResult {
-        guard slideCount > 1 else { return .result() }
+        let uuid  = uuidFromEntityID(widget.id)
+        // Prefer slide count from the embedded entity config (Shortcut use);
+        // fall back to the parameter (Button use, where entity ID is a bare UUID).
+        let count = decodeConfigFromID(widget.id)?.slides?.count ?? slideCount
+        guard count > 1 else { return .result() }
 
-        // Read the current index from the lightweight UserDefaults key.
-        // We deliberately avoid loadConfigurations() here: on SideStore the app-group
-        // entitlement is stripped, so it always returns [], which previously caused
-        // the firstIndex lookup to fail and the function to return early without
-        // updating anything.
-        let idxKey = "slideIdx_\(widgetID)"
+        let idxKey = "slideIdx_\(uuid)"
         var currentIndex = 0
         for id in SharedStorage.appGroupCandidates {
             if let v = UserDefaults(suiteName: id)?.object(forKey: idxKey) as? Int {
@@ -885,19 +889,16 @@ struct AdvanceImageIntent: AppIntent {
         }
 
         let nextIndex = forward
-            ? (currentIndex + 1) % slideCount
-            : (currentIndex - 1 + slideCount) % slideCount
+            ? (currentIndex + 1) % count
+            : (currentIndex - 1 + count) % count
 
-        // Write new index to every available store.
         for id in SharedStorage.appGroupCandidates {
             UserDefaults(suiteName: id)?.set(nextIndex, forKey: idxKey)
         }
         UserDefaults.standard.set(nextIndex, forKey: idxKey)
 
-        // Best-effort: also update the persisted config so the index survives
-        // a full timeline refresh that re-reads from SharedStorage.
         if var configs = try? SharedStorage.shared.loadConfigurations(),
-           let idx = configs.firstIndex(where: { $0.id.uuidString == widgetID }) {
+           let idx = configs.firstIndex(where: { $0.id.uuidString == uuid }) {
             configs[idx].currentSlideIndex = nextIndex
             try? SharedStorage.shared.saveConfigurations(configs)
         }

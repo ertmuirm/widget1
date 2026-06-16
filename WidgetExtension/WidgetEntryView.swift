@@ -299,7 +299,8 @@ struct WidgetEntryView: View {
                 if hasNavigation {
                     HStack(spacing: 0) {
                         Button(intent: AdvanceImageIntent(
-                            widgetID: entry.entityUUID,
+                            widget: ImageWidgetEntity(id: entry.entityUUID,
+                                                      name: entry.configuration.name),
                             forward: false,
                             slideCount: slides.count)) {
                             Color.black.opacity(0.001)
@@ -319,7 +320,8 @@ struct WidgetEntryView: View {
                         }
 
                         Button(intent: AdvanceImageIntent(
-                            widgetID: entry.entityUUID,
+                            widget: ImageWidgetEntity(id: entry.entityUUID,
+                                                      name: entry.configuration.name),
                             forward: true,
                             slideCount: slides.count)) {
                             Color.black.opacity(0.001)

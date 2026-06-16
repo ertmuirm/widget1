@@ -37,10 +37,45 @@ final class SharedStorage {
     // MARK: - Keychain shared access group
 
     static let sharedKeychainGroup: String? = {
-        let candidates = [
-            "J3D2F4SMVD.com.ioswidget.shared",
-            "com.ioswidget.shared"
-        ]
+        // Discover the actual team ID at runtime. On SideStore the signing team ID
+        // may differ from the hardcoded "J3D2F4SMVD", so we write a probe item
+        // without specifying an access group, read back the kSecAttrAccessGroup
+        // attribute iOS assigned, and extract the team-ID prefix from it.
+        var discoveredCandidate: String? = nil
+        let discSvc = "com.ioswidget.teamdiscover"
+        let discAcc = "__teamdiscover__"
+        var dq: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+                                  kSecAttrService as String: discSvc,
+                                  kSecAttrAccount as String: discAcc]
+        SecItemDelete(dq as CFDictionary)
+        var aq = dq
+        aq[kSecValueData as String]      = Data([0x01])
+        aq[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        if SecItemAdd(aq as CFDictionary, nil) == errSecSuccess {
+            var rq = dq
+            rq[kSecReturnAttributes as String] = true
+            rq[kSecMatchLimit as String]        = kSecMatchLimitOne
+            var out: AnyObject?
+            if SecItemCopyMatching(rq as CFDictionary, &out) == errSecSuccess,
+               let attrs  = out as? [String: Any],
+               let grp    = attrs[kSecAttrAccessGroup as String] as? String {
+                // grp looks like "TEAMID.com.ioswidget[.extension]"
+                // Team IDs are always 10 uppercase alphanumeric chars.
+                let prefix = grp.split(separator: ".").first.map(String.init) ?? ""
+                if prefix.count >= 8 {
+                    discoveredCandidate = "\(prefix).com.ioswidget.shared"
+                }
+            }
+            SecItemDelete(dq as CFDictionary)
+        }
+
+        // Probe candidates: dynamic discovery first, then hardcoded fallbacks.
+        var seen = Set<String>()
+        let candidates = ([discoveredCandidate, "J3D2F4SMVD.com.ioswidget.shared",
+                           "com.ioswidget.shared"] as [String?])
+            .compactMap { $0 }
+            .filter { seen.insert($0).inserted }
+
         for group in candidates {
             var q: [String: Any] = [
                 kSecClass as String:           kSecClassGenericPassword,
