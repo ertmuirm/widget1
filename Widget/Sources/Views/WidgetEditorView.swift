@@ -567,7 +567,7 @@ struct WidgetEditorView: View {
     // MARK: - Helpers
 
     private func addItem() {
-        guard configuration.items.count < configuration.maxItems else { return }
+        guard configuration.items.count < configuration.maxConfiguredItems else { return }
         configuration.items.append(WidgetItem(
             qrCodeLabelSize: CGFloat(defaultQRLabelSize),
             fontSize: CGFloat(defaultTextFontSize)
