@@ -43,6 +43,7 @@ private struct SlimAction: Codable {
 }
 
 private struct SlimItem: Codable {
+    var i: String      // id.uuidString (required for order preservation)
     var d: String      // DisplayType.rawValue
     var s: String?     // sfSymbolName        (nil = none)
     var t: String?     // customText           (nil = none)
@@ -58,6 +59,7 @@ private struct SlimItem: Codable {
 
 private extension SlimItem {
     init(_ item: WidgetItem) {
+        i  = item.id.uuidString  // Save the ID so order can be preserved
         d  = item.displayType.rawValue
         s  = item.sfSymbolName
         t  = item.customText
@@ -74,7 +76,7 @@ private extension SlimItem {
     }
     func toWidgetItem() -> WidgetItem {
         WidgetItem(
-            id: UUID(),
+            id: UUID(uuidString: i) ?? UUID(),  // Restore original ID
             displayType: DisplayType(rawValue: d) ?? .icon,
             sfSymbolName: s,
             customText: t,
@@ -334,11 +336,13 @@ private func makeEntry(configID: String?) -> WidgetEntry {
 
     // Apply item-order override written by SwapWidgetItemsIntent. Fires when the full
     // config didn't cross the process boundary so finalConfig still has the old order.
-    let orderKey = "itemOrder_\(entityUUID)"
+    // Normalize entityUUID to uppercase for consistent key lookup (UUID case may vary).
+    let normalizedEntityUUID = entityUUID.uppercased()
+    let orderKey = "itemOrder_\(normalizedEntityUUID)"
     if let orderStr = SharedStorage.shared.gatherReadOverride(forKey: orderKey) {
-        let uuids = orderStr.split(separator: ",").map(String.init)
-        let byUUID = Dictionary(uniqueKeysWithValues: finalConfig.items.map { ($0.id.uuidString, $0) })
-        let reordered = uuids.compactMap { byUUID[$0] }
+        let uuids = orderStr.split(separator: ",").map { String($0) }
+        let byUUID = Dictionary(uniqueKeysWithValues: finalConfig.items.map { ($0.id.uuidString.uppercased(), $0) })
+        let reordered = uuids.compactMap { byUUID[$0.uppercased()] }
         if reordered.count == finalConfig.items.count {
             finalConfig.items = reordered
         }
@@ -379,7 +383,8 @@ private func makeTimeline(configID: String?) -> Timeline<WidgetEntry> {
     let entry = makeEntry(configID: configID)
     
     // Check if data version changed - if so, force a refresh soon
-    let entityUUID = configID.map { uuidFromEntityID($0) } ?? entry.entityUUID
+    // Normalize to uppercase for consistent key lookup
+    let entityUUID = (configID.map { uuidFromEntityID($0) } ?? entry.entityUUID).uppercased()
     let versionKey = "dataVersion_\(entityUUID)"
     let knownVersionKey = "knownVersion_\(entityUUID)"
     
