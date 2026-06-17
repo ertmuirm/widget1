@@ -130,6 +130,16 @@ struct WidgetEntryView: View {
             } else {
                 itemsGrid
             }
+            
+            // DEBUG: Show refresh timestamp in top-left corner
+            // This helps verify if getTimeline() is being called
+            Text(entry.debugRefreshTime)
+                .font(.system(size: 6, weight: .bold, design: .monospaced))
+                .foregroundStyle(.gray)
+                .padding(2)
+                .background(Color.black.opacity(0.5))
+                .cornerRadius(2)
+                .offset(x: -20, y: -20)
         }
         // widgetURL fires for taps on areas not covered by a Link (gaps, empty cells).
         // The app's Page 0 is a black screen, so this tap silently opens and immediately
@@ -202,6 +212,7 @@ struct WidgetEntryView: View {
                 Button(intent: WidgetItemActionIntent(encodedAction: encoded)) {
                     ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
                 }
+                .buttonStyle(.plain)  // Remove default button styling (gray highlight)
             } else {
                 ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
             }

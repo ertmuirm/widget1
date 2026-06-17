@@ -298,6 +298,9 @@ struct WidgetEntry: TimelineEntry {
     /// WidgetEntryView must use this UUID — not configuration.id — when constructing
     /// AdvanceImageIntent so the intent can match the correct slideIdx_ key.
     let entityUUID: String
+    /// Debug: timestamp when this entry was created (HH:mm:ss format)
+    /// Use this to verify if getTimeline() is being called
+    let debugRefreshTime: String
 
     init(date: Date, configuration: WidgetConfig,
          showItemLabels: Bool = SharedStorage.shared.showItemLabels,
@@ -306,6 +309,10 @@ struct WidgetEntry: TimelineEntry {
         self.configuration = configuration
         self.showItemLabels = showItemLabels
         self.entityUUID = entityUUID.isEmpty ? configuration.id.uuidString : entityUUID
+        // Format: HH:mm:ss for easy reading
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        self.debugRefreshTime = formatter.string(from: date)
     }
 }
 
@@ -414,14 +421,47 @@ private func makeEntry(configID: String?) -> WidgetEntry {
 private func makeTimeline(configID: String?) -> Timeline<WidgetEntry> {
     let entry = makeEntry(configID: configID)
     
-    // Always use .atEnd policy for sideloaded apps.
-    // This makes iOS call getTimeline() when:
-    // - Widget becomes visible after being off-screen
-    // - Widget is tapped/interacted with
-    // - System decides to refresh
-    // Battery impact is LOW - iOS controls timing and batches requests.
+    // Check if data version changed - if so, use .atEnd to trigger more frequent refreshes
+    let entityUUID = (configID.map { uuidFromEntityID($0) } ?? entry.entityUUID).uppercased()
+    let versionKey = "dataVersion_\(entityUUID)"
+    let knownVersionKey = "knownVersion_\(entityUUID)"
     
-    return Timeline(entries: [entry], policy: .atEnd)
+    var currentVersion = 0
+    for id in SharedStorage.appGroupCandidates {
+        if let v = UserDefaults(suiteName: id)?.integer(forKey: versionKey), v > 0 {
+            currentVersion = v; break
+        }
+    }
+    if currentVersion == 0 {
+        currentVersion = UserDefaults.standard.integer(forKey: versionKey)
+    }
+    
+    var lastKnownVersion = 0
+    for id in SharedStorage.appGroupCandidates {
+        if let v = UserDefaults(suiteName: id)?.integer(forKey: knownVersionKey), v > 0 {
+            lastKnownVersion = v; break
+        }
+    }
+    if lastKnownVersion == 0 {
+        lastKnownVersion = UserDefaults.standard.integer(forKey: knownVersionKey)
+    }
+    
+    // If version changed, use atEnd policy - this tells iOS to call us again
+    // when the widget is displayed, which is efficient and battery-friendly
+    if currentVersion > 0 && currentVersion != lastKnownVersion {
+        // Update known version so we only do this once per change
+        for id in SharedStorage.appGroupCandidates {
+            UserDefaults(suiteName: id)?.set(currentVersion, forKey: knownVersionKey)
+        }
+        UserDefaults.standard.set(currentVersion, forKey: knownVersionKey)
+        
+        // atEnd = iOS calls us again when widget is displayed
+        return Timeline(entries: [entry], policy: .atEnd)
+    }
+    
+    // Normal case: refresh in 1 hour
+    let next = Calendar.current.date(byAdding: .hour, value: 1, to: Date()) ?? Date()
+    return Timeline(entries: [entry], policy: .after(next))
 }
 
 private func makeClockEntry(position: ClockDigitPosition?) -> WidgetEntry {
