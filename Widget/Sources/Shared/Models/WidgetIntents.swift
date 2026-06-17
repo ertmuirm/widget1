@@ -1,6 +1,5 @@
 import AppIntents
 import WidgetKit
-import UIKit
 
 // MARK: - Widget Item Action Intent
 //
@@ -19,33 +18,16 @@ struct WidgetItemActionIntent: AppIntent {
     init(encodedAction: String) { self.encodedAction = encodedAction }
     
     func perform() async throws -> some IntentResult {
-        // Decode the action
-        guard let data = Data(base64Encoded: encodedAction),
-              let action = try? JSONDecoder().decode(WidgetAction.self, from: data) else {
-            return .result()
+        // Store the action in shared UserDefaults so the main app can:
+        // 1. Execute the action
+        // 2. Call WidgetCenter.shared.reloadAllTimelines()
+        let pendingKey = "pendingWidgetAction"
+        UserDefaults.standard.set(encodedAction, forKey: pendingKey)
+        for id in SharedStorage.appGroupCandidates {
+            UserDefaults(suiteName: id)?.set(encodedAction, forKey: pendingKey)
         }
         
-        // Execute the action
-        switch action.type {
-        case .urlScheme:
-            if let url = URL(string: action.payload) {
-                await UIApplication.shared.open(url)
-            }
-        case .shortcut:
-            if let url = URL(string: "shortcuts://run-shortcut?name=\(action.payload.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? action.payload)") {
-                await UIApplication.shared.open(url)
-            }
-        case .appIntent:
-            // For appIntent, the payload is the app's bundle ID - try to open it
-            if let bundleID = action.payload.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-               let url = URL(string: "openapp://launch?bundle=\(bundleID)") {
-                await UIApplication.shared.open(url)
-            }
-        }
-        
-        // Force widget refresh
-        WidgetCenter.shared.reloadAllTimelines()
-        
+        // Intent completion triggers iOS to call getTimeline()
         return .result()
     }
 }
