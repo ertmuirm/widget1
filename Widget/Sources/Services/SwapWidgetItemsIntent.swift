@@ -199,6 +199,7 @@ struct SwapWidgetItemsIntent: AppIntent {
 
         var configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
 
+        // Find the config - widget.id is already the UUID string
         guard let configIdx = configs.firstIndex(where: { $0.id.uuidString == widget.id }) else {
             return .result(dialog: IntentDialog(stringLiteral: "Widget \"\(widget.name)\" not found"))
         }
@@ -226,16 +227,17 @@ struct SwapWidgetItemsIntent: AppIntent {
 
         try SharedStorage.shared.saveConfigurations(configs)
 
-        // Write a lightweight item-order override so the widget extension can apply the
-        // new order even when cross-process SharedStorage reads fail (e.g. on SideStore).
-        let orderKey = "itemOrder_\(widget.id)"
+        // Write item-order override using the SAME UUID format as makeEntry() reads
+        // makeEntry uses uuidFromEntityID(entityID) which extracts UUID from entity ID
+        // Widget.id IS the UUID string, so this should match
+        let entityUUID = widget.id  // Already a UUID string
+        let orderKey = "itemOrder_\(entityUUID)"
         let orderValue = config.items.map { $0.id.uuidString }.joined(separator: ",")
         SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
 
         // Increment version counter to signal data changed.
-        // Widget reads this on next refresh (widget touch/scroll) to detect stale cache.
-        let versionKey = "dataVersion_\(widget.id)"
-        let currentVersion = (UserDefaults.standard.integer(forKey: versionKey))
+        let versionKey = "dataVersion_\(entityUUID)"
+        let currentVersion = UserDefaults.standard.integer(forKey: versionKey)
         let newVersion = currentVersion + 1
         UserDefaults.standard.set(newVersion, forKey: versionKey)
         for id in SharedStorage.appGroupCandidates {
@@ -281,7 +283,7 @@ struct DebugWidgetIntent: AppIntent {
         }
 
         var info = "Widget: \(widget.name)\n"
-        info += "ID: \(widget.id.prefix(8))...\n"
+        info += "Widget.id: \(widget.id)\n"
 
         // Check full config
         let configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
@@ -293,16 +295,20 @@ struct DebugWidgetIntent: AppIntent {
             info += "Full config: NOT FOUND\n"
         }
 
-        // Check order override
-        let orderKey = "itemOrder_\(widget.id)"
+        // Check order override using widget.id (which is the UUID)
+        let entityUUID = widget.id
+        let orderKey = "itemOrder_\(entityUUID)"
+        info += "Order key: \(orderKey)\n"
         if let order = SharedStorage.shared.gatherReadOverride(forKey: orderKey) {
-            info += "Order override: \(order.prefix(30))...\n"
+            info += "Order override: FOUND\n"
+            let preview = order.prefix(50).split(separator: ",").map(String.init).prefix(3).joined(separator: ", ")
+            info += "First 3 UUIDs: \(preview)\n"
         } else {
             info += "Order override: NOT FOUND\n"
         }
 
         // Check version
-        let versionKey = "dataVersion_\(widget.id)"
+        let versionKey = "dataVersion_\(entityUUID)"
         let version = UserDefaults.standard.integer(forKey: versionKey)
         info += "Version: \(version)\n"
 
