@@ -168,7 +168,7 @@ struct GridWidgetQuery: EntityQuery {
 
 struct SwapWidgetItemsIntent: AppIntent {
     static var title: LocalizedStringResource = "Swap Widget Items"
-    static var description = IntentDescription("Swaps two items in a Grid Widget by their positions. Position 1 is the top-left cell. Positions beyond the grid size (e.g. position 10 in a 3x3 widget) refer to pre-configured bench items. The widget updates instantly on the home screen.")
+    static var description = IntentDescription("Swaps two items in a Grid Widget by their positions. Position 1 is the top-left cell. Positions beyond the grid size (e.g. position 10 in a 3x3 widget) refer to pre-configured bench items. The widget updates when touched.")
     static var openAppWhenRun: Bool = false
 
     @Parameter(title: "Widget",
@@ -194,14 +194,13 @@ struct SwapWidgetItemsIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         guard widget.id != "none" else {
-            return .result(dialog: IntentDialog(stringLiteral:
-                "No grid widgets found. Create one in the app first."))
+            return .result(dialog: IntentDialog(stringLiteral: "No grid widgets found"))
         }
 
         var configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
+
         guard let configIdx = configs.firstIndex(where: { $0.id.uuidString == widget.id }) else {
-            return .result(dialog: IntentDialog(stringLiteral:
-                "Widget \"\(widget.name)\" not found. It may have been deleted."))
+            return .result(dialog: IntentDialog(stringLiteral: "Widget \"\(widget.name)\" not found"))
         }
 
         let a = positionA - 1   // convert to 0-based
@@ -210,16 +209,13 @@ struct SwapWidgetItemsIntent: AppIntent {
         let count = config.items.count
 
         guard a >= 0, a < count else {
-            return .result(dialog: IntentDialog(stringLiteral:
-                "Position \(positionA) is out of range. \"\(widget.name)\" has \(count) configured item(s)."))
+            return .result(dialog: IntentDialog(stringLiteral: "Position \(positionA) out of range"))
         }
         guard b >= 0, b < count else {
-            return .result(dialog: IntentDialog(stringLiteral:
-                "Position \(positionB) is out of range. \"\(widget.name)\" has \(count) configured item(s)."))
+            return .result(dialog: IntentDialog(stringLiteral: "Position \(positionB) out of range"))
         }
         guard a != b else {
-            return .result(dialog: IntentDialog(stringLiteral:
-                "Both positions are the same — nothing to swap."))
+            return .result(dialog: IntentDialog(stringLiteral: "Same positions - nothing to swap"))
         }
 
         let nameA = itemLabel(config.items[a])
@@ -236,15 +232,23 @@ struct SwapWidgetItemsIntent: AppIntent {
         let orderValue = config.items.map { $0.id.uuidString }.joined(separator: ",")
         SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
 
-        // Post Darwin notification to reliably wake the widget extension process.
-        // WidgetCenter.shared.reloadAllTimelines() may not work on sideloaded apps,
-        // so we use Darwin notifications for guaranteed cross-process communication.
+        // Increment version counter to signal data changed.
+        // Widget reads this on next refresh (widget touch/scroll) to detect stale cache.
+        let versionKey = "dataVersion_\(widget.id)"
+        let currentVersion = (UserDefaults.standard.integer(forKey: versionKey))
+        let newVersion = currentVersion + 1
+        UserDefaults.standard.set(newVersion, forKey: versionKey)
+        for id in SharedStorage.appGroupCandidates {
+            UserDefaults(suiteName: id)?.set(newVersion, forKey: versionKey)
+        }
+
+        // Post Darwin notification (best effort - may not wake suspended extension)
         DarwinNotificationCenter.shared.postSwapAction()
 
         WidgetCenter.shared.reloadAllTimelines()
 
-        return .result(dialog: IntentDialog(stringLiteral:
-            "Swapped \(nameA) (position \(positionA)) with \(nameB) (position \(positionB)) in \"\(widget.name)\"."))
+        let result = "Swapped \(nameA) (position \(positionA)) with \(nameB) (position \(positionB)) in \"\(widget.name)\". Touch the widget to refresh."
+        return .result(dialog: IntentDialog(stringLiteral: result))
     }
 
     private func itemLabel(_ item: WidgetItem) -> String {

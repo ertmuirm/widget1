@@ -288,6 +288,7 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let config: WidgetConfig
     if let id = configID, id != "none" {
         let uuid = uuidFromEntityID(id)
+
         if let found = liveConfigs.first(where: { $0.id.uuidString == uuid }) {
             config = found
         } else if var embedded = decodeConfigFromID(id) {
