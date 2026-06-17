@@ -293,33 +293,36 @@ struct DebugWidgetIntent: AppIntent {
             info += "Full config: \(config.items.count) items\n"
             info += "Order in config:\n"
             for (i, item) in config.items.prefix(5).enumerated() {
-                let icon = item.sfSymbolName ?? item.customText ?? "?"
-                info += "  \(i+1): \(icon) [\(item.id.uuidString.prefix(8))]\n"
+                let type = item.displayType.rawValue
+                let label = item.displayType == .text ? (item.customText ?? "?") : 
+                           (item.displayType == .icon ? (item.sfSymbolName ?? "icon") : "?")
+                info += "  [\(i)]: \(label) (\(type))\n"
             }
         } else {
             info += "Full config: NOT FOUND\n"
         }
 
-        // Check order override
+        // Check order override (uses position indices now)
         let orderKey = "itemOrder_\(entityUUID)"
-        info += "Order override:\n"
+        info += "Order override: "
         if let order = SharedStorage.shared.gatherReadOverride(forKey: orderKey) {
-            info += "  FOUND\n"
-            // Match UUIDs to icons
-            let orderUUIDs = order.split(separator: ",").map { String($0) }
+            info += "FOUND\n"
+            info += "  Positions: \(order)\n"
+            // Decode positions and show what item is at each position
+            let positions = order.split(separator: ",").compactMap { Int($0) }
             if let config = configs.first(where: { $0.id.uuidString == widget.id }) {
-                let byUUID = Dictionary(uniqueKeysWithValues: config.items.map { ($0.id.uuidString.uppercased(), $0) })
-                for (i, uuid) in orderUUIDs.prefix(5).enumerated() {
-                    if let item = byUUID[uuid.uppercased()] {
-                        let icon = item.sfSymbolName ?? item.customText ?? "?"
-                        info += "  \(i+1): \(icon) [\(uuid.prefix(8))]\n"
-                    } else {
-                        info += "  \(i+1): ? [\(uuid.prefix(8))]\n"
+                info += "  Resolved:\n"
+                for (newPos, oldPos) in positions.prefix(5).enumerated() {
+                    if oldPos >= 0 && oldPos < config.items.count {
+                        let item = config.items[oldPos]
+                        let label = item.displayType == .text ? (item.customText ?? "?") : 
+                                   (item.displayType == .icon ? (item.sfSymbolName ?? "icon") : "?")
+                        info += "    pos\(newPos): \(label)\n"
                     }
                 }
             }
         } else {
-            info += "  NOT FOUND\n"
+            info += "NOT FOUND\n"
         }
 
         // Check version
