@@ -260,3 +260,52 @@ struct SwapWidgetItemsIntent: AppIntent {
         }
     }
 }
+
+// MARK: - Debug Intent (for testing)
+
+struct DebugWidgetIntent: AppIntent {
+    static var title: LocalizedStringResource = "Debug Widget State"
+    static var description = IntentDescription("Shows current widget data state for debugging.")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Widget",
+               description: "The Grid Widget to debug.")
+    var widget: GridWidgetEntity
+
+    init() {}
+    init(widget: GridWidgetEntity) { self.widget = widget }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard widget.id != "none" else {
+            return .result(dialog: IntentDialog(stringLiteral: "No widgets found"))
+        }
+
+        var info = "Widget: \(widget.name)\n"
+        info += "ID: \(widget.id.prefix(8))...\n"
+
+        // Check full config
+        let configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
+        if let config = configs.first(where: { $0.id.uuidString == widget.id }) {
+            info += "Full config: FOUND (\(config.items.count) items)\n"
+            let order = config.items.prefix(3).map { $0.sfSymbolName ?? $0.customText ?? "?" }.joined(separator: ", ")
+            info += "First 3: \(order)\n"
+        } else {
+            info += "Full config: NOT FOUND\n"
+        }
+
+        // Check order override
+        let orderKey = "itemOrder_\(widget.id)"
+        if let order = SharedStorage.shared.gatherReadOverride(forKey: orderKey) {
+            info += "Order override: \(order.prefix(30))...\n"
+        } else {
+            info += "Order override: NOT FOUND\n"
+        }
+
+        // Check version
+        let versionKey = "dataVersion_\(widget.id)"
+        let version = UserDefaults.standard.integer(forKey: versionKey)
+        info += "Version: \(version)\n"
+
+        return .result(dialog: IntentDialog(stringLiteral: info))
+    }
+}
