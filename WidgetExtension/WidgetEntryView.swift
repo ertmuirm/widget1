@@ -196,13 +196,32 @@ struct WidgetEntryView: View {
 
     @ViewBuilder
     private func itemCell(_ item: WidgetItem, size: WidgetSize) -> some View {
-        if let url = resolveItemURL(item) {
+        // For appIntent actions, use Button(intent:) which triggers getTimeline() after completion
+        if let action = item.action, action.type == .appIntent {
+            if let encoded = encodeActionForIntent(action) {
+                Button(intent: WidgetItemActionIntent(encodedAction: encoded)) {
+                    ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
+                }
+            } else {
+                ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
+            }
+        }
+        // For URL actions, use Link
+        else if let url = resolveItemURL(item) {
             Link(destination: url) {
                 ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
             }
-        } else {
+        }
+        // No action - just display
+        else {
             ItemView(item: item, widgetSize: size, showLabel: entry.showItemLabels)
         }
+    }
+    
+    // Encode action for passing to WidgetItemActionIntent
+    private func encodeActionForIntent(_ action: WidgetAction) -> String? {
+        guard let data = try? JSONEncoder().encode(action) else { return nil }
+        return data.base64EncodedString()
     }
 
     // MARK: - Image Slideshow

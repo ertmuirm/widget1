@@ -2,6 +2,54 @@ import AppIntents
 import WidgetKit
 import UIKit
 
+// MARK: - Widget Item Action Intent
+//
+// When widget items have .appIntent actions, we use Button(intent:) to trigger them.
+// This ensures iOS calls getTimeline() after the intent completes, refreshing the widget.
+
+struct WidgetItemActionIntent: AppIntent {
+    static var title: LocalizedStringResource = "Widget Item Action"
+    static var description = IntentDescription("Triggers widget item action and refreshes widget")
+    static var openAppWhenRun: Bool = false
+    
+    @Parameter(title: "Encoded Action")
+    var encodedAction: String  // Base64 encoded WidgetAction
+    
+    init() {}
+    init(encodedAction: String) { self.encodedAction = encodedAction }
+    
+    func perform() async throws -> some IntentResult {
+        // Decode the action
+        guard let data = Data(base64Encoded: encodedAction),
+              let action = try? JSONDecoder().decode(WidgetAction.self, from: data) else {
+            return .result()
+        }
+        
+        // Execute the action
+        switch action.type {
+        case .urlScheme:
+            if let url = URL(string: action.payload) {
+                await UIApplication.shared.open(url)
+            }
+        case .shortcut:
+            if let url = URL(string: "shortcuts://run-shortcut?name=\(action.payload.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? action.payload)") {
+                await UIApplication.shared.open(url)
+            }
+        case .appIntent:
+            // For appIntent, the payload is the app's bundle ID - try to open it
+            if let bundleID = action.payload.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+               let url = URL(string: "openapp://launch?bundle=\(bundleID)") {
+                await UIApplication.shared.open(url)
+            }
+        }
+        
+        // Force widget refresh
+        WidgetCenter.shared.reloadAllTimelines()
+        
+        return .result()
+    }
+}
+
 // MARK: - Entity ID encoding
 //
 // Entity IDs use the format "<uuid>|<base64-slim-json>". The config is encoded with
