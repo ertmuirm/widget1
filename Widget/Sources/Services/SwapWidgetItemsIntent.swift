@@ -96,6 +96,12 @@ struct AdvanceCodeSlideIntent: AppIntent {
         UserDefaults.standard.synchronize()
 
         try SharedStorage.shared.saveConfigurations(configs)
+
+        // Post Darwin notification to reliably wake the widget extension process.
+        // WidgetCenter.shared.reloadTimelines() may not work on sideloaded apps,
+        // so we use Darwin notifications for guaranteed cross-process communication.
+        DarwinNotificationCenter.shared.postSlideAdvance()
+
         WidgetCenter.shared.reloadTimelines(ofKind: "BroadcastImage")
 
         let direction = forward ? "advanced to" : "reversed to"
@@ -229,6 +235,11 @@ struct SwapWidgetItemsIntent: AppIntent {
         let orderKey = "itemOrder_\(widget.id)"
         let orderValue = config.items.map { $0.id.uuidString }.joined(separator: ",")
         SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
+
+        // Post Darwin notification to reliably wake the widget extension process.
+        // WidgetCenter.shared.reloadAllTimelines() may not work on sideloaded apps,
+        // so we use Darwin notifications for guaranteed cross-process communication.
+        DarwinNotificationCenter.shared.postSwapAction()
 
         WidgetCenter.shared.reloadAllTimelines()
 
