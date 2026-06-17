@@ -230,12 +230,14 @@ struct SwapWidgetItemsIntent: AppIntent {
         // Write item-order override using POSITION INDICES (not UUIDs)
         // Since SlimItem creates new UUIDs on load, we use array positions instead.
         // Format: "0,2,1,3,4" means position 0 stays at 0, position 1 moves to 2, etc.
-        let entityUUID = widget.id
+        // NOTE: Use uppercase UUID to match makeEntry() which normalizes entityUUID.uppercased()
+        let entityUUID = widget.id.uppercased()
         let orderKey = "itemOrder_\(entityUUID)"
         let orderValue = (0..<config.items.count).map(String.init).joined(separator: ",")
         SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
 
         // Increment version counter to signal data changed.
+        // entityUUID is already uppercase from above
         let versionKey = "dataVersion_\(entityUUID)"
         let currentVersion = UserDefaults.standard.integer(forKey: versionKey)
         let newVersion = currentVersion + 1
