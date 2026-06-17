@@ -330,3 +330,49 @@ struct DebugWidgetIntent: AppIntent {
         return .result(dialog: IntentDialog(stringLiteral: info))
     }
 }
+
+// MARK: - Test Refresh Intent
+
+struct TestRefreshIntent: AppIntent {
+    static var title: LocalizedStringResource = "Test Widget Refresh"
+    static var description = IntentDescription("Writes a timestamp. If widget shows this timestamp, refresh works.")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Widget",
+               description: "The Grid Widget to test.")
+    var widget: GridWidgetEntity
+
+    init() {}
+    init(widget: GridWidgetEntity) { self.widget = widget }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard widget.id != "none" else {
+            return .result(dialog: IntentDialog(stringLiteral: "No widgets found"))
+        }
+
+        let entityUUID = widget.id.uppercased()
+        
+        // Write current timestamp
+        let timestamp = Int(Date().timeIntervalSince1970)
+        let timestampKey = "testTimestamp_\(entityUUID)"
+        UserDefaults.standard.set(timestamp, forKey: timestampKey)
+        for id in SharedStorage.appGroupCandidates {
+            UserDefaults(suiteName: id)?.set(timestamp, forKey: timestampKey)
+        }
+        
+        // Increment version to trigger refresh
+        let versionKey = "dataVersion_\(entityUUID)"
+        let currentVersion = UserDefaults.standard.integer(forKey: versionKey)
+        let newVersion = currentVersion + 1
+        UserDefaults.standard.set(newVersion, forKey: versionKey)
+        for id in SharedStorage.appGroupCandidates {
+            UserDefaults(suiteName: id)?.set(newVersion, forKey: versionKey)
+        }
+        
+        DarwinNotificationCenter.shared.postSwapAction()
+        WidgetCenter.shared.reloadAllTimelines()
+        
+        let formattedTime = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+        return .result(dialog: IntentDialog(stringLiteral: "Wrote timestamp: \(formattedTime). Touch widget to check if it updates."))
+    }
+}
