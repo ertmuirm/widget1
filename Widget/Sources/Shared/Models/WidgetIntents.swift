@@ -43,7 +43,6 @@ private struct SlimAction: Codable {
 }
 
 private struct SlimItem: Codable {
-    var i: String      // id.uuidString (required for order preservation)
     var d: String      // DisplayType.rawValue
     var s: String?     // sfSymbolName        (nil = none)
     var t: String?     // customText           (nil = none)
@@ -59,7 +58,6 @@ private struct SlimItem: Codable {
 
 private extension SlimItem {
     init(_ item: WidgetItem) {
-        i  = item.id.uuidString  // Save the ID so order can be preserved
         d  = item.displayType.rawValue
         s  = item.sfSymbolName
         t  = item.customText
@@ -76,7 +74,7 @@ private extension SlimItem {
     }
     func toWidgetItem() -> WidgetItem {
         WidgetItem(
-            id: UUID(uuidString: i) ?? UUID(),  // Restore original ID
+            id: UUID(),  // Create new ID - order is preserved by array position
             displayType: DisplayType(rawValue: d) ?? .icon,
             sfSymbolName: s,
             customText: t,
@@ -334,16 +332,20 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     }
     if let v = slideOverride { finalConfig.currentSlideIndex = v }
 
-    // Apply item-order override written by SwapWidgetItemsIntent. Fires when the full
-    // config didn't cross the process boundary so finalConfig still has the old order.
-    // Normalize entityUUID to uppercase for consistent key lookup (UUID case may vary).
+    // Apply item-order override written by SwapWidgetItemsIntent using position indices.
+    // Since SlimItem creates new UUIDs on load, we use array positions instead.
+    // Format: "0,2,1,3,4" means item at index 0 stays at 0, item at index 1 moves to 2, etc.
     let normalizedEntityUUID = entityUUID.uppercased()
     let orderKey = "itemOrder_\(normalizedEntityUUID)"
     if let orderStr = SharedStorage.shared.gatherReadOverride(forKey: orderKey) {
-        let uuids = orderStr.split(separator: ",").map { String($0) }
-        let byUUID = Dictionary(uniqueKeysWithValues: finalConfig.items.map { ($0.id.uuidString.uppercased(), $0) })
-        let reordered = uuids.compactMap { byUUID[$0.uppercased()] }
-        if reordered.count == finalConfig.items.count {
+        let positions = orderStr.split(separator: ",").compactMap { Int($0) }
+        if positions.count == finalConfig.items.count {
+            var reordered = finalConfig.items
+            for (newIndex, oldIndex) in positions.enumerated() {
+                if oldIndex >= 0 && oldIndex < reordered.count {
+                    reordered[newIndex] = finalConfig.items[oldIndex]
+                }
+            }
             finalConfig.items = reordered
         }
     }

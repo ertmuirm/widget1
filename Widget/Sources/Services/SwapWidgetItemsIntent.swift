@@ -227,12 +227,12 @@ struct SwapWidgetItemsIntent: AppIntent {
 
         try SharedStorage.shared.saveConfigurations(configs)
 
-        // Write item-order override using the SAME UUID format as makeEntry() reads
-        // makeEntry uses uuidFromEntityID(entityID) which extracts UUID from entity ID
-        // Widget.id IS the UUID string, so this should match
-        let entityUUID = widget.id  // Already a UUID string
+        // Write item-order override using POSITION INDICES (not UUIDs)
+        // Since SlimItem creates new UUIDs on load, we use array positions instead.
+        // Format: "0,2,1,3,4" means position 0 stays at 0, position 1 moves to 2, etc.
+        let entityUUID = widget.id
         let orderKey = "itemOrder_\(entityUUID)"
-        let orderValue = config.items.map { $0.id.uuidString }.joined(separator: ",")
+        let orderValue = (0..<config.items.count).map(String.init).joined(separator: ",")
         SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
 
         // Increment version counter to signal data changed.
@@ -285,26 +285,41 @@ struct DebugWidgetIntent: AppIntent {
         var info = "Widget: \(widget.name)\n"
         info += "Widget.id: \(widget.id)\n"
 
-        // Check full config
+        let entityUUID = widget.id.uppercased()
+
+        // Check full config with item positions
         let configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
         if let config = configs.first(where: { $0.id.uuidString == widget.id }) {
-            info += "Full config: FOUND (\(config.items.count) items)\n"
-            let order = config.items.prefix(3).map { $0.sfSymbolName ?? $0.customText ?? "?" }.joined(separator: ", ")
-            info += "First 3: \(order)\n"
+            info += "Full config: \(config.items.count) items\n"
+            info += "Order in config:\n"
+            for (i, item) in config.items.prefix(5).enumerated() {
+                let icon = item.sfSymbolName ?? item.customText ?? "?"
+                info += "  \(i+1): \(icon) [\(item.id.uuidString.prefix(8))]\n"
+            }
         } else {
             info += "Full config: NOT FOUND\n"
         }
 
-        // Check order override using widget.id (which is the UUID)
-        let entityUUID = widget.id
+        // Check order override
         let orderKey = "itemOrder_\(entityUUID)"
-        info += "Order key: \(orderKey)\n"
+        info += "Order override:\n"
         if let order = SharedStorage.shared.gatherReadOverride(forKey: orderKey) {
-            info += "Order override: FOUND\n"
-            let preview = order.prefix(50).split(separator: ",").map(String.init).prefix(3).joined(separator: ", ")
-            info += "First 3 UUIDs: \(preview)\n"
+            info += "  FOUND\n"
+            // Match UUIDs to icons
+            let orderUUIDs = order.split(separator: ",").map { String($0) }
+            if let config = configs.first(where: { $0.id.uuidString == widget.id }) {
+                let byUUID = Dictionary(uniqueKeysWithValues: config.items.map { ($0.id.uuidString.uppercased(), $0) })
+                for (i, uuid) in orderUUIDs.prefix(5).enumerated() {
+                    if let item = byUUID[uuid.uppercased()] {
+                        let icon = item.sfSymbolName ?? item.customText ?? "?"
+                        info += "  \(i+1): \(icon) [\(uuid.prefix(8))]\n"
+                    } else {
+                        info += "  \(i+1): ? [\(uuid.prefix(8))]\n"
+                    }
+                }
+            }
         } else {
-            info += "Order override: NOT FOUND\n"
+            info += "  NOT FOUND\n"
         }
 
         // Check version
