@@ -231,13 +231,18 @@ struct SwapWidgetItemsIntent: AppIntent {
         // Since SlimItem creates new UUIDs on load, we use array positions instead.
         // Format: "0,2,1,3,4" means position 0 stays at 0, position 1 moves to 2, etc.
         // NOTE: Use uppercase UUID to match makeEntry() which normalizes entityUUID.uppercased()
-        let entityUUID = (widget.id.split(separator: "|").first ?? Substring(widget.id)).uppercased()
-        let orderKey = "itemOrder_\(entityUUID)"
+        let widgetUUIDFromID = (widget.id.split(separator: "|").first ?? Substring(widget.id)).uppercased()
+        // Use the actual config.id.uuidString (not widget.id) since they may differ
+        let actualConfigUUID = config.id.uuidString.uppercased()
+        // Debug: write info to UserDefaults for Shortcuts to read
+        UserDefaults.standard.set("widgetUUID: \(widgetUUIDFromID.prefix(8)) configUUID: \(actualConfigUUID.prefix(8))", forKey: "swapDebug")
+        
+        let orderKey = "itemOrder_\(actualConfigUUID)"
         let orderValue = (0..<config.items.count).map(String.init).joined(separator: ",")
         SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
 
-        // Write fresh config JSON to UserDefaults.standard (same as RefreshWidgetIntent)
-        let freshConfigKey = "freshConfig_\(entityUUID)"
+        // Write fresh config JSON to UserDefaults.standard using actual config UUID
+        let freshConfigKey = "freshConfig_\(actualConfigUUID)"
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         if let configData = try? encoder.encode(config) {
@@ -247,8 +252,8 @@ struct SwapWidgetItemsIntent: AppIntent {
         }
 
         // Increment version counter to signal data changed.
-        // entityUUID is already uppercase from above
-        let versionKey = "dataVersion_\(entityUUID)"
+        // actualConfigUUID is already uppercase
+        let versionKey = "dataVersion_\(actualConfigUUID)"
         let currentVersion = UserDefaults.standard.integer(forKey: versionKey)
         let newVersion = currentVersion + 1
         UserDefaults.standard.set(newVersion, forKey: versionKey)
