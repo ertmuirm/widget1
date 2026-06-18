@@ -131,25 +131,25 @@ struct WidgetEntryView: View {
                 itemsGrid
             }
             
-            // DEBUG: Show detailed key info in top-left corner
-            VStack(alignment: .leading, spacing: 1) {
+            // DEBUG: Show detailed key info in top-left corner (larger for readability)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(entry.debugRefreshTime)
-                    .font(.system(size: 5, weight: .bold, design: .monospaced))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundStyle(.gray)
-                HStack(spacing: 1) {
+                HStack(spacing: 2) {
                     Text("U:")
                     Text(entry.debugEntityUUID)
                 }
-                .font(.system(size: 4, weight: .bold, design: .monospaced))
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
                 .foregroundStyle(.yellow)
                 Text(entry.debugOrderInfo)
-                    .font(.system(size: 4, weight: .bold, design: .monospaced))
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
                     .foregroundStyle(entry.debugOrderFound ? .green : .red)
             }
-            .padding(2)
-            .background(Color.black.opacity(0.7))
-            .cornerRadius(2)
-            .offset(x: -18, y: -18)
+            .padding(4)
+            .background(Color.black.opacity(0.8))
+            .cornerRadius(4)
+            .offset(x: -24, y: -24)
         }
         // widgetURL fires for taps on areas not covered by a Link (gaps, empty cells).
         // The app's Page 0 is a black screen, so this tap silently opens and immediately
