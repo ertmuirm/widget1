@@ -367,3 +367,50 @@ struct TestRefreshIntent: AppIntent {
         return .result(dialog: IntentDialog(stringLiteral: "Wrote timestamp: \(formattedTime). Touch widget to check if it updates."))
     }
 }
+
+// MARK: - Debug Storage Intent
+
+/// Diagnostic shortcut to show what storage the main app can access.
+/// Use this to debug widget refresh issues with sideloaded apps.
+struct DebugStorageIntent: AppIntent {
+    static var title: LocalizedStringResource = "Debug Widget Storage"
+    static var description = IntentDescription("Shows which storage the app can access for widget configs.")
+    static var openAppWhenRun: Bool = false
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        var info = "=== WIDGET STORAGE DEBUG ===\n\n"
+        
+        // Check keychain
+        let kcGroup = SharedStorage.sharedKeychainGroup ?? "nil"
+        let kcHasData = SharedStorage.shared.keychainHasConfigs
+        info += "Keychain group: \(kcGroup)\n"
+        info += "Keychain has configs: \(kcHasData)\n\n"
+        
+        // Check each App Group candidate
+        for id in SharedStorage.appGroupCandidates {
+            let hasContainer = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) != nil
+            let hasData = UserDefaults(suiteName: id)?.data(forKey: SharedStorage.configKey) != nil
+            var fileExists = false
+            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                let url = container.appendingPathComponent("widgetConfigs.json")
+                fileExists = FileManager.default.fileExists(atPath: url.path)
+            }
+            let shortId = id.replacingOccurrences(of: "group.", with: "")
+            info += "[\(shortId)]\n"
+            info += "  Container: \(hasContainer ? "✓" : "✗")\n"
+            info += "  UserDefaults data: \(hasData ? "✓" : "✗")\n"
+            info += "  File exists: \(fileExists ? "✓" : "✗")\n\n"
+        }
+        
+        // Load and show configs
+        let configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
+        info += "Configs loaded: \(configs.count)\n"
+        for (i, c) in configs.prefix(5).enumerated() {
+            info += "[\(i)] \(c.name)\n"
+            info += "    UUID: \(c.id.uuidString)\n"
+            info += "    Items: \(c.items.count)\n"
+        }
+        
+        return .result(dialog: IntentDialog(stringLiteral: info))
+    }
+}

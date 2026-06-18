@@ -145,6 +145,14 @@ struct WidgetEntryView: View {
                 Text(entry.debugOrderInfo)
                     .font(.system(size: 8, weight: .bold, design: .monospaced))
                     .foregroundStyle(entry.debugOrderFound ? .green : .red)
+                HStack(spacing: 2) {
+                    Text("S:")
+                    Text(entry.debugStorageName)
+                    Text("C:")
+                    Text("\(entry.debugConfigCount)")
+                }
+                .font(.system(size: 7, weight: .bold, design: .monospaced))
+                .foregroundStyle(.cyan)
             }
             .padding(4)
             .background(Color.black.opacity(0.8))

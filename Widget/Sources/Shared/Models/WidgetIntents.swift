@@ -306,12 +306,18 @@ struct WidgetEntry: TimelineEntry {
     let debugOrderInfo: String
     /// Debug: whether order override was found
     let debugOrderFound: Bool
+    /// Debug: which storage location is active (kc:xxx or App Group ID)
+    let debugStorageName: String
+    /// Debug: number of configs found in storage
+    let debugConfigCount: Int
 
     init(date: Date, configuration: WidgetConfig,
          showItemLabels: Bool = SharedStorage.shared.showItemLabels,
          entityUUID: String = "",
          debugOrderInfo: String = "---",
-         debugOrderFound: Bool = false) {
+         debugOrderFound: Bool = false,
+         debugStorageName: String = "---",
+         debugConfigCount: Int = -1) {
         self.date = date
         self.configuration = configuration
         self.showItemLabels = showItemLabels
@@ -323,6 +329,8 @@ struct WidgetEntry: TimelineEntry {
         self.debugEntityUUID = String(self.entityUUID.suffix(8))
         self.debugOrderInfo = debugOrderInfo
         self.debugOrderFound = debugOrderFound
+        self.debugStorageName = debugStorageName
+        self.debugConfigCount = debugConfigCount
     }
 }
 
@@ -444,9 +452,12 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     }
 
     let showLabels = finalConfig.showItemLabels ?? storage.showItemLabels
+    let storageName = storage.getActiveStorageName()
+    let configCount = liveConfigs.count
     return WidgetEntry(date: Date(), configuration: finalConfig,
                        showItemLabels: showLabels, entityUUID: entityUUID,
-                       debugOrderInfo: debugOrderInfo, debugOrderFound: orderFound)
+                       debugOrderInfo: debugOrderInfo, debugOrderFound: orderFound,
+                       debugStorageName: storageName, debugConfigCount: configCount)
 }
 
 private func makeTimeline(configID: String?) -> Timeline<WidgetEntry> {

@@ -230,6 +230,22 @@ final class SharedStorage {
         }
         return lines.joined(separator: "\n")
     }
+    /// Returns which storage location is currently active for configs.
+    /// Checks keychain first, then App Group UserDefaults.
+    func getActiveStorageName() -> String {
+        // Keychain has data
+        if keychainRead(forKey: Self.configKey) != nil {
+            return "kc:" + (Self.sharedKeychainGroup ?? "nil")
+        }
+        // Check each App Group candidate
+        for id in Self.appGroupCandidates {
+            if let ud = UserDefaults(suiteName: id), ud.data(forKey: Self.configKey) != nil {
+                return id.replacingOccurrences(of: "group.", with: "")
+            }
+        }
+        return "NONE"
+    }
+
 
     // MARK: - SCATTER write helpers
 
