@@ -231,7 +231,7 @@ struct SwapWidgetItemsIntent: AppIntent {
         // Since SlimItem creates new UUIDs on load, we use array positions instead.
         // Format: "0,2,1,3,4" means position 0 stays at 0, position 1 moves to 2, etc.
         // NOTE: Use uppercase UUID to match makeEntry() which normalizes entityUUID.uppercased()
-        let entityUUID = widget.id.uppercased()
+        let entityUUID = (widget.id.split(separator: "|").first ?? Substring(widget.id)).uppercased()
         let orderKey = "itemOrder_\(entityUUID)"
         let orderValue = (0..<config.items.count).map(String.init).joined(separator: ",")
         SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
@@ -351,7 +351,7 @@ struct TestRefreshIntent: AppIntent {
             return .result(dialog: IntentDialog(stringLiteral: "No widgets found"))
         }
 
-        let entityUUID = widget.id.uppercased()
+        let entityUUID = (widget.id.split(separator: "|").first ?? Substring(widget.id)).uppercased()
         
         // Write current timestamp
         let timestamp = Int(Date().timeIntervalSince1970)
