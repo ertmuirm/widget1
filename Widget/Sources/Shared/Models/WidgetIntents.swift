@@ -374,8 +374,14 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     // Format: "0,2,1,3,4" means item at index 0 stays at 0, item at index 1 moves to 2, etc.
     let normalizedEntityUUID = entityUUID.uppercased()
     let orderKey = "itemOrder_\(normalizedEntityUUID)"
+    
+    // DEBUG: Log key being looked up
+    let debugLog = "makeEntry: looking for key '\(orderKey)', UUID='\(normalizedEntityUUID)'"
+    NSLog("[Widget] %@", debugLog)
+    
     if let orderStr = SharedStorage.shared.gatherReadOverride(forKey: orderKey) {
         let positions = orderStr.split(separator: ",").compactMap { Int($0) }
+        NSLog("[Widget] makeEntry: FOUND order '%@'", orderStr)
         if positions.count == finalConfig.items.count {
             var reordered = finalConfig.items
             for (newIndex, oldIndex) in positions.enumerated() {
@@ -385,6 +391,8 @@ private func makeEntry(configID: String?) -> WidgetEntry {
             }
             finalConfig.items = reordered
         }
+    } else {
+        NSLog("[Widget] makeEntry: order NOT FOUND for key '%@'", orderKey)
     }
 
     // Only keep imageData for the ACTIVE slide. loadConfigurations() eagerly loads

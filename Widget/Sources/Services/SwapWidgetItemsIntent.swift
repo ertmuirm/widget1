@@ -234,6 +234,11 @@ struct SwapWidgetItemsIntent: AppIntent {
         let entityUUID = widget.id.uppercased()
         let orderKey = "itemOrder_\(entityUUID)"
         let orderValue = (0..<config.items.count).map(String.init).joined(separator: ",")
+        
+        // DEBUG: Log what we're writing
+        NSLog("[SwapIntent] Writing key='%@', entityUUID='%@', orderValue='%@', itemCount=%d", 
+              orderKey, entityUUID, orderValue, config.items.count)
+        
         SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
 
         // Increment version counter to signal data changed.
