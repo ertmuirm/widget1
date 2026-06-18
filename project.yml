@@ -90,5 +90,7 @@ targets:
       properties:
         com.apple.security.application-groups:
           - group.com.ioswidget
+          - group.com.ioswidget.J3D2F4SMVD
+          - group.J3D2F4SMVD.com.ioswidget
         keychain-access-groups:
           - J3D2F4SMVD.com.ioswidget.shared
