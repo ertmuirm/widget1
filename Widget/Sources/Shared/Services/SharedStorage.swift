@@ -345,7 +345,7 @@ final class SharedStorage {
     }
     
     /// Debug version that returns both data and source info
-    private func gatherReadDebug(forKey key: String) -> (data: Data?, source: String) {
+    func gatherReadDebug(forKey key: String) -> (data: Data?, source: String) {
         // First check UserDefaults.standard
         if let data = UserDefaults.standard.data(forKey: key), !data.isEmpty {
             return (data, "UserDefaults.standard(\(data.count)bytes)")
