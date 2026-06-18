@@ -299,12 +299,17 @@ struct WidgetEntry: TimelineEntry {
     /// AdvanceImageIntent so the intent can match the correct slideIdx_ key.
     let entityUUID: String
     /// Debug: timestamp when this entry was created (HH:mm:ss format)
-    /// Use this to verify if getTimeline() is being called
     let debugRefreshTime: String
+    /// Debug: info about order override key lookup
+    let debugOrderInfo: String
+    /// Debug: whether order override was found
+    let debugOrderFound: Bool
 
     init(date: Date, configuration: WidgetConfig,
          showItemLabels: Bool = SharedStorage.shared.showItemLabels,
-         entityUUID: String = "") {
+         entityUUID: String = "",
+         debugOrderInfo: String = "---",
+         debugOrderFound: Bool = false) {
         self.date = date
         self.configuration = configuration
         self.showItemLabels = showItemLabels
@@ -313,6 +318,8 @@ struct WidgetEntry: TimelineEntry {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
         self.debugRefreshTime = formatter.string(from: date)
+        self.debugOrderInfo = debugOrderInfo
+        self.debugOrderFound = debugOrderFound
     }
 }
 
@@ -375,13 +382,11 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let normalizedEntityUUID = entityUUID.uppercased()
     let orderKey = "itemOrder_\(normalizedEntityUUID)"
     
-    // DEBUG: Log key being looked up
-    let debugLog = "makeEntry: looking for key '\(orderKey)', UUID='\(normalizedEntityUUID)'"
-    NSLog("[Widget] %@", debugLog)
-    
+    // Check order override and track for debug display
+    var orderFound = false
     if let orderStr = SharedStorage.shared.gatherReadOverride(forKey: orderKey) {
+        orderFound = true
         let positions = orderStr.split(separator: ",").compactMap { Int($0) }
-        NSLog("[Widget] makeEntry: FOUND order '%@'", orderStr)
         if positions.count == finalConfig.items.count {
             var reordered = finalConfig.items
             for (newIndex, oldIndex) in positions.enumerated() {
@@ -391,9 +396,11 @@ private func makeEntry(configID: String?) -> WidgetEntry {
             }
             finalConfig.items = reordered
         }
-    } else {
-        NSLog("[Widget] makeEntry: order NOT FOUND for key '%@'", orderKey)
     }
+    
+    // Create debug info string for widget display (shows last 8 chars of key)
+    let keySuffix = String(orderKey.suffix(8))
+    let debugOrderInfo = orderFound ? "KEY:\(keySuffix)" : "NOKEYS"
 
     // Only keep imageData for the ACTIVE slide. loadConfigurations() eagerly loads
     // every slide's image; holding them all decoded simultaneously easily blows the
@@ -423,7 +430,8 @@ private func makeEntry(configID: String?) -> WidgetEntry {
 
     let showLabels = finalConfig.showItemLabels ?? storage.showItemLabels
     return WidgetEntry(date: Date(), configuration: finalConfig,
-                       showItemLabels: showLabels, entityUUID: entityUUID)
+                       showItemLabels: showLabels, entityUUID: entityUUID,
+                       debugOrderInfo: debugOrderInfo, debugOrderFound: orderFound)
 }
 
 private func makeTimeline(configID: String?) -> Timeline<WidgetEntry> {

@@ -131,15 +131,20 @@ struct WidgetEntryView: View {
                 itemsGrid
             }
             
-            // DEBUG: Show refresh timestamp in top-left corner
-            // This helps verify if getTimeline() is being called
-            Text(entry.debugRefreshTime)
-                .font(.system(size: 6, weight: .bold, design: .monospaced))
-                .foregroundStyle(.gray)
-                .padding(2)
-                .background(Color.black.opacity(0.5))
-                .cornerRadius(2)
-                .offset(x: -20, y: -20)
+            // DEBUG: Show key info in top-left corner
+            // Shows: timestamp | order key (truncated) | found/not found
+            VStack(alignment: .leading, spacing: 1) {
+                Text(entry.debugRefreshTime)
+                    .font(.system(size: 5, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.gray)
+                Text(entry.debugOrderInfo)
+                    .font(.system(size: 4, weight: .bold, design: .monospaced))
+                    .foregroundStyle(entry.debugOrderFound ? .green : .red)
+            }
+            .padding(2)
+            .background(Color.black.opacity(0.7))
+            .cornerRadius(2)
+            .offset(x: -18, y: -18)
         }
         // widgetURL fires for taps on areas not covered by a Link (gaps, empty cells).
         // The app's Page 0 is a black screen, so this tap silently opens and immediately
