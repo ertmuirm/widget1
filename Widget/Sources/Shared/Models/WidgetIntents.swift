@@ -387,8 +387,10 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     
     // Check order override and track for debug display
     var orderFound = false
+    var orderValue: String? = nil
     if let orderStr = SharedStorage.shared.gatherReadOverride(forKey: orderKey) {
         orderFound = true
+        orderValue = orderStr
         let positions = orderStr.split(separator: ",").compactMap { Int($0) }
         if positions.count == finalConfig.items.count {
             var reordered = finalConfig.items
@@ -401,9 +403,15 @@ private func makeEntry(configID: String?) -> WidgetEntry {
         }
     }
     
-    // Create debug info string for widget display (shows last 8 chars of key)
-    let keySuffix = String(orderKey.suffix(8))
-    let debugOrderInfo = orderFound ? "KEY:\(keySuffix)" : "NOKEYS"
+    // Create debug info string for widget display
+    // Show: "NO:" + last 6 of UUID if not found, or order value if found
+    let uuidSuffix = String(normalizedEntityUUID.suffix(6))
+    let debugOrderInfo: String
+    if orderFound {
+        debugOrderInfo = "OK:\(orderValue ?? "")"
+    } else {
+        debugOrderInfo = "NO:\(uuidSuffix)"
+    }
 
     // Only keep imageData for the ACTIVE slide. loadConfigurations() eagerly loads
     // every slide's image; holding them all decoded simultaneously easily blows the

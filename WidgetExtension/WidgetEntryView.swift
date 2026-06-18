@@ -136,9 +136,12 @@ struct WidgetEntryView: View {
                 Text(entry.debugRefreshTime)
                     .font(.system(size: 5, weight: .bold, design: .monospaced))
                     .foregroundStyle(.gray)
-                Text(entry.debugEntityUUID)
-                    .font(.system(size: 4, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.yellow)
+                HStack(spacing: 1) {
+                    Text("U:")
+                    Text(entry.debugEntityUUID)
+                }
+                .font(.system(size: 4, weight: .bold, design: .monospaced))
+                .foregroundStyle(.yellow)
                 Text(entry.debugOrderInfo)
                     .font(.system(size: 4, weight: .bold, design: .monospaced))
                     .foregroundStyle(entry.debugOrderFound ? .green : .red)
