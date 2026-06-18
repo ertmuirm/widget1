@@ -402,6 +402,16 @@ struct DebugStorageIntent: AppIntent {
             info += "  File exists: \(fileExists ? "✓" : "✗")\n\n"
         }
         
+        // Check UserDefaults.standard directly
+        let standardKey = SharedStorage.configKey
+        let standardData = UserDefaults.standard.data(forKey: standardKey)
+        let standardSize = standardData?.count ?? 0
+        info += "[UserDefaults.standard] has \(standardSize) bytes for \(standardKey)\n\n"
+
+        // Show getActiveStorageName result
+        let activeStorage = SharedStorage.shared.getActiveStorageName()
+        info += "getActiveStorageName(): \(activeStorage)\n\n"
+
         // Load and show configs
         let configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
         info += "Configs loaded: \(configs.count)\n"
