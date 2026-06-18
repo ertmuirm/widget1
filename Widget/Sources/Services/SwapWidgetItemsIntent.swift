@@ -236,6 +236,16 @@ struct SwapWidgetItemsIntent: AppIntent {
         let orderValue = (0..<config.items.count).map(String.init).joined(separator: ",")
         SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
 
+        // Write fresh config JSON to UserDefaults.standard (same as RefreshWidgetIntent)
+        let freshConfigKey = "freshConfig_\(entityUUID)"
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        if let configData = try? encoder.encode(config) {
+            let configJSON = configData.base64EncodedString()
+            UserDefaults.standard.set(configJSON, forKey: freshConfigKey)
+            UserDefaults.standard.synchronize()
+        }
+
         // Increment version counter to signal data changed.
         // entityUUID is already uppercase from above
         let versionKey = "dataVersion_\(entityUUID)"
