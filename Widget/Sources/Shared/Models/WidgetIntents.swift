@@ -346,6 +346,18 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     storage.appendExtensionLog("makeEntry directRead source=\(directRead.source) data=\(directRead.data?.count ?? -1)")
     let liveConfigs = (try? storage.loadConfigurations()) ?? []
 
+    // Check for refresh key written by RefreshWidgetIntent button.
+    // When detected, force re-read from SharedStorage on next line.
+    var refreshDetected = false
+    let tempEntityUUID = configID.flatMap { uuidFromEntityID($0) } ?? ""
+    let tempNormalizedUUID = tempEntityUUID.uppercased()
+    let tempRefreshKey = "widgetRefresh_\(tempNormalizedUUID)"
+    if let _ = storage.gatherReadOverride(forKey: tempRefreshKey) {
+        refreshDetected = true
+        storage.scatterWriteOverride("", forKey: tempRefreshKey)
+        storage.appendExtensionLog("REFRESH: detected, re-reading config")
+    }
+
     let config: WidgetConfig
     if let id = configID, id != "none" {
         let uuid = uuidFromEntityID(id)
@@ -1057,13 +1069,15 @@ struct RefreshWidgetIntent: AppIntent {
             return .result(dialog: IntentDialog(stringLiteral: "Widget config not found. Please re-add the widget."))
         }
 
-        // Write a refresh marker with current timestamp
+        // Write a refresh marker with current timestamp using all possible channels
         let refreshKey = "widgetRefresh_\(upperUUID)"
-        let timestamp = Int(Date().timeIntervalSince1970)
+        let timestamp = String(Int(Date().timeIntervalSince1970))
         UserDefaults.standard.set(timestamp, forKey: refreshKey)
         for id in SharedStorage.appGroupCandidates {
             UserDefaults(suiteName: id)?.set(timestamp, forKey: refreshKey)
         }
+        // Use scatterWriteOverride for widget to read
+        SharedStorage.shared.scatterWriteOverride(timestamp, forKey: refreshKey)
 
         // Try to reload widget timelines (may not work for sideloaded apps)
         WidgetCenter.shared.reloadAllTimelines()
