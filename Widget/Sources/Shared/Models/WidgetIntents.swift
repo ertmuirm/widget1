@@ -378,7 +378,7 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     // Check for fresh config written by RefreshWidgetIntent.
     // This is the ONLY way to get fresh data for sideloaded apps since
     // entity ID data is captured at widget-add time and never updates.
-    let freshConfigKey = "freshConfig_\(tempNormalizedUUID)"
+    // Uses freshConfigKey already defined earlier in the function.
     let freshConfigJSON = UserDefaults.standard.string(forKey: freshConfigKey)
     
     let config: WidgetConfig
