@@ -340,6 +340,8 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let storage = SharedStorage.shared
     // Debug: direct check of gatherReadDebug
     let directRead = storage.gatherReadDebug(forKey: SharedStorage.configKey)
+    // Write debug info to shared container for main app to read
+    storage.writeWidgetDebugInfo()
     // This will show in the extension log
     storage.appendExtensionLog("makeEntry directRead source=\(directRead.source) data=\(directRead.data?.count ?? -1)")
     let liveConfigs = (try? storage.loadConfigurations()) ?? []

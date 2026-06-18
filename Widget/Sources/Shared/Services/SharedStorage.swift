@@ -375,6 +375,70 @@ final class SharedStorage {
         return gatherReadDebug(forKey: key).source
     }
 
+
+    /// Write debug info about gatherRead to a shared file (for debugging)
+    func writeWidgetDebugInfo() {
+        let result = gatherReadDebug(forKey: Self.configKey)
+        var info = "Widget Extension Debug Info
+"
+        info += "gatherReadDebug result: \(result.source)
+"
+        info += "data size: \(result.data?.count ?? -1)
+"
+        
+        // Check each source directly
+        let standardData = UserDefaults.standard.data(forKey: Self.configKey)
+        info += "UserDefaults.standard: \(standardData?.count ?? -1) bytes
+"
+        
+        for id in Self.appGroupCandidates {
+            let ud = UserDefaults(suiteName: id)
+            let data = ud?.data(forKey: Self.configKey)
+            info += "AppGroup(\(id)): \(data?.count ?? -1) bytes
+"
+        }
+        
+        // Check shared container files
+        for id in Self.appGroupCandidates {
+            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                let url = container.appendingPathComponent("widgetConfigs.json")
+                if let data = try? Data(contentsOf: url) {
+                    info += "File(\(id)): \(data.count) bytes
+"
+                }
+            }
+        }
+        
+        // Check all UserDefaults.standard keys
+        info += "
+All UserDefaults.standard keys containing 'config' or 'Widget':
+"
+        let allKeys = UserDefaults.standard.dictionaryRepresentation().keys
+        for key in allKeys {
+            if key.lowercased().contains("config") || key.lowercased().contains("widget") {
+                if let data = UserDefaults.standard.data(forKey: key) {
+                    info += "  \(key): \(data.count) bytes
+"
+                }
+            }
+        }
+        
+        // Write to first available shared container
+        for id in Self.appGroupCandidates {
+            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                let url = container.appendingPathComponent("widget_debug.txt")
+                try? info.write(to: url, atomically: true, encoding: .utf8)
+                return
+            }
+        }
+        
+        // Last resort: write to documents directory
+        if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let url = docs.appendingPathComponent("widget_debug.txt")
+            try? info.write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
+
     // MARK: - Configuration CRUD
 
     func saveConfigurations(_ configurations: [WidgetConfig]) throws {
