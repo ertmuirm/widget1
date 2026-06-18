@@ -359,7 +359,8 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     // This will show in the extension log
     storage.appendExtensionLog("makeEntry directRead source=\(directRead.source) data=\(directRead.data?.count ?? -1)")
     let liveConfigs = (try? storage.loadConfigurations()) ?? []
-    storage.appendExtensionLog("makeEntry liveConfigs count=\(liveConfigs.count)")
+    let liveStorageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
+    storage.appendExtensionLog("makeEntry liveConfigs count=\(liveConfigs.count) storage=\(liveStorageDebug.source)")
 
     // Check for refresh key written by RefreshWidgetIntent button.
     // When detected, force re-read from SharedStorage on next line.
@@ -740,6 +741,11 @@ struct LargeWidgetEntity: AppEntity, Hashable {
 
 struct LargeWidgetQuery: EntityQuery {
     func entities(for identifiers: [String]) async throws -> [LargeWidgetEntity] {
+        // Debug: check what storage is accessible
+        let storage = SharedStorage.shared
+        let storageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
+        storage.appendExtensionLog("LargeQuery: storage=\(storageDebug.source)")
+        
         let configs = filteredConfigs(size: .systemLarge)
         return identifiers.map { storedID in
             let uuid = uuidFromEntityID(storedID)
