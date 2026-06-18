@@ -233,6 +233,10 @@ final class SharedStorage {
     /// Returns which storage location is currently active for configs.
     /// Checks keychain first, then App Group UserDefaults.
     func getActiveStorageName() -> String {
+        // First check UserDefaults.standard (shared for unsandboxed apps)
+        if UserDefaults.standard.data(forKey: Self.configKey) != nil {
+            return "standard"
+        }
         // Keychain has data
         if keychainRead(forKey: Self.configKey) != nil {
             return "kc:" + (Self.sharedKeychainGroup ?? "nil")
@@ -242,10 +246,6 @@ final class SharedStorage {
             if let ud = UserDefaults(suiteName: id), ud.data(forKey: Self.configKey) != nil {
                 return id.replacingOccurrences(of: "group.", with: "")
             }
-        }
-        // Check UserDefaults.standard (shared for unsandboxed apps)
-        if UserDefaults.standard.data(forKey: Self.configKey) != nil {
-            return "standard"
         }
         return "NONE"
     }
