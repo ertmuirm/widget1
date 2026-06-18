@@ -231,21 +231,28 @@ final class SharedStorage {
         return lines.joined(separator: "\n")
     }
     /// Returns which storage location is currently active for configs.
-    /// Checks keychain first, then App Group UserDefaults.
+    /// Checks UserDefaults.standard first (shared for unsandboxed apps), then keychain, then App Groups.
     func getActiveStorageName() -> String {
         // First check UserDefaults.standard (shared for unsandboxed apps)
-        if UserDefaults.standard.data(forKey: Self.configKey) != nil {
-            return "standard"
+        let standardData = UserDefaults.standard.data(forKey: Self.configKey)
+        if standardData != nil, !standardData!.isEmpty {
+            return "standard(\(standardData!.count)bytes)"
         }
         // Keychain has data
-        if keychainRead(forKey: Self.configKey) != nil {
+        if let kcData = keychainRead(forKey: Self.configKey), !kcData.isEmpty {
             return "kc:" + (Self.sharedKeychainGroup ?? "nil")
         }
         // Check each App Group candidate
         for id in Self.appGroupCandidates {
-            if let ud = UserDefaults(suiteName: id), ud.data(forKey: Self.configKey) != nil {
+            if let ud = UserDefaults(suiteName: id), let data = ud.data(forKey: Self.configKey), !data.isEmpty {
                 return id.replacingOccurrences(of: "group.", with: "")
             }
+        }
+        // Debug: check if key exists with different data
+        let allKeys = UserDefaults.standard.dictionaryRepresentation().keys
+        let matchingKeys = allKeys.filter { $0.contains("WidgetConfig") || $0.contains("config") }
+        if !matchingKeys.isEmpty {
+            return "NONE(keyMatch:\(matchingKeys.first ?? "?"))"
         }
         return "NONE"
     }
