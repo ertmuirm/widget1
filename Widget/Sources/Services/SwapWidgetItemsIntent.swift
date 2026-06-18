@@ -434,3 +434,48 @@ struct DebugStorageIntent: AppIntent {
         return .result(dialog: IntentDialog(stringLiteral: info))
     }
 }
+
+// MARK: - Refresh Widget Intent
+
+/// Intent that can be triggered by a widget button to refresh the widget.
+/// When tapped, this attempts to reload the widget timeline with fresh data.
+struct RefreshWidgetIntent: AppIntent {
+    static var title: LocalizedStringResource = "Refresh Widget"
+    static var description = IntentDescription("Refreshes the widget with latest data. Tap this button after making changes to the widget configuration.")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Widget",
+               description: "The widget to refresh.")
+    var widget: GridWidgetEntity
+
+    init() {}
+    init(widget: GridWidgetEntity) { self.widget = widget }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard widget.id != "none" else {
+            return .result(dialog: IntentDialog(stringLiteral: "No widget selected. Please add a widget to your home screen first."))
+        }
+
+        let entityUUID = widget.id.uppercased()
+
+        // Get fresh config from SharedStorage (this runs in main app context)
+        let configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
+        guard let config = configs.first(where: { $0.id.uuidString == entityUUID }) else {
+            return .result(dialog: IntentDialog(stringLiteral: "Widget not found in storage. Please re-add the widget to your home screen."))
+        }
+
+        // Write a refresh marker with current timestamp
+        let refreshKey = "widgetRefresh_\(entityUUID)"
+        let timestamp = Int(Date().timeIntervalSince1970)
+        UserDefaults.standard.set(timestamp, forKey: refreshKey)
+        for id in SharedStorage.appGroupCandidates {
+            UserDefaults(suiteName: id)?.set(timestamp, forKey: refreshKey)
+        }
+
+        // Try to reload widget timelines (may not work for sideloaded apps)
+        WidgetCenter.shared.reloadAllTimelines()
+        DarwinNotificationCenter.shared.postSwapAction()
+
+        return .result(dialog: IntentDialog(stringLiteral: "Widget refreshed! Config '\(config.name)' has \(config.items.count) items. Please wait a moment for the widget to update."))
+    }
+}

@@ -158,6 +158,29 @@ struct WidgetEntryView: View {
             .background(Color.black.opacity(0.8))
             .cornerRadius(4)
             .offset(x: -24, y: -24)
+            
+            // Refresh button - appears only when there are items
+            if !entry.configuration.items.isEmpty {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button(intent: RefreshWidgetIntent(widget: GridWidgetEntity(
+                            id: entry.entityUUID,
+                            name: entry.configuration.name,
+                            sizeLabel: entry.configuration.size.displayName))) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(6)
+                                .background(Color.blue.opacity(0.8))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(4)
+                    }
+                }
+            }
         }
         // widgetURL fires for taps on areas not covered by a Link (gaps, empty cells).
         // The app's Page 0 is a black screen, so this tap silently opens and immediately
