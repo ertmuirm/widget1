@@ -20,10 +20,10 @@ jobs:
       - name: Build and Package IPA
         run: |
           set -e
-          
+
           # Generate Xcode project first
           xcodegen generate
-          
+
           # Build using xcodebuild
           xcodebuild -project Widget.xcodeproj -scheme Widget -configuration Release \
             -derivedDataPath ./build \
@@ -32,11 +32,20 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             OTHER_CODE_SIGN_FLAGS="--" \
             build 2>&1 | tee build.log | tail -50
-          
+
           # Show any errors
           echo "=== Build Errors ==="
           grep -i "error:" build.log || echo "No errors found"
-          
+
+          # Manually embed entitlements for BroadcastExtension
+          EXTENSION=$(find ./build -path "*/PlugIns/BroadcastExtension.appex" -type d 2>/dev/null | head -1)
+          if [ -n "$EXTENSION" ]; then
+            echo "Embedding entitlements into: $EXTENSION"
+            cp WidgetExtension/BroadcastExtension.entitlements "$EXTENSION/BroadcastExtension.entitlements"
+            echo "Entitlements:"
+            cat "$EXTENSION/BroadcastExtension.entitlements"
+          fi
+
           # Find Widget.app anywhere in build
           APP=$(find ./build -name "Widget.app" -type d 2>/dev/null | head -1)
           if [ -n "$APP" ]; then
@@ -51,8 +60,8 @@ jobs:
             exit 1
           fi
           zip -r Widget.ipa Payload
-          ls -la *.ipa 
-    
+          ls -la *.ipa
+
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
