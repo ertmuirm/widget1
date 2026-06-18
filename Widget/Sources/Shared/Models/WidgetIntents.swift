@@ -525,10 +525,13 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     // Fresh config debug info - show the key and whether it was found
     let freshConfigInfo: String
     let marker = UserDefaults.standard.string(forKey: "refreshMarker") ?? "NO_MARKER"
+    // Show configID, extracted UUID, and full key
+    let extractedUUID = configID.flatMap { uuidFromEntityID($0) } ?? "NIL"
+    let configIDSample = configID.map { $0.count > 20 ? String($0.prefix(20)) + "..." : $0 } ?? "nil"
     if let json = freshConfigJSON, !json.isEmpty {
-        freshConfigInfo = "KEY=\(freshConfigKey.prefix(16)) FOUND|MARKER=\(marker.prefix(20))"
+        freshConfigInfo = "configID: \(configIDSample)\nUUID: \(extractedUUID.prefix(8))...\nKEY: \(freshConfigKey.prefix(12))... FOUND|MARKER=\(marker.prefix(10))"
     } else {
-        freshConfigInfo = "KEY=\(freshConfigKey.prefix(16)) NF|MARKER=\(marker.prefix(20))"
+        freshConfigInfo = "configID: \(configIDSample)\nUUID: \(extractedUUID.prefix(8))...\nKEY: \(freshConfigKey.prefix(12))... NF|MARKER=\(marker.prefix(10))"
     }
     
     return WidgetEntry(date: Date(), configuration: finalConfig,
