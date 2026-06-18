@@ -66,280 +66,48 @@ struct AdvanceCodeSlideIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         guard widget.id != "none" else {
-            return .result(dialog: "No code widgets found. Create one in the app first.")
-        }
-
-        var configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
-        guard let idx = configs.firstIndex(where: { $0.id.uuidString == widget.id }) else {
-            return .result(dialog: "Widget \"\(widget.name)\" not found. It may have been deleted.")
-        }
-
-        let slides = configs[idx].slides ?? []
-        let count = slides.count
-        guard count > 1 else {
-            return .result(dialog: "\"\(widget.name)\" has only one slide — nothing to advance.")
-        }
-
-        let current = configs[idx].currentSlideIndex ?? 0
-        let next = forward
-            ? (current + 1) % count
-            : (current - 1 + count) % count
-        configs[idx].currentSlideIndex = next
-
-        // Write lightweight slideIdx override to all cross-process stores (Int).
-        let idxKey = "slideIdx_\(widget.id)"
-        for id in SharedStorage.appGroupCandidates {
-            UserDefaults(suiteName: id)?.set(next, forKey: idxKey)
-            UserDefaults(suiteName: id)?.synchronize()
-        }
-        UserDefaults.standard.set(next, forKey: idxKey)
-        UserDefaults.standard.synchronize()
-
-        try SharedStorage.shared.saveConfigurations(configs)
-
-        // Post Darwin notification to reliably wake the widget extension process.
-        // WidgetCenter.shared.reloadTimelines() may not work on sideloaded apps,
-        // so we use Darwin notifications for guaranteed cross-process communication.
-        DarwinNotificationCenter.shared.postSlideAdvance()
-
-        WidgetCenter.shared.reloadTimelines(ofKind: "BroadcastImage")
-
-        let direction = forward ? "advanced to" : "reversed to"
-        return .result(dialog: IntentDialog(stringLiteral:
-            "\"\(widget.name)\": \(direction) slide \(next + 1) of \(count)."))
-    }
-}
-
-// MARK: - Grid Widget Entity
-
-struct GridWidgetEntity: AppEntity, Hashable {
-    static var typeDisplayRepresentation: TypeDisplayRepresentation {
-        TypeDisplayRepresentation(name: "Grid Widget")
-    }
-    static var defaultQuery = GridWidgetQuery()
-
-    var id: String      // UUID string of the WidgetConfig
-    var name: String
-    var sizeLabel: String   // e.g. "Small 3×3" — shown as subtitle in picker
-
-    var displayRepresentation: DisplayRepresentation {
-        DisplayRepresentation(
-            title: "\(name)",
-            subtitle: "\(sizeLabel)"
-        )
-    }
-
-    init(id: String, name: String, sizeLabel: String) {
-        self.id = id; self.name = name; self.sizeLabel = sizeLabel
-    }
-}
-
-// MARK: - Query
-
-struct GridWidgetQuery: EntityQuery {
-    func entities(for identifiers: [String]) async throws -> [GridWidgetEntity] {
-        let configs = gridConfigs()
-        return identifiers.compactMap { storedID in
-            configs.first(where: { $0.id.uuidString == storedID })
-                .map { GridWidgetEntity(id: $0.id.uuidString, name: $0.name, sizeLabel: $0.size.displayName) }
-        }
-    }
-
-    func suggestedEntities() async throws -> [GridWidgetEntity] {
-        let list = gridConfigs()
-        guard !list.isEmpty else {
-            return [GridWidgetEntity(id: "none", name: "No Grid Widgets saved", sizeLabel: "")]
-        }
-        return list.map { GridWidgetEntity(id: $0.id.uuidString, name: $0.name, sizeLabel: $0.size.displayName) }
-    }
-
-    func defaultResult() async -> GridWidgetEntity? {
-        gridConfigs().first.map { GridWidgetEntity(id: $0.id.uuidString, name: $0.name, sizeLabel: $0.size.displayName) }
-    }
-
-    private func gridConfigs() -> [WidgetConfig] {
-        ((try? SharedStorage.shared.loadConfigurations()) ?? [])
-            .filter { $0.widgetKind == .grid || $0.widgetKind == nil }
-            .filter { $0.size != .systemExtraLarge }
-    }
-}
-
-// MARK: - Intent
-
-struct SwapWidgetItemsIntent: AppIntent {
-    static var title: LocalizedStringResource = "Swap Widget Items"
-    static var description = IntentDescription("Swaps two items in a Grid Widget by their positions. Position 1 is the top-left cell. Positions beyond the grid size (e.g. position 10 in a 3x3 widget) refer to pre-configured bench items. The widget updates when touched.")
-    static var openAppWhenRun: Bool = false
-
-    @Parameter(title: "Widget",
-               description: "The Grid Widget to modify.")
-    var widget: GridWidgetEntity
-
-    @Parameter(title: "Position A",
-               description: "The first item position (1 = top-left, counts left-to-right, top-to-bottom). Can be a bench position beyond the grid size.",
-               default: 1,
-               inclusiveRange: (1, 72))
-    var positionA: Int
-
-    @Parameter(title: "Position B",
-               description: "The second item position. Can be a bench position beyond the grid size.",
-               default: 2,
-               inclusiveRange: (1, 72))
-    var positionB: Int
-
-    init() {}
-    init(widget: GridWidgetEntity, positionA: Int, positionB: Int) {
-        self.widget = widget; self.positionA = positionA; self.positionB = positionB
-    }
-
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        guard widget.id != "none" else {
-            return .result(dialog: IntentDialog(stringLiteral: "No grid widgets found"))
-        }
-
-        var configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
-
-        // Find the config - widget.id is already the UUID string
-        guard let configIdx = configs.firstIndex(where: { $0.id.uuidString == widget.id }) else {
-            return .result(dialog: IntentDialog(stringLiteral: "Widget \"\(widget.name)\" not found"))
-        }
-
-        let a = positionA - 1   // convert to 0-based
-        let b = positionB - 1
-        var config = configs[configIdx]
-        let count = config.items.count
-
-        guard a >= 0, a < count else {
-            return .result(dialog: IntentDialog(stringLiteral: "Position \(positionA) out of range"))
-        }
-        guard b >= 0, b < count else {
-            return .result(dialog: IntentDialog(stringLiteral: "Position \(positionB) out of range"))
-        }
-        guard a != b else {
-            return .result(dialog: IntentDialog(stringLiteral: "Same positions - nothing to swap"))
-        }
-
-        let nameA = itemLabel(config.items[a])
-        let nameB = itemLabel(config.items[b])
-
-        config.items.swapAt(a, b)
-        configs[configIdx] = config
-
-        try SharedStorage.shared.saveConfigurations(configs)
-
-        // Write item-order override using POSITION INDICES (not UUIDs)
-        // Since SlimItem creates new UUIDs on load, we use array positions instead.
-        // Format: "0,2,1,3,4" means position 0 stays at 0, position 1 moves to 2, etc.
-        // NOTE: Use uppercase UUID to match makeEntry() which normalizes entityUUID.uppercased()
-        let entityUUID = widget.id.uppercased()
-        let orderKey = "itemOrder_\(entityUUID)"
-        let orderValue = (0..<config.items.count).map(String.init).joined(separator: ",")
-        
-        // DEBUG: Log what we're writing
-        NSLog("[SwapIntent] Writing key='%@', entityUUID='%@', orderValue='%@', itemCount=%d", 
-              orderKey, entityUUID, orderValue, config.items.count)
-        
-        SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
-
-        // Increment version counter to signal data changed.
-        // entityUUID is already uppercase from above
-        let versionKey = "dataVersion_\(entityUUID)"
-        let currentVersion = UserDefaults.standard.integer(forKey: versionKey)
-        let newVersion = currentVersion + 1
-        UserDefaults.standard.set(newVersion, forKey: versionKey)
-        for id in SharedStorage.appGroupCandidates {
-            UserDefaults(suiteName: id)?.set(newVersion, forKey: versionKey)
-        }
-
-        // Post Darwin notification (best effort - may not wake suspended extension)
-        DarwinNotificationCenter.shared.postSwapAction()
-
-        WidgetCenter.shared.reloadAllTimelines()
-
-        let result = "Swapped \(nameA) (position \(positionA)) with \(nameB) (position \(positionB)) in \"\(widget.name)\". Touch the widget to refresh."
-        return .result(dialog: IntentDialog(stringLiteral: result))
-    }
-
-    private func itemLabel(_ item: WidgetItem) -> String {
-        switch item.displayType {
-        case .icon:   return item.sfSymbolName ?? "icon"
-        case .text:   return "\"\(item.customText ?? "text")\""
-        case .image:  return "image"
-        case .qrCode: return "QR code"
-        }
-    }
-}
-
-// MARK: - Debug Intent (for testing)
-
-struct DebugWidgetIntent: AppIntent {
-    static var title: LocalizedStringResource = "Debug Widget State"
-    static var description = IntentDescription("Shows current widget data state for debugging.")
-    static var openAppWhenRun: Bool = false
-
-    @Parameter(title: "Widget",
-               description: "The Grid Widget to debug.")
-    var widget: GridWidgetEntity
-
-    init() {}
-    init(widget: GridWidgetEntity) { self.widget = widget }
-
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        guard widget.id != "none" else {
             return .result(dialog: IntentDialog(stringLiteral: "No widgets found"))
         }
 
+        let entityUUIDUpper = widget.id.uppercased()
+        let entityUUIDLower = widget.id
+        
         var info = "Widget: \(widget.name)\n"
-        info += "Widget.id: \(widget.id)\n"
+        info += "Widget.id UPPER: \(entityUUIDUpper)\n"
+        info += "Widget.id lower: \(entityUUIDLower)\n"
 
-        let entityUUID = widget.id.uppercased()
+        let orderKeyUpper = "itemOrder_\(entityUUIDUpper)"
+        let orderKeyLower = "itemOrder_\(entityUUIDLower)"
+        info += "Key UPPER: \(orderKeyUpper)\n"
+        info += "Key lower: \(orderKeyLower)\n"
 
-        // Check full config with item positions
         let configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
+        
         if let config = configs.first(where: { $0.id.uuidString == widget.id }) {
-            info += "Full config: \(config.items.count) items\n"
-            info += "Order in config:\n"
-            for (i, item) in config.items.prefix(5).enumerated() {
-                let type = item.displayType.rawValue
-                let label = item.displayType == .text ? (item.customText ?? "?") : 
-                           (item.displayType == .icon ? (item.sfSymbolName ?? "icon") : "?")
-                info += "  [\(i)]: \(label) (\(type))\n"
-            }
+            info += "Config found: \(config.items.count) items\n"
         } else {
-            info += "Full config: NOT FOUND\n"
+            info += "Config NOT found\n"
         }
 
-        // Check order override (uses position indices now)
-        let orderKey = "itemOrder_\(entityUUID)"
-        info += "Order override: "
-        if let order = SharedStorage.shared.gatherReadOverride(forKey: orderKey) {
-            info += "FOUND\n"
-            info += "  Positions: \(order)\n"
-            // Decode positions and show what item is at each position
-            let positions = order.split(separator: ",").compactMap { Int($0) }
-            if let config = configs.first(where: { $0.id.uuidString == widget.id }) {
-                info += "  Resolved:\n"
-                for (newPos, oldPos) in positions.prefix(5).enumerated() {
-                    if oldPos >= 0 && oldPos < config.items.count {
-                        let item = config.items[oldPos]
-                        let label = item.displayType == .text ? (item.customText ?? "?") : 
-                                   (item.displayType == .icon ? (item.sfSymbolName ?? "icon") : "?")
-                        info += "    pos\(newPos): \(label)\n"
-                    }
-                }
-            }
+        info += "Order UPPER: "
+        if let order = SharedStorage.shared.gatherReadOverride(forKey: orderKeyUpper) {
+            info += "FOUND '\(order)'\n"
+        } else {
+            info += "NOT FOUND\n"
+        }
+        
+        info += "Order lower: "
+        if let order = SharedStorage.shared.gatherReadOverride(forKey: orderKeyLower) {
+            info += "FOUND '\(order)'\n"
         } else {
             info += "NOT FOUND\n"
         }
 
-        // Check version
-        let versionKey = "dataVersion_\(entityUUID)"
-        let version = UserDefaults.standard.integer(forKey: versionKey)
-        info += "Version: \(version)\n"
-
         return .result(dialog: IntentDialog(stringLiteral: info))
     }
 }
+
+
 
 // MARK: - Test Refresh Intent
 

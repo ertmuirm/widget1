@@ -131,12 +131,14 @@ struct WidgetEntryView: View {
                 itemsGrid
             }
             
-            // DEBUG: Show key info in top-left corner
-            // Shows: timestamp | order key (truncated) | found/not found
+            // DEBUG: Show detailed key info in top-left corner
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.debugRefreshTime)
                     .font(.system(size: 5, weight: .bold, design: .monospaced))
                     .foregroundStyle(.gray)
+                Text(entry.debugEntityUUID)
+                    .font(.system(size: 4, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.yellow)
                 Text(entry.debugOrderInfo)
                     .font(.system(size: 4, weight: .bold, design: .monospaced))
                     .foregroundStyle(entry.debugOrderFound ? .green : .red)

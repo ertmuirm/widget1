@@ -300,6 +300,8 @@ struct WidgetEntry: TimelineEntry {
     let entityUUID: String
     /// Debug: timestamp when this entry was created (HH:mm:ss format)
     let debugRefreshTime: String
+    /// Debug: entity UUID (last 8 chars) for comparison with SwapIntent
+    let debugEntityUUID: String
     /// Debug: info about order override key lookup
     let debugOrderInfo: String
     /// Debug: whether order override was found
@@ -318,6 +320,7 @@ struct WidgetEntry: TimelineEntry {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
         self.debugRefreshTime = formatter.string(from: date)
+        self.debugEntityUUID = String(self.entityUUID.suffix(8))
         self.debugOrderInfo = debugOrderInfo
         self.debugOrderFound = debugOrderFound
     }
