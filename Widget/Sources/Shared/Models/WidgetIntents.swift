@@ -352,7 +352,13 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let tempEntityUUID = configID.flatMap { uuidFromEntityID($0) } ?? ""
     let tempNormalizedUUID = tempEntityUUID.uppercased()
     let tempRefreshKey = "widgetRefresh_\(tempNormalizedUUID)"
-    if let _ = storage.gatherReadOverride(forKey: tempRefreshKey) {
+    
+    // Debug: check what we can read
+    let standardRefresh = UserDefaults.standard.string(forKey: tempRefreshKey)
+    let gatherRefresh = storage.gatherReadOverride(forKey: tempRefreshKey)
+    storage.appendExtensionLog("REFRESH: key=\(tempRefreshKey) standard=\(standardRefresh ?? "nil") gather=\(gatherRefresh ?? "nil")")
+    
+    if gatherRefresh != nil {
         refreshDetected = true
         storage.scatterWriteOverride("", forKey: tempRefreshKey)
         storage.appendExtensionLog("REFRESH: detected, re-reading config")
