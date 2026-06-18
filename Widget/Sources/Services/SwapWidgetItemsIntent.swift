@@ -409,7 +409,7 @@ struct DebugStorageIntent: AppIntent {
         info += "[UserDefaults.standard] has \(standardSize) bytes for \(standardKey)\n\n"
 
         // Show getActiveStorageName result
-        let activeStorage = SharedStorage.shared.getActiveStorageName()
+        let activeStorage = SharedStorage.shared.debugReadSource(forKey: SharedStorage.configKey)
         info += "getActiveStorageName(): \(activeStorage)\n\n"
 
         // Load and show configs
