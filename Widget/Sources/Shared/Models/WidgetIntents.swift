@@ -452,7 +452,7 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     }
 
     let showLabels = finalConfig.showItemLabels ?? storage.showItemLabels
-    let storageName = storage.getActiveStorageName()
+    let storageName = storage.debugReadSource(forKey: SharedStorage.configKey)
     let configCount = liveConfigs.count
     return WidgetEntry(date: Date(), configuration: finalConfig,
                        showItemLabels: showLabels, entityUUID: entityUUID,

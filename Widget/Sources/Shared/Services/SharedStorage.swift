@@ -343,6 +343,37 @@ final class SharedStorage {
         }
         return nil
     }
+    
+    /// Debug version that returns both data and source info
+    private func gatherReadDebug(forKey key: String) -> (data: Data?, source: String) {
+        // First check UserDefaults.standard
+        if let data = UserDefaults.standard.data(forKey: key), !data.isEmpty {
+            return (data, "UserDefaults.standard(\(data.count)bytes)")
+        }
+        if let data = keychainRead(forKey: key), !data.isEmpty { 
+            return (data, "keychain")
+        }
+        for id in Self.appGroupCandidates {
+            if let data = UserDefaults(suiteName: id)?.data(forKey: key), !data.isEmpty {
+                return (data, "AppGroup(\(id))")
+            }
+        }
+        for id in Self.appGroupCandidates {
+            if let container = FileManager.default.containerURL(
+                forSecurityApplicationGroupIdentifier: id) {
+                let url = container.appendingPathComponent("widgetConfigs.json")
+                if let data = try? Data(contentsOf: url), !data.isEmpty {
+                    return (data, "file(\(id))")
+                }
+            }
+        }
+        return (nil, "NOT FOUND")
+    }
+    
+    /// Returns where gatherRead would find data and the source
+    func debugReadSource(forKey key: String) -> String {
+        return gatherReadDebug(forKey: key).source
+    }
 
     // MARK: - Configuration CRUD
 
