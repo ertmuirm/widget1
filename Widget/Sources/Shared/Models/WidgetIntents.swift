@@ -410,7 +410,11 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     if orderFound {
         debugOrderInfo = "OK:\(orderValue ?? "")"
     } else {
-        debugOrderInfo = "NO:\(uuidSuffix)"
+        // Also show if config came from default (random UUID) vs saved config
+        let isDefaultConfig = (configID == nil || configID == "none" || 
+                               !liveConfigs.contains { $0.id.uuidString.uppercased() == normalizedEntityUUID })
+        let prefix = isDefaultConfig ? "DEF:" : "NO:"
+        debugOrderInfo = "\(prefix)\(uuidSuffix)"
     }
 
     // Only keep imageData for the ACTIVE slide. loadConfigurations() eagerly loads
