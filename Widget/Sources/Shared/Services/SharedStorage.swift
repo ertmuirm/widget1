@@ -243,6 +243,10 @@ final class SharedStorage {
                 return id.replacingOccurrences(of: "group.", with: "")
             }
         }
+        // Check UserDefaults.standard (shared for unsandboxed apps)
+        if UserDefaults.standard.data(forKey: Self.configKey) != nil {
+            return "standard"
+        }
         return "NONE"
     }
 
@@ -311,6 +315,10 @@ final class SharedStorage {
     // MARK: - GATHER read helper
 
     private func gatherRead(forKey key: String) -> Data? {
+        // First check UserDefaults.standard - this is shared for unsandboxed apps
+        if let data = UserDefaults.standard.data(forKey: key), !data.isEmpty {
+            return data
+        }
         if let data = keychainRead(forKey: key), !data.isEmpty { return data }
         for id in Self.appGroupCandidates {
             if let data = UserDefaults(suiteName: id)?.data(forKey: key), !data.isEmpty {
@@ -326,7 +334,7 @@ final class SharedStorage {
                 }
             }
         }
-        return UserDefaults.standard.data(forKey: key)
+        return nil
     }
 
     // MARK: - Configuration CRUD
