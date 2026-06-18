@@ -148,6 +148,7 @@ struct WidgetEntryView: View {
                 Text("Fresh: \(entry.debugFreshConfigInfo)")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundStyle(.orange)
+                    .lineLimit(2)
             }
             .padding(8)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

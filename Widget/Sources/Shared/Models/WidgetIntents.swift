@@ -521,12 +521,13 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let storageName = storage.debugReadSource(forKey: SharedStorage.configKey)
     let configCount = liveConfigs.count
     
-    // Fresh config debug info
+    // Fresh config debug info - show the key and whether it was found
     let freshConfigInfo: String
+    let marker = UserDefaults.standard.string(forKey: "refreshMarker") ?? "NO_MARKER"
     if let json = freshConfigJSON, !json.isEmpty {
-        freshConfigInfo = "FRESH:\(json.prefix(30))..."
+        freshConfigInfo = "KEY=\(freshConfigKey.prefix(16)) FOUND|MARKER=\(marker.prefix(20))"
     } else {
-        freshConfigInfo = "NOFRESH"
+        freshConfigInfo = "KEY=\(freshConfigKey.prefix(16)) NF|MARKER=\(marker.prefix(20))"
     }
     
     return WidgetEntry(date: Date(), configuration: finalConfig,
@@ -1140,6 +1141,10 @@ struct RefreshWidgetIntent: AppIntent {
             UserDefaults.standard.set(configJSON, forKey: freshConfigKey)
             UserDefaults.standard.synchronize()
         }
+
+        // Write a simple marker to test if widget can see UserDefaults.standard
+        UserDefaults.standard.set("MARKER_\(upperUUID)_\(Date().timeIntervalSince1970)", forKey: "refreshMarker")
+        UserDefaults.standard.synchronize()
 
         // Try to reload widget timelines (may not work for sideloaded apps)
         WidgetCenter.shared.reloadAllTimelines()
