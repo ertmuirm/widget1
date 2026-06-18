@@ -338,6 +338,16 @@ struct WidgetEntry: TimelineEntry {
 
 private func makeEntry(configID: String?) -> WidgetEntry {
     let storage = SharedStorage.shared
+    
+    // Get entityUUID early for fresh config key
+    let entityUUIDForKey = configID.flatMap { uuidFromEntityID($0) } ?? ""
+    let normalizedUUIDForKey = entityUUIDForKey.uppercased()
+    let freshConfigKey = "freshConfig_\(normalizedUUIDForKey)"
+    
+    // Debug: check fresh config BEFORE anything else
+    let freshConfigJSON = UserDefaults.standard.string(forKey: freshConfigKey)
+    storage.appendExtensionLog("makeEntry START: freshConfigKey=\(freshConfigKey) jsonLen=\(freshConfigJSON?.count ?? -1)")
+    
     // Debug: direct check of gatherReadDebug
     let directRead = storage.gatherReadDebug(forKey: SharedStorage.configKey)
     // Write debug info to shared container for main app to read
@@ -345,6 +355,7 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     // This will show in the extension log
     storage.appendExtensionLog("makeEntry directRead source=\(directRead.source) data=\(directRead.data?.count ?? -1)")
     let liveConfigs = (try? storage.loadConfigurations()) ?? []
+    storage.appendExtensionLog("makeEntry liveConfigs count=\(liveConfigs.count)")
 
     // Check for refresh key written by RefreshWidgetIntent button.
     // When detected, force re-read from SharedStorage on next line.
