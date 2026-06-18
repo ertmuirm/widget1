@@ -418,9 +418,14 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let orderKey = "itemOrder_\(normalizedEntityUUID)"
     
     // Check order override and track for debug display
+    // Read from UserDefaults.standard directly since it may be shared for sideloaded apps
     var orderFound = false
     var orderValue: String? = nil
-    if let orderStr = SharedStorage.shared.gatherReadOverride(forKey: orderKey) {
+    if let orderStr = UserDefaults.standard.string(forKey: orderKey), !orderStr.isEmpty {
+        orderFound = true
+        orderValue = orderStr
+        storage.appendExtensionLog("ORDER: found in UserDefaults.standard: \(orderStr)")
+    } else if let orderStr = SharedStorage.shared.gatherReadOverride(forKey: orderKey) {
         orderFound = true
         orderValue = orderStr
         let positions = orderStr.split(separator: ",").compactMap { Int($0) }
@@ -1075,15 +1080,19 @@ struct RefreshWidgetIntent: AppIntent {
             return .result(dialog: IntentDialog(stringLiteral: "Widget config not found. Please re-add the widget."))
         }
 
-        // Write a refresh marker with current timestamp using all possible channels
+        // Write refresh marker to UserDefaults.standard (shared between app and widget)
         let refreshKey = "widgetRefresh_\(upperUUID)"
         let timestamp = String(Int(Date().timeIntervalSince1970))
         UserDefaults.standard.set(timestamp, forKey: refreshKey)
-        for id in SharedStorage.appGroupCandidates {
-            UserDefaults(suiteName: id)?.set(timestamp, forKey: refreshKey)
-        }
-        // Use scatterWriteOverride for widget to read
-        SharedStorage.shared.scatterWriteOverride(timestamp, forKey: refreshKey)
+        UserDefaults.standard.synchronize()
+        
+        // Write the CURRENT item order directly to UserDefaults.standard
+        // The widget will read this and apply it when refreshing.
+        // Format: "0,2,1,3,4" means item at index 0 goes to position 0, etc.
+        let orderValue = (0..<config.items.count).map(String.init).joined(separator: ",")
+        let orderKey = "itemOrder_\(upperUUID)"
+        UserDefaults.standard.set(orderValue, forKey: orderKey)
+        UserDefaults.standard.synchronize()
 
         // Try to reload widget timelines (may not work for sideloaded apps)
         WidgetCenter.shared.reloadAllTimelines()
