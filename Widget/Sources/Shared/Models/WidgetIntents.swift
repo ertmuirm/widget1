@@ -1032,3 +1032,42 @@ struct AdvanceImageIntent: AppIntent {
         return .result()
     }
 }
+
+// MARK: - Refresh Widget Intent
+
+/// Intent triggered by widget button to refresh the widget with fresh data.
+/// This runs in the main app's context, giving full access to SharedStorage.
+struct RefreshWidgetIntent: AppIntent {
+    static var title: LocalizedStringResource = "Refresh Widget"
+    static var description = IntentDescription("Refreshes the widget with latest data from storage. Tap after making changes.")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Widget Entity ID")
+    var entityUUID: String  // The UUID of the widget config
+
+    init() {}
+    init(entityUUID: String) { self.entityUUID = entityUUID }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        // Get fresh config from SharedStorage (runs in main app context)
+        let configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
+        let upperUUID = entityUUID.uppercased()
+        
+        guard let config = configs.first(where: { $0.id.uuidString.uppercased() == upperUUID }) else {
+            return .result(dialog: IntentDialog(stringLiteral: "Widget config not found. Please re-add the widget."))
+        }
+
+        // Write a refresh marker with current timestamp
+        let refreshKey = "widgetRefresh_\(upperUUID)"
+        let timestamp = Int(Date().timeIntervalSince1970)
+        UserDefaults.standard.set(timestamp, forKey: refreshKey)
+        for id in SharedStorage.appGroupCandidates {
+            UserDefaults(suiteName: id)?.set(timestamp, forKey: refreshKey)
+        }
+
+        // Try to reload widget timelines (may not work for sideloaded apps)
+        WidgetCenter.shared.reloadAllTimelines()
+
+        return .result(dialog: IntentDialog(stringLiteral: "Widget '\(config.name)' refreshed with \(config.items.count) items."))
+    }
+}

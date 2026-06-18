@@ -165,10 +165,7 @@ struct WidgetEntryView: View {
                     Spacer()
                     HStack {
                         Spacer()
-                        Button(intent: RefreshWidgetIntent(widget: GridWidgetEntity(
-                            id: entry.entityUUID,
-                            name: entry.configuration.name,
-                            sizeLabel: entry.configuration.size.displayName))) {
+                        Button(intent: RefreshWidgetIntent(entityUUID: entry.entityUUID)) {
                             Image(systemName: "arrow.clockwise")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(.white)
