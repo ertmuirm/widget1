@@ -403,7 +403,11 @@ final class SharedStorage {
         appendExtensionLog("SAVE: \(configurations.count) configs size=\(data.count) kc=\(kcWriteStatus==errSecSuccess ? "ok" : "fail(\(kcWriteStatus))")")    }
 
     func loadConfigurations() throws -> [WidgetConfig] {
-        guard let data = gatherRead(forKey: Self.configKey) else {
+        // Debug: log what gatherRead finds
+        let readResult = gatherReadDebug(forKey: Self.configKey)
+        appendExtensionLog("LOAD: gatherRead returned source=\(readResult.source), data=\(readResult.data?.count ?? -1)")
+        
+        guard let data = readResult.data else {
             appendExtensionLog("LOAD: no data found in any store")
             return []
         }
