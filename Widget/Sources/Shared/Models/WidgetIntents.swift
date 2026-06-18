@@ -364,10 +364,33 @@ private func makeEntry(configID: String?) -> WidgetEntry {
         storage.appendExtensionLog("REFRESH: detected, re-reading config")
     }
 
+    // Check for fresh config written by RefreshWidgetIntent.
+    // This is the ONLY way to get fresh data for sideloaded apps since
+    // entity ID data is captured at widget-add time and never updates.
+    let freshConfigKey = "freshConfig_\(tempNormalizedUUID)"
+    let freshConfigJSON = UserDefaults.standard.string(forKey: freshConfigKey)
+    
     let config: WidgetConfig
-    if let id = configID, id != "none" {
+    if let jsonStr = freshConfigJSON, !jsonStr.isEmpty {
+        // Fresh config available from refresh button - decode and use it directly
+        storage.appendExtensionLog("FRESH: using config from UserDefaults.standard")
+        if let configData = Data(base64Encoded: jsonStr) {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            if let decoded = try? decoder.decode(WidgetConfig.self, from: configData) {
+                config = decoded
+                // Clear the fresh config so it's only used once
+                UserDefaults.standard.removeObject(forKey: freshConfigKey)
+            } else {
+                storage.appendExtensionLog("FRESH: failed to decode config")
+                config = .defaultConfiguration
+            }
+        } else {
+            config = .defaultConfiguration
+        }
+    } else if let id = configID, id != "none" {
+        // No fresh config - use stale entity ID data (standard behavior)
         let uuid = uuidFromEntityID(id)
-
         if let found = liveConfigs.first(where: { $0.id.uuidString == uuid }) {
             config = found
         } else if var embedded = decodeConfigFromID(id) {
@@ -1080,19 +1103,19 @@ struct RefreshWidgetIntent: AppIntent {
             return .result(dialog: IntentDialog(stringLiteral: "Widget config not found. Please re-add the widget."))
         }
 
-        // Write refresh marker to UserDefaults.standard (shared between app and widget)
-        let refreshKey = "widgetRefresh_\(upperUUID)"
-        let timestamp = String(Int(Date().timeIntervalSince1970))
-        UserDefaults.standard.set(timestamp, forKey: refreshKey)
-        UserDefaults.standard.synchronize()
+        // Write the FULL fresh config JSON to UserDefaults.standard
+        // The widget will decode this directly, bypassing stale entity ID data.
+        // Key format: "freshConfig_<UUID>" contains JSON-encoded WidgetConfig
+        let freshConfigKey = "freshConfig_\(upperUUID)"
         
-        // Write the CURRENT item order directly to UserDefaults.standard
-        // The widget will read this and apply it when refreshing.
-        // Format: "0,2,1,3,4" means item at index 0 goes to position 0, etc.
-        let orderValue = (0..<config.items.count).map(String.init).joined(separator: ",")
-        let orderKey = "itemOrder_\(upperUUID)"
-        UserDefaults.standard.set(orderValue, forKey: orderKey)
-        UserDefaults.standard.synchronize()
+        // Encode the fresh config (with current item order) to JSON
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        if let configData = try? encoder.encode(config) {
+            let configJSON = configData.base64EncodedString()
+            UserDefaults.standard.set(configJSON, forKey: freshConfigKey)
+            UserDefaults.standard.synchronize()
+        }
 
         // Try to reload widget timelines (may not work for sideloaded apps)
         WidgetCenter.shared.reloadAllTimelines()
