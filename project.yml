@@ -85,6 +85,7 @@ targets:
         CODE_SIGNING_ALLOWED: NO
         SKIP_INSTALL: YES
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"
+        CODE_SIGN_ENTITLEMENTS: WidgetExtension/BroadcastExtension.entitlements
     entitlements:
       path: WidgetExtension/BroadcastExtension.entitlements
       properties:
