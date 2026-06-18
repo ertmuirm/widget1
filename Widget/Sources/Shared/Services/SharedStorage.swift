@@ -403,13 +403,10 @@ final class SharedStorage {
             }
         }
 
-        // Write to first available shared container
-        for id in Self.appGroupCandidates {
-            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
-                let url = container.appendingPathComponent("widget_debug.txt")
-                try? info.write(to: url, atomically: true, encoding: String.Encoding.utf8)
-                return
-            }
+        // Write to Documents folder (accessible via iTunes/Finder backup)
+        if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let url = docs.appendingPathComponent("widget_debug.txt")
+            try? info.write(to: url, atomically: true, encoding: String.Encoding.utf8)
         }
     }
 

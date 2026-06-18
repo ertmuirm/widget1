@@ -379,6 +379,16 @@ struct DebugStorageIntent: AppIntent {
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
         var info = "=== WIDGET STORAGE DEBUG ===\n\n"
+        // Try to read widget debug file from Documents folder
+        if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let url = docs.appendingPathComponent("widget_debug.txt")
+            if let data = try? Data(contentsOf: url),
+               let widgetDebug = String(data: data, encoding: .utf8) {
+                info += "=== WIDGET EXTENSION DEBUG (from file) ===\n"
+                info += widgetDebug
+                info += "\n\n"
+            }
+        }
         
         // Check keychain
         let kcGroup = SharedStorage.sharedKeychainGroup ?? "nil"
