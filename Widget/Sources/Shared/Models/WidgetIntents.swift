@@ -528,10 +528,12 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     // Show configID, extracted UUID, and full key
     let extractedUUID = configID.flatMap { uuidFromEntityID($0) } ?? "NIL"
     let configIDSample = configID.map { $0.count > 20 ? String($0.prefix(20)) + "..." : $0 } ?? "nil"
+    // Also show the entityUUID (VUID source)
+    let configIDSuffix = configID.map { String($0.suffix(8)) } ?? "nil"
     if let json = freshConfigJSON, !json.isEmpty {
-        freshConfigInfo = "configID: \(configIDSample)\nUUID: \(extractedUUID.prefix(8))...\nKEY: \(freshConfigKey.prefix(12))... FOUND|MARKER=\(marker.prefix(10))"
+        freshConfigInfo = "configID: \(configIDSample)\nconfigIDSuffix: \(configIDSuffix)\nKEY.UUID: \(normalizedUUIDForKey.prefix(8))...\nVUID: \(entityUUID.suffix(8))\nFOUND"
     } else {
-        freshConfigInfo = "configID: \(configIDSample)\nUUID: \(extractedUUID.prefix(8))...\nKEY: \(freshConfigKey.prefix(12))... NF|MARKER=\(marker.prefix(10))"
+        freshConfigInfo = "configID: \(configIDSample)\nconfigIDSuffix: \(configIDSuffix)\nKEY.UUID: \(normalizedUUIDForKey.prefix(8))...\nVUID: \(entityUUID.suffix(8))\nNF|MARKER=\(marker.prefix(10))"
     }
     
     return WidgetEntry(date: Date(), configuration: finalConfig,
