@@ -131,33 +131,28 @@ struct WidgetEntryView: View {
                 itemsGrid
             }
             
-            // DEBUG: Show detailed key info in top-left corner (larger for readability)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(entry.debugRefreshTime)
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.gray)
-                HStack(spacing: 2) {
-                    Text("U:")
-                    Text(entry.debugEntityUUID)
-                }
-                .font(.system(size: 8, weight: .bold, design: .monospaced))
-                .foregroundStyle(.yellow)
-                Text(entry.debugOrderInfo)
-                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+            // DEBUG: Larger debug panel for 6x6 widget
+            VStack(alignment: .leading, spacing: 4) {
+                Text("DEBUG - \(entry.debugRefreshTime)")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white)
+                Text("UUID: \(entry.debugEntityUUID)")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.yellow)
+                Text("Order: \(entry.debugOrderInfo)")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundStyle(entry.debugOrderFound ? .green : .red)
-                HStack(spacing: 2) {
-                    Text("S:")
-                    Text(entry.debugStorageName)
-                    Text("C:")
-                    Text("\(entry.debugConfigCount)")
-                }
-                .font(.system(size: 7, weight: .bold, design: .monospaced))
-                .foregroundStyle(.cyan)
+                Text("Storage: \(entry.debugStorageName) (C:\(entry.debugConfigCount))")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.cyan)
+                Text("Fresh: \(entry.debugFreshConfigInfo)")
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.orange)
             }
-            .padding(4)
-            .background(Color.black.opacity(0.8))
-            .cornerRadius(4)
-            .offset(x: -24, y: -24)
+            .padding(8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Color.black.opacity(0.9))
+            .cornerRadius(8)
             
             // Refresh button - appears only when there are items
             if !entry.configuration.items.isEmpty {

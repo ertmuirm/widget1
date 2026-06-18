@@ -310,6 +310,8 @@ struct WidgetEntry: TimelineEntry {
     let debugStorageName: String
     /// Debug: number of configs found in storage
     let debugConfigCount: Int
+    /// Debug: info about fresh config from refresh button
+    let debugFreshConfigInfo: String
 
     init(date: Date, configuration: WidgetConfig,
          showItemLabels: Bool = SharedStorage.shared.showItemLabels,
@@ -317,7 +319,8 @@ struct WidgetEntry: TimelineEntry {
          debugOrderInfo: String = "---",
          debugOrderFound: Bool = false,
          debugStorageName: String = "---",
-         debugConfigCount: Int = -1) {
+         debugConfigCount: Int = -1,
+         debugFreshConfigInfo: String = "---") {
         self.date = date
         self.configuration = configuration
         self.showItemLabels = showItemLabels
@@ -331,6 +334,7 @@ struct WidgetEntry: TimelineEntry {
         self.debugOrderFound = debugOrderFound
         self.debugStorageName = debugStorageName
         self.debugConfigCount = debugConfigCount
+        self.debugFreshConfigInfo = debugFreshConfigInfo
     }
 }
 
@@ -516,10 +520,20 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let showLabels = finalConfig.showItemLabels ?? storage.showItemLabels
     let storageName = storage.debugReadSource(forKey: SharedStorage.configKey)
     let configCount = liveConfigs.count
+    
+    // Fresh config debug info
+    let freshConfigInfo: String
+    if let json = freshConfigJSON, !json.isEmpty {
+        freshConfigInfo = "FRESH:\(json.prefix(30))..."
+    } else {
+        freshConfigInfo = "NOFRESH"
+    }
+    
     return WidgetEntry(date: Date(), configuration: finalConfig,
                        showItemLabels: showLabels, entityUUID: entityUUID,
                        debugOrderInfo: debugOrderInfo, debugOrderFound: orderFound,
-                       debugStorageName: storageName, debugConfigCount: configCount)
+                       debugStorageName: storageName, debugConfigCount: configCount,
+                       debugFreshConfigInfo: freshConfigInfo)
 }
 
 private func makeTimeline(configID: String?) -> Timeline<WidgetEntry> {
