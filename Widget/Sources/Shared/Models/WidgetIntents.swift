@@ -715,25 +715,25 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     
     var infoLines: [String] = []
     infoLines.append("=== RESELECTION DEBUG ===")
-    infoLines.append("uuid: \(entityUUID.prefix(8)) items: \(itemCount)")
+    infoLines.append("uuid: \(entityUUID.prefix(8))")
+    // Show full entity ID info
+    infoLines.append("fullID.len: \(configID?.count ?? 0)")
+    // Hash of full entity ID to detect if it changes
+    let fullIDHash = configID.map { String($0.hashValue) } ?? "nil"
+    infoLines.append("fullID.hash: \(fullIDHash.prefix(10))")
+    infoLines.append("items: \(itemCount)")
     infoLines.append("order: \(debugOrderInfo)")
     infoLines.append("---")
-    // Show storage status
     infoLines.append("src: \(configSource)")
     infoLines.append("liveConfigs: \(liveConfigs.count)")
     infoLines.append("Storage: \(storageName)")
-    // Show what caller triggered this
     if !note.isEmpty {
         infoLines.append("caller: \(note)")
     }
-    // Key observations
     infoLines.append("---")
-    infoLines.append("OBSERVATIONS:")
-    infoLines.append("1. Reselection works = fresh data")
-    infoLines.append("2. snapshot/suggested NOT called")
-    infoLines.append("3. Timeline uses stored entityID")
-    infoLines.append("4. Question: HOW is fresh data")
-    infoLines.append("   obtained if all storage empty?")
+    infoLines.append("KEY: If fullID.hash changes")
+    infoLines.append("after reselection, the entity")
+    infoLines.append("has fresh swapped data!")
     freshConfigInfo = infoLines.joined(separator: "\n")
     
     return WidgetEntry(date: Date(), configuration: finalConfig,
