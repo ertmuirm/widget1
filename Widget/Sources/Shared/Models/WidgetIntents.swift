@@ -349,28 +349,14 @@ private func makeEntry(configID: String?) -> WidgetEntry {
 private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetEntry {
     let storage = SharedStorage.shared
     
-    // EXTENSIVE DEBUG: Trace exactly where data comes from
-    let debugTimestamp = Date().timeIntervalSince1970
+    // Debug note from timeline
     let note = debugNote ?? timelineDebugNote
-    storage.appendExtensionLog("=== makeEntry START id=\(configID?.prefix(20) ?? "nil") ts=\(debugTimestamp) note=\(note) ===")
     
-    // Debug: direct check of gatherReadDebug
-    let directRead = storage.gatherReadDebug(forKey: SharedStorage.configKey)
-    storage.appendExtensionLog("makeEntry directRead source=\(directRead.source) bytes=\(directRead.data?.count ?? -1)")
-    
-    // Write debug info to shared container for main app to read
-    storage.writeWidgetDebugInfo()
-    
+    // Load configs - this is what reselection uses (via suggestedEntities -> entities -> loadConfigurations)
     let liveConfigs = (try? storage.loadConfigurations()) ?? []
-    storage.appendExtensionLog("makeEntry liveConfigs count=\(liveConfigs.count)")
     
-    // Check all UserDefaults.standard keys related to configs
-    let udKeys = ["widgetConfigurations", "LATEST_ENCODED_CONFIG", "ENCODED_CONFIG", "dataVersion", "refreshMarker"]
-    for key in udKeys {
-        let val = UserDefaults.standard.object(forKey: key)
-        let hasVal = val != nil
-        storage.appendExtensionLog("makeEntry UD.standard[\(key)]=\(hasVal ? "YES" : "nil")")
-    }
+    // Direct check of gatherRead for debugging
+    let directRead = storage.gatherReadDebug(forKey: SharedStorage.configKey)
 
     // Load config - widget reselection just calls SharedStorage which should have fresh data
     // BUT: For sideloaded apps, SharedStorage may not be shared. So we check multiple sources:
@@ -682,29 +668,19 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     let itemCount = finalConfig.items.count
     
     // Check if order key exists in UserDefaults.standard
-    let orderInUD = UserDefaults.standard.string(forKey: orderKey) ?? "nil"
-    
-    // Show first few liveConfigs UUIDs to see if our target is there
-    let liveConfigUUIDs = liveConfigs.prefix(5).map { String($0.id.uuidString.prefix(8)) }.joined(separator: ",")
-    
     var infoLines: [String] = []
-    infoLines.append("=== REFRESH DEBUG ===")
-    infoLines.append("configID: " + configIDSample + " len=" + String(configID?.count ?? 0))
-    infoLines.append("uuid: " + entityUUID.prefix(8))
-    infoLines.append("orderKey: " + orderKey)
-    infoLines.append("orderInUD: " + (orderInUD.count > 20 ? String(orderInUD.prefix(20)) + "..." : orderInUD))
-    infoLines.append("Storage: " + storageName + " (C: \(liveConfigs.count))")
-    infoLines.append("  Raw: " + directRead.source)
-    infoLines.append("CONFIG_SRC: " + configSource)
-    infoLines.append("liveConfigUUIDs: " + liveConfigUUIDs)
-    infoLines.append("ITEMS: \(itemCount) [\(itemNames)]")
-    infoLines.append("ORDER: " + debugOrderInfo)
-    infoLines.append("AppGrps: " + (appGroupStatus.isEmpty ? "none" : appGroupStatus.prefix(50)))
+    infoLines.append("=== DEBUG ===")
+    infoLines.append("uuid: \(entityUUID.prefix(8)) items: \(itemCount) order: \(debugOrderInfo)")
+    infoLines.append("CONFIG_SRC: \(configSource) | liveConfigs: \(liveConfigs.count)")
+    infoLines.append("Storage: \(storageName) (C:\(liveConfigs.count))")
     infoLines.append("---")
-    infoLines.append("RESELECT: " + decodeDebug.prefix(40))
-    infoLines.append("LATEST_ENC: " + (latestEncoded != nil ? "YES" : "nil"))
+    // RESELECTION: works because suggestedEntities() calls loadConfigurations()
+    // REFRESH: fails because cached entity ID decodes OLD embedded data
+    // FIX: re-query entities(for:) which loads fresh SharedStorage data
     if !note.isEmpty {
-        infoLines.append("NOTE: " + note)
+        infoLines.append("NOTE: \(note)")
+    } else {
+        infoLines.append("REFRESH: Uses cached entity (NOT re-queried)")
     }
     freshConfigInfo = infoLines.joined(separator: "\n")
     
