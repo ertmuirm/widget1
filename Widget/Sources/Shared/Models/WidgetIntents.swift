@@ -130,7 +130,7 @@ private struct SlimSlide: Codable {
     var a: SlimAction? // action
 }
 
-private struct SlimConfig: Codable {
+struct SlimConfig: Codable {
     var i: String      // id.uuidString
     var n: String      // name
     var sz: String     // WidgetSize.rawValue
@@ -224,7 +224,7 @@ private func uuidFromEntityID(_ entityID: String) -> String {
     String(entityID.split(separator: "|", maxSplits: 1).first ?? Substring(entityID))
 }
 
-private func decodeConfigFromID(_ entityID: String) -> WidgetConfig? {
+func decodeConfigFromID(_ entityID: String) -> WidgetConfig? {
     let parts = entityID.split(separator: "|", maxSplits: 1)
     guard parts.count == 2, let data = Data(base64Encoded: String(parts[1])) else { return nil }
     // Try compact slim format first (current), then legacy full WidgetConfig JSON.
