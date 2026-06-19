@@ -989,13 +989,30 @@ struct LargeWidgetQuery: EntityQuery {
     }
     func suggestedEntities() async throws -> [LargeWidgetEntity] {
         let storage = SharedStorage.shared
+        
+        // DEBUG: Check what storage is accessible during reselection
         let storageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
+        storage.appendExtensionLog("=== RESELECTION DEBUG ===")
         storage.appendExtensionLog("suggestedEntities: storage=\(storageDebug.source) bytes=\(storageDebug.data?.count ?? -1)")
+        
+        // Also check UserDefaults.standard
+        let udData = UserDefaults.standard.data(forKey: SharedStorage.configKey)
+        storage.appendExtensionLog("suggestedEntities: UD.std=\(udData != nil ? "HAS(\(udData!.count)B)" : "empty")")
         
         let list = filteredConfigs(size: .systemLarge)
         storage.appendExtensionLog("suggestedEntities: list.count=\(list.count)")
         
-        if list.isEmpty { return [LargeWidgetEntity(id: "none", name: "No Large Widgets")] }
+        if list.isEmpty { 
+            storage.appendExtensionLog("suggestedEntities: NO CONFIGS - returning 'none'")
+            return [LargeWidgetEntity(id: "none", name: "No Large Widgets")] 
+        }
+        
+        // Log what we're returning
+        for config in list.prefix(3) {
+            let entityID = encodeEntityID(config)
+            storage.appendExtensionLog("suggestedEntities: returning id.len=\(entityID.count) name=\(config.name)")
+        }
+        
         return list.map { LargeWidgetEntity(id: encodeEntityID($0), name: $0.name) }
     }
     func defaultResult() async -> LargeWidgetEntity? {
@@ -1448,15 +1465,28 @@ struct RefreshWidgetIntent: AppIntent {
     init() {}
     init(entityUUID: String) { self.entityUUID = entityUUID }
 
-    func perform() async throws -> some IntentResult & ProvidesDialog {
-        // Simply trigger widget timeline reload - this is the same mechanism iOS uses
-        // when the user manually reselects the widget. The widget will rebuild its
-        // timeline and read fresh data from SharedStorage.
-        WidgetCenter.shared.reloadAllTimelines()
+    func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let storage = SharedStorage.shared
         
-        // Also post Darwin notification as backup
+        // DEBUG: Compare with what reselection sees
+        let storageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
+        storage.appendExtensionLog("=== REFRESH INTENT DEBUG ===")
+        storage.appendExtensionLog("RefreshIntent: entityUUID=\(entityUUID.prefix(8))")
+        storage.appendExtensionLog("RefreshIntent: storage=\(storageDebug.source) bytes=\(storageDebug.data?.count ?? -1)")
+        
+        // Try to find a fresh entity with the same UUID
+        let candidates = try await LargeWidgetQuery().suggestedEntities()
+        storage.appendExtensionLog("RefreshIntent: candidates.count=\(candidates.count)")
+        
+        if let freshEntity = candidates.first(where: { uuidFromEntityID($0.id) == entityUUID }) {
+            storage.appendExtensionLog("RefreshIntent: found fresh entity id.len=\(freshEntity.id.count)")
+            return .result(value: freshEntity.id, dialog: IntentDialog("Widget refreshed with latest data."))
+        }
+        
+        storage.appendExtensionLog("RefreshIntent: no matching entity found")
+        WidgetCenter.shared.reloadAllTimelines()
         DarwinNotificationCenter.shared.postWidgetUpdate()
-
-        return .result(dialog: IntentDialog(stringLiteral: "Widget refreshed. Tap widget to see changes."))
+        
+        return .result(value: "", dialog: IntentDialog("Widget refreshed. Tap widget to see changes."))
     }
 }
