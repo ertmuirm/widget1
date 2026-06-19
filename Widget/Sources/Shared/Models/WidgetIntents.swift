@@ -369,28 +369,20 @@ struct WidgetEntry: TimelineEntry {
 private var timelineDebugNote: String = ""
 
 private func makeEntry(configID: String?) -> WidgetEntry {
-    SharedStorage.shared.appendExtensionLog(">>> makeEntry CALLED configID.len=\(configID?.count ?? -1)")
-    return makeEntryInternal(configID: configID, debugNote: "from makeEntry()")
+    return makeEntryInternal(configID: configID, debugNote: "makeEntry()")
 }
 
 private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetEntry {
     let storage = SharedStorage.shared
     
-    // DEBUG: Always log what we receive
-    storage.appendExtensionLog("=== makeEntryInternal ===")
-    storage.appendExtensionLog("configID: \(configID?.prefix(30) ?? "nil")")
-    storage.appendExtensionLog("callerNote: \(debugNote ?? "none")")
-    
     // Debug note from timeline
     let note = debugNote ?? timelineDebugNote
     
-    // Load configs - this is what reselection uses (via suggestedEntities -> entities -> loadConfigurations)
+    // Load configs
     let liveConfigs = (try? storage.loadConfigurations()) ?? []
-    storage.appendExtensionLog("liveConfigs: \(liveConfigs.count)")
     
     // Direct check of gatherRead for debugging
     let directRead = storage.gatherReadDebug(forKey: SharedStorage.configKey)
-    storage.appendExtensionLog("gatherRead: \(directRead.source)")
 
     // Load config - widget reselection just calls SharedStorage which should have fresh data
     // BUT: For sideloaded apps, SharedStorage may not be shared. So we check multiple sources:
@@ -722,22 +714,26 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     }
     
     var infoLines: [String] = []
-    infoLines.append("=== DEBUG ===")
+    infoLines.append("=== RESELECTION DEBUG ===")
     infoLines.append("uuid: \(entityUUID.prefix(8)) items: \(itemCount)")
     infoLines.append("order: \(debugOrderInfo)")
     infoLines.append("---")
-    // Reselection flow:
-    // 1. suggestedEntities() calls filteredConfigs() -> loads from SharedStorage
-    // 2. If configs found, encodeEntityID() creates FRESH 633-char entity ID
-    // 3. Widget stores this new entity ID
-    // 4. Timeline decodes entity ID -> gets fresh config
-    if !note.isEmpty {
-        infoLines.append("MODE: \(note)")
-    }
-    infoLines.append("---")
+    // Show storage status
     infoLines.append("src: \(configSource)")
     infoLines.append("liveConfigs: \(liveConfigs.count)")
     infoLines.append("Storage: \(storageName)")
+    // Show what caller triggered this
+    if !note.isEmpty {
+        infoLines.append("caller: \(note)")
+    }
+    // Key observations
+    infoLines.append("---")
+    infoLines.append("OBSERVATIONS:")
+    infoLines.append("1. Reselection works = fresh data")
+    infoLines.append("2. snapshot/suggested NOT called")
+    infoLines.append("3. Timeline uses stored entityID")
+    infoLines.append("4. Question: HOW is fresh data")
+    infoLines.append("   obtained if all storage empty?")
     freshConfigInfo = infoLines.joined(separator: "\n")
     
     return WidgetEntry(date: Date(), configuration: finalConfig,
