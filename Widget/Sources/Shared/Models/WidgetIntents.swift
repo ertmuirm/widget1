@@ -966,25 +966,29 @@ struct LargeBroadcastProvider: AppIntentTimelineProvider {
     }
     func timeline(for configuration: SelectLargeWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
         let storedID = configuration.selectedWidget?.id ?? "nil"
-        SharedStorage.shared.appendExtensionLog("LARGE_TL START id.len=\(storedID.count)")
         
-        // Re-query entities to get FRESH data from SharedStorage (same as reselection!)
-        let entities = try? await LargeWidgetQuery().entities(for: [storedID])
-        SharedStorage.shared.appendExtensionLog("LARGE_TL entities.count=\(entities?.count ?? -1)")
+        // Check storage in query context
+        let storageDebug = SharedStorage.shared.gatherReadDebug(forKey: SharedStorage.configKey)
+        let queryConfigs = filteredConfigs(size: .systemLarge)
         
         var freshID: String? = nil
-        if let fresh = entities?.first {
-            SharedStorage.shared.appendExtensionLog("LARGE_TL: RE-QUERIED fresh id.len=\(fresh.id.count) name=\(fresh.name)")
-            freshID = fresh.id
-            timelineDebugNote = "LARGE_TL:REQUERIED fresh.id.len=\(fresh.id.count)"
+        var note: String
+        
+        if queryConfigs.isEmpty {
+            // filteredConfigs returns empty = SharedStorage not accessible
+            note = "QRY:EMPTY storage=\(storageDebug.source)"
         } else {
-            SharedStorage.shared.appendExtensionLog("LARGE_TL: FALLBACK to storedID")
-            timelineDebugNote = "LARGE_TL:FALLBACK stored.len=\(storedID.count)"
+            // Found configs via query - re-query entities
+            let entities = try? await LargeWidgetQuery().entities(for: [storedID])
+            if let fresh = entities?.first {
+                freshID = fresh.id
+                note = "QRY:GOT_CONFIGS fresh.id.len=\(fresh.id.count)"
+            } else {
+                note = "QRY:NO_ENTITY storage=\(storageDebug.source)"
+            }
         }
         
-        let entry = makeEntryInternal(configID: freshID ?? storedID, debugNote: nil)
-        timelineDebugNote = "" // Clear after use
-        
+        let entry = makeEntryInternal(configID: freshID ?? storedID, debugNote: note)
         let next = Calendar.current.date(byAdding: .minute, value: 30, to: Date()) ?? Date()
         return Timeline(entries: [entry], policy: .after(next))
     }
