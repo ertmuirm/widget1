@@ -444,6 +444,11 @@ private func makeEntry(configID: String?) -> WidgetEntry {
         // DEBUG: Log all data sources
         storage.appendExtensionLog("DATA_SOURCES: latestEnc=\(latestEncoded != nil)|specificEnc=\(specificEncoded != nil)|liveConfigs=\(liveConfigs.count)|id.len=\(id.count)")
         
+        // DEBUG: Show first few UUIDs in liveConfigs and the target uuid
+        let configUUIDs = liveConfigs.prefix(3).map { $0.id.uuidString.prefix(8) }.joined(separator: ",")
+        storage.appendExtensionLog("DEBUG: liveConfigs UUIDs[0-2]=\(configUUIDs)")
+        storage.appendExtensionLog("DEBUG: target uuid=\(uuid.prefix(8)) comparing...")
+        
         // 1. FIRST: Check live configs from SharedStorage (THIS HAS FRESH DATA!)
         // Widget reselection loads configs via loadConfigurations() which is accessible!
         if let found = liveConfigs.first(where: { $0.id.uuidString.uppercased() == uuid.uppercased() }) {
@@ -662,6 +667,9 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     // Check if order key exists in UserDefaults.standard
     let orderInUD = UserDefaults.standard.string(forKey: orderKey) ?? "nil"
     
+    // Show first few liveConfigs UUIDs to see if our target is there
+    let liveConfigUUIDs = liveConfigs.prefix(5).map { String($0.id.uuidString.prefix(8)) }.joined(separator: ",")
+    
     var infoLines: [String] = []
     infoLines.append("=== REFRESH DEBUG ===")
     infoLines.append("configID: " + configIDSample + " len=" + String(configID?.count ?? 0))
@@ -671,6 +679,7 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     infoLines.append("Storage: " + storageName + " (C: \(liveConfigs.count))")
     infoLines.append("  Raw: " + directRead.source)
     infoLines.append("CONFIG_SRC: " + configSource)
+    infoLines.append("liveConfigUUIDs: " + liveConfigUUIDs)
     infoLines.append("ITEMS: \(itemCount) [\(itemNames)]")
     infoLines.append("ORDER: " + debugOrderInfo)
     infoLines.append("AppGrps: " + (appGroupStatus.isEmpty ? "none" : appGroupStatus.prefix(50)))
