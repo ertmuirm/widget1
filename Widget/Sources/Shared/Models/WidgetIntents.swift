@@ -565,16 +565,15 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let configIDSuffix = configID.map { String($0.suffix(8)) } ?? "nil"
     
     // Keys being checked
-    let freshConfigKeyByEntity = "freshConfig_\(normalizedUUIDForKey)"
-    let freshConfigKeyByConfig = config.id.uuidString.uppercased()
-    let orderKey = "itemOrder_\(entityUUID.uppercased())"
-    let versionKey = "dataVersion_\(entityUUID.uppercased())"
+    let freshConfigKeyByEntity = "freshConfig_" + normalizedUUIDForKey
+    let freshConfigKeyByConfig = "freshConfig_" + config.id.uuidString.uppercased()
+    let orderKey = "itemOrder_" + entityUUID.uppercased()
+    let versionKey = "dataVersion_" + entityUUID.uppercased()
     let swapDebug = UserDefaults.standard.string(forKey: "swapDebug") ?? "NO_SWAP_DEBUG"
     
     // Check all keys for freshConfig (both entity UUID and config.id UUID)
     let freshConfigByEntity = UserDefaults.standard.string(forKey: freshConfigKeyByEntity) != nil
-    let freshConfigKeyConfigUUID = "freshConfig_\(freshConfigKeyByConfig)"
-    let freshConfigByConfig = UserDefaults.standard.string(forKey: freshConfigKeyConfigUUID) != nil
+    let freshConfigByConfig = UserDefaults.standard.string(forKey: freshConfigKeyByConfig) != nil
     
     // Check order key
     let orderByEntity = UserDefaults.standard.string(forKey: orderKey)
@@ -582,34 +581,33 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     // Check version
     let dataVersion = UserDefaults.standard.integer(forKey: versionKey)
     
-    if freshConfigJSON != nil && !freshConfigJSON!.isEmpty {
-        freshConfigInfo = """
-        === FRESH CONFIG FOUND ===
-        configID: \(configIDSample)
-        entityUUID: \(entityUUID.prefix(8))...
-        configID.uuid: \(configIDSuffix)
-        ---
-        KEY_BY_ENTITY: \(freshConfigKeyByEntity.prefix(20))... = \(freshConfigByEntity)
-        KEY_BY_CONFIG: \(freshConfigKeyConfigUUID.prefix(20))... = \(freshConfigByConfig)
-        ORDER_KEY: \(orderKey.prefix(20))... = \(orderByEntity?.prefix(10) ?? "nil")
-        VERSION: \(versionKey.prefix(20))... = \(dataVersion)
-        """
+    // Data source explanation
+    let dataSource: String
+    if freshConfigJSON != nil && !(freshConfigJSON ?? "").isEmpty {
+        dataSource = "SOURCE: freshConfig (refresh button wrote this)"
+    } else if storageName == "NOT_FOUND" {
+        dataSource = "SOURCE: embedded config.id (stale at widget-add time)"
     } else {
-        freshConfigInfo = """
-        === FRESH CONFIG NOT FOUND ===
-        configID: \(configIDSample)
-        entityUUID: \(entityUUID.prefix(8))...
-        config.id: \(config.id.uuidString.prefix(8))...
-        ---
-        KEY_BY_ENTITY: \(freshConfigKeyByEntity) = \(freshConfigByEntity)
-        KEY_BY_CONFIG: \(freshConfigKeyConfigUUID) = \(freshConfigByConfig)
-        ORDER_KEY: \(orderKey) = \(orderByEntity?.prefix(10) ?? "nil")
-        VERSION: \(versionKey) = \(dataVersion)
-        ---
-        SWAP_DEBUG: \(swapDebug.prefix(50))
-        MARKER: \(marker.prefix(15))
-        """
+        dataSource = "SOURCE: SharedStorage (live from app)"
     }
+    
+    // Build the info string
+    var infoLines: [String] = []
+    infoLines.append("=== REFRESH DEBUG ===")
+    infoLines.append("configID: " + configIDSample)
+    infoLines.append("entityUUID: " + entityUUID.prefix(8) + "...")
+    infoLines.append("config.id: " + config.id.uuidString.prefix(8) + "...")
+    infoLines.append("---")
+    infoLines.append(dataSource)
+    infoLines.append("---")
+    infoLines.append("KEY_BY_ENTITY: " + freshConfigKeyByEntity + " = " + String(freshConfigByEntity))
+    infoLines.append("KEY_BY_CONFIG: " + freshConfigKeyByConfig + " = " + String(freshConfigByConfig))
+    infoLines.append("ORDER_KEY: " + orderKey + " = " + (orderByEntity ?? "nil"))
+    infoLines.append("VERSION: " + versionKey + " = " + String(dataVersion))
+    infoLines.append("---")
+    infoLines.append("SWAP: " + String(swapDebug.prefix(30)))
+    infoLines.append("MARKER: " + String(marker.prefix(15)))
+    freshConfigInfo = infoLines.joined(separator: "\n")
     
     return WidgetEntry(date: Date(), configuration: finalConfig,
                        showItemLabels: showLabels, entityUUID: entityUUID,
