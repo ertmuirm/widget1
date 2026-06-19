@@ -556,18 +556,59 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let storageName = storage.debugReadSource(forKey: SharedStorage.configKey)
     let configCount = liveConfigs.count
     
-    // Fresh config debug info - show the key and whether it was found
+    // Fresh config debug info - comprehensive debug output
     let freshConfigInfo: String
     let marker = UserDefaults.standard.string(forKey: "refreshMarker") ?? "NO_MARKER"
-    // Show configID, extracted UUID, and full key
-    let extractedUUID = configID.flatMap { uuidFromEntityID($0) } ?? "NIL"
+    
+    // Build all the keys we're checking
     let configIDSample = configID.map { $0.count > 20 ? String($0.prefix(20)) + "..." : $0 } ?? "nil"
-    // Also show the entityUUID (VUID source)
     let configIDSuffix = configID.map { String($0.suffix(8)) } ?? "nil"
-    if let json = freshConfigJSON, !json.isEmpty {
-        freshConfigInfo = "configID: \(configIDSample)\nconfigIDSuffix: \(configIDSuffix)\nKEY.UUID: \(normalizedUUIDForKey.prefix(8))...\nVUID: \(entityUUID.suffix(8))\nFOUND"
+    
+    // Keys being checked
+    let freshConfigKeyByEntity = "freshConfig_\(normalizedUUIDForKey)"
+    let freshConfigKeyByConfig = config.id.uuidString.uppercased()
+    let orderKey = "itemOrder_\(entityUUID.uppercased())"
+    let versionKey = "dataVersion_\(entityUUID.uppercased())"
+    let swapDebug = UserDefaults.standard.string(forKey: "swapDebug") ?? "NO_SWAP_DEBUG"
+    
+    // Check all keys for freshConfig (both entity UUID and config.id UUID)
+    let freshConfigByEntity = UserDefaults.standard.string(forKey: freshConfigKeyByEntity) != nil
+    let freshConfigKeyConfigUUID = "freshConfig_\(freshConfigKeyByConfig)"
+    let freshConfigByConfig = UserDefaults.standard.string(forKey: freshConfigKeyConfigUUID) != nil
+    
+    // Check order key
+    let orderByEntity = UserDefaults.standard.string(forKey: orderKey)
+    
+    // Check version
+    let dataVersion = UserDefaults.standard.integer(forKey: versionKey)
+    
+    if freshConfigJSON != nil && !freshConfigJSON!.isEmpty {
+        freshConfigInfo = """
+        === FRESH CONFIG FOUND ===
+        configID: \(configIDSample)
+        entityUUID: \(entityUUID.prefix(8))...
+        configID.uuid: \(configIDSuffix)
+        ---
+        KEY_BY_ENTITY: \(freshConfigKeyByEntity.prefix(20))... = \(freshConfigByEntity)
+        KEY_BY_CONFIG: \(freshConfigKeyConfigUUID.prefix(20))... = \(freshConfigByConfig)
+        ORDER_KEY: \(orderKey.prefix(20))... = \(orderByEntity?.prefix(10) ?? "nil")
+        VERSION: \(versionKey.prefix(20))... = \(dataVersion)
+        """
     } else {
-        freshConfigInfo = "configID: \(configIDSample)\nconfigIDSuffix: \(configIDSuffix)\nKEY.UUID: \(normalizedUUIDForKey.prefix(8))...\nVUID: \(entityUUID.suffix(8))\nNF|MARKER=\(marker.prefix(10))"
+        freshConfigInfo = """
+        === FRESH CONFIG NOT FOUND ===
+        configID: \(configIDSample)
+        entityUUID: \(entityUUID.prefix(8))...
+        config.id: \(config.id.uuidString.prefix(8))...
+        ---
+        KEY_BY_ENTITY: \(freshConfigKeyByEntity) = \(freshConfigByEntity)
+        KEY_BY_CONFIG: \(freshConfigKeyConfigUUID) = \(freshConfigByConfig)
+        ORDER_KEY: \(orderKey) = \(orderByEntity?.prefix(10) ?? "nil")
+        VERSION: \(versionKey) = \(dataVersion)
+        ---
+        SWAP_DEBUG: \(swapDebug.prefix(50))
+        MARKER: \(marker.prefix(15))
+        """
     }
     
     return WidgetEntry(date: Date(), configuration: finalConfig,
