@@ -659,10 +659,15 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let itemNames = finalConfig.items.prefix(3).map { $0.displayType.rawValue }.joined(separator: ",")
     let itemCount = finalConfig.items.count
     
+    // Check if order key exists in UserDefaults.standard
+    let orderInUD = UserDefaults.standard.string(forKey: orderKey) ?? "nil"
+    
     var infoLines: [String] = []
     infoLines.append("=== REFRESH DEBUG ===")
     infoLines.append("configID: " + configIDSample + " len=" + String(configID?.count ?? 0))
     infoLines.append("uuid: " + entityUUID.prefix(8))
+    infoLines.append("orderKey: " + orderKey)
+    infoLines.append("orderInUD: " + (orderInUD.count > 20 ? String(orderInUD.prefix(20)) + "..." : orderInUD))
     infoLines.append("Storage: " + storageName + " (C: \(liveConfigs.count))")
     infoLines.append("  Raw: " + directRead.source)
     infoLines.append("CONFIG_SRC: " + configSource)
