@@ -298,6 +298,15 @@ struct SwapWidgetItemsIntent: AppIntent {
                 try? freshEntityID.write(to: url, atomically: true, encoding: String.Encoding.utf8)
             }
         }
+        
+        // CRITICAL: Write widget-specific key using entity UUID
+        // This ensures the correct widget gets its fresh data
+        let widgetSpecificKey = "SWAPPED_CONFIG_\(widgetUUID.uppercased())"
+        UserDefaults.standard.set(freshEntityID, forKey: widgetSpecificKey)
+        for id in SharedStorage.appGroupCandidates {
+            UserDefaults(suiteName: id)?.set(freshEntityID, forKey: widgetSpecificKey)
+        }
+        storage.appendExtensionLog("SWAP_WRITE: widgetSpecificKey=\(widgetSpecificKey.prefix(30))")
 
         // Write item-order override using WIDGET's UUID (reuse widgetUUID declared earlier)
         let orderKey = "itemOrder_\(widgetUUID)"

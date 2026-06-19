@@ -395,9 +395,30 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     
     // Check for latest encoded config (written by swap intent)
     var latestEncoded: String? = nil
+    let entityUUIDForKey = configID.map { uuidFromEntityID($0) } ?? ""
+    
+    // FIRST: Check widget-specific swapped config key
+    let widgetSpecificKey = "SWAPPED_CONFIG_\(entityUUIDForKey.uppercased())"
     for id in SharedStorage.appGroupCandidates {
-        if let s = UserDefaults(suiteName: id)?.string(forKey: "LATEST_ENCODED_CONFIG"), !s.isEmpty {
-            latestEncoded = s; break
+        if let s = UserDefaults(suiteName: id)?.string(forKey: widgetSpecificKey), !s.isEmpty {
+            latestEncoded = s
+            storage.appendExtensionLog("makeEntry: found SWAPPED_CONFIG via AppGroup len=\(s.count)")
+            break
+        }
+    }
+    if latestEncoded == nil {
+        latestEncoded = UserDefaults.standard.string(forKey: widgetSpecificKey)
+        if latestEncoded != nil {
+            storage.appendExtensionLog("makeEntry: found SWAPPED_CONFIG via UD.std len=\(latestEncoded!.count)")
+        }
+    }
+    
+    // SECOND: Check LATEST_ENCODED_CONFIG
+    if latestEncoded == nil {
+        for id in SharedStorage.appGroupCandidates {
+            if let s = UserDefaults(suiteName: id)?.string(forKey: "LATEST_ENCODED_CONFIG"), !s.isEmpty {
+                latestEncoded = s; break
+            }
         }
     }
     if latestEncoded == nil {
