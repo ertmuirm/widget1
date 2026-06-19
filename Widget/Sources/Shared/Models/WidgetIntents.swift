@@ -369,20 +369,28 @@ struct WidgetEntry: TimelineEntry {
 private var timelineDebugNote: String = ""
 
 private func makeEntry(configID: String?) -> WidgetEntry {
-    return makeEntryInternal(configID: configID, debugNote: nil)
+    SharedStorage.shared.appendExtensionLog(">>> makeEntry CALLED configID.len=\(configID?.count ?? -1)")
+    return makeEntryInternal(configID: configID, debugNote: "from makeEntry()")
 }
 
 private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetEntry {
     let storage = SharedStorage.shared
+    
+    // DEBUG: Always log what we receive
+    storage.appendExtensionLog("=== makeEntryInternal ===")
+    storage.appendExtensionLog("configID: \(configID?.prefix(30) ?? "nil")")
+    storage.appendExtensionLog("callerNote: \(debugNote ?? "none")")
     
     // Debug note from timeline
     let note = debugNote ?? timelineDebugNote
     
     // Load configs - this is what reselection uses (via suggestedEntities -> entities -> loadConfigurations)
     let liveConfigs = (try? storage.loadConfigurations()) ?? []
+    storage.appendExtensionLog("liveConfigs: \(liveConfigs.count)")
     
     // Direct check of gatherRead for debugging
     let directRead = storage.gatherReadDebug(forKey: SharedStorage.configKey)
+    storage.appendExtensionLog("gatherRead: \(directRead.source)")
 
     // Load config - widget reselection just calls SharedStorage which should have fresh data
     // BUT: For sideloaded apps, SharedStorage may not be shared. So we check multiple sources:
