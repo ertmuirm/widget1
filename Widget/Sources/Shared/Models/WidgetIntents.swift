@@ -66,13 +66,13 @@ private let kSlimBlack: Int = 255                                              /
 
 // MARK: - Slim Codable structs
 
-private struct SlimAction: Codable {
+struct SlimAction: Codable {
     var t: String    // ActionType.rawValue
     var p: String    // payload
     var n: String?   // displayName
 }
 
-private struct SlimItem: Codable {
+struct SlimItem: Codable {
     var d: String      // DisplayType.rawValue
     var s: String?     // sfSymbolName        (nil = none)
     var t: String?     // customText           (nil = none)
@@ -121,7 +121,7 @@ private extension SlimItem {
     }
 }
 
-private struct SlimSlide: Codable {
+struct SlimSlide: Codable {
     var fn: String?    // filename             (nil = QR/barcode slide)
     var qc: String?    // qrCodeContent
     var ql: String?    // qrCodeLabel
