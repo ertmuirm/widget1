@@ -439,6 +439,21 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
         }
     }
     
+    // NEW: Check for refresh entity written by RefreshWidgetIntent
+    let refreshEntityUUID = configID.map { uuidFromEntityID($0) } ?? ""
+    let refreshKey = "REFRESH_ENTITY_\(refreshEntityUUID)"
+    if let refreshData = storage.keychainRead(forKey: refreshKey),
+       let refreshID = String(data: refreshData, encoding: .utf8),
+       refreshID != configID {
+        // Found a refresh entity! Use it instead
+        storage.appendExtensionLog("REFRESH: Found fresh entity via keychain, len=\(refreshID.count)")
+        // Use this fresh entity ID
+        if let decoded = decodeConfigFromID(refreshID) {
+            specificEncoded = refreshID
+            storage.appendExtensionLog("REFRESH: decoded successfully items=\(decoded.items.count)")
+        }
+    }
+    
     // DEBUG: Show how widget reselection gets data
     // Widget reselection decodes the entity ID to get config data
     var decodeDebug: String
@@ -526,8 +541,8 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     // SharedStorage is unavailable and config falls back to .defaultConfiguration
     // (which has a fresh random UUID), we still look up the key AdvanceImageIntent wrote.
     var finalConfig = config
-    let entityUUID = configID.map { uuidFromEntityID($0) } ?? config.id.uuidString
-    let idxKey = "slideIdx_\(entityUUID)"
+    let entityUUID2 = configID.map { uuidFromEntityID($0) } ?? config.id.uuidString
+    let idxKey = "slideIdx_\(entityUUID2)"
     var slideOverride: Int? = nil
     for id in SharedStorage.appGroupCandidates {
         if let v = UserDefaults(suiteName: id)?.object(forKey: idxKey) as? Int {
@@ -542,11 +557,12 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     // Apply item-order override written by SwapWidgetItemsIntent using position indices.
     // Since SlimItem creates new UUIDs on load, we use array positions instead.
     // Format: "0,2,1,3,4" means item at index 0 stays at 0, item at index 1 moves to 2, etc.
-    let normalizedEntityUUID = entityUUID.uppercased()
+    let entityUUIDForOrder = configID.map { uuidFromEntityID($0) } ?? config.id.uuidString
+    let normalizedEntityUUID = entityUUIDForOrder.uppercased()
     let orderKey = "itemOrder_\(normalizedEntityUUID)"
     
     // DEBUG: Log exact keys being checked
-    storage.appendExtensionLog("ORDER_KEY_DEBUG: entityUUID=\(entityUUID.prefix(8)) normalized=\(normalizedEntityUUID.prefix(20)) orderKey=\(orderKey)")
+    storage.appendExtensionLog("ORDER_KEY_DEBUG: entityUUID=\(entityUUIDForOrder.prefix(8)) normalized=\(normalizedEntityUUID.prefix(20)) orderKey=\(orderKey)")
     storage.appendExtensionLog("ORDER_KEY_DEBUG: UD.st[\(orderKey)]=\(UserDefaults.standard.string(forKey: orderKey) != nil ? "YES" : "nil")")
     
     // Check order override from ALL sources - App Group files are most likely to work
@@ -672,12 +688,12 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     
     // Build info string
     let configIDSample = configID.map { $0.count > 20 ? String($0.prefix(20)) + "..." : $0 } ?? "nil"
-    let versionKeyByEntity = "dataVersion_" + entityUUID.uppercased()
+    let versionKeyByEntity = "dataVersion_" + entityUUIDForOrder.uppercased()
     let dataVersion = UserDefaults.standard.integer(forKey: versionKeyByEntity)
     
     // Debug: Show what config we ended up with
     let configSource: String
-    if liveConfigs.contains(where: { $0.id.uuidString.uppercased() == entityUUID.uppercased() }) {
+    if liveConfigs.contains(where: { $0.id.uuidString.uppercased() == entityUUIDForOrder.uppercased() }) {
         configSource = "liveConfigs"
     } else if latestEncoded != nil {
         configSource = "LATEST_ENC"
@@ -715,7 +731,7 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     
     var infoLines: [String] = []
     infoLines.append("=== RESELECTION DEBUG ===")
-    infoLines.append("uuid: \(entityUUID.prefix(8))")
+    infoLines.append("uuid: \(entityUUIDForOrder.prefix(8))")
     infoLines.append("fullID.len: \(configID?.count ?? 0)")
     let fullIDHash = configID.map { String($0.hashValue) } ?? "nil"
     infoLines.append("fullID.hash: \(fullIDHash.prefix(10))")
@@ -737,7 +753,7 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     freshConfigInfo = infoLines.joined(separator: "\n")
     
     return WidgetEntry(date: Date(), configuration: finalConfig,
-                       showItemLabels: showLabels, entityUUID: entityUUID,
+                       showItemLabels: showLabels, entityUUID: entityUUIDForOrder,
                        debugOrderInfo: debugOrderInfo, debugOrderFound: orderFound,
                        debugStorageName: storageName, debugConfigCount: configCount,
                        debugFreshConfigInfo: freshConfigInfo)
@@ -1455,27 +1471,31 @@ struct RefreshWidgetIntent: AppIntent {
     init(entityUUID: String) { self.entityUUID = entityUUID }
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        // This intent runs in the MAIN APP context when user taps widget button
+        // But it seems to run in widget context sometimes. Try both approaches.
+        
         let storage = SharedStorage.shared
-        
-        // DEBUG: Compare with what reselection sees
         let storageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
-        storage.appendExtensionLog("=== REFRESH INTENT DEBUG ===")
-        storage.appendExtensionLog("RefreshIntent: entityUUID=\(entityUUID.prefix(8))")
-        storage.appendExtensionLog("RefreshIntent: storage=\(storageDebug.source) bytes=\(storageDebug.data?.count ?? -1)")
         
-        // Try to find a fresh entity with the same UUID
+        // Try suggestedEntities first
         let candidates = try await LargeWidgetQuery().suggestedEntities()
-        storage.appendExtensionLog("RefreshIntent: candidates.count=\(candidates.count)")
+        let validCandidate = candidates.first { $0.id != "none" }
         
-        if let freshEntity = candidates.first(where: { uuidFromEntityID($0.id) == entityUUID }) {
-            storage.appendExtensionLog("RefreshIntent: found fresh entity id.len=\(freshEntity.id.count)")
-            return .result(value: freshEntity.id, dialog: IntentDialog("Widget refreshed with latest data."))
+        if let fresh = validCandidate {
+            // Found fresh entity - write to keychain so widget can read it
+            let key = "REFRESH_ENTITY_\(entityUUID)"
+            if let data = fresh.id.data(using: .utf8) {
+                let status = storage.keychainWrite(data, forKey: key)
+                storage.appendExtensionLog("Refresh: wrote fresh entity to keychain status=\(status)")
+            }
+            
+            WidgetCenter.shared.reloadAllTimelines()
+            return .result(value: fresh.id, dialog: IntentDialog("Widget refreshed!"))
         }
         
-        storage.appendExtensionLog("RefreshIntent: no matching entity found")
+        // Fallback: reload timelines
+        storage.appendExtensionLog("Refresh: no fresh entity found")
         WidgetCenter.shared.reloadAllTimelines()
-        DarwinNotificationCenter.shared.postWidgetUpdate()
-        
-        return .result(value: "", dialog: IntentDialog("Widget refreshed. Tap widget to see changes."))
+        return .result(value: "", dialog: IntentDialog("Widget refreshed."))
     }
 }
