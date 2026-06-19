@@ -340,12 +340,19 @@ struct WidgetEntry: TimelineEntry {
 
 // MARK: - Shared provider logic
 
+private var timelineDebugNote: String = ""
+
 private func makeEntry(configID: String?) -> WidgetEntry {
+    return makeEntryInternal(configID: configID, debugNote: nil)
+}
+
+private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetEntry {
     let storage = SharedStorage.shared
     
     // EXTENSIVE DEBUG: Trace exactly where data comes from
     let debugTimestamp = Date().timeIntervalSince1970
-    storage.appendExtensionLog("=== makeEntry START id=\(configID?.prefix(20) ?? "nil") ts=\(debugTimestamp) ===")
+    let note = debugNote ?? timelineDebugNote
+    storage.appendExtensionLog("=== makeEntry START id=\(configID?.prefix(20) ?? "nil") ts=\(debugTimestamp) note=\(note) ===")
     
     // Debug: direct check of gatherReadDebug
     let directRead = storage.gatherReadDebug(forKey: SharedStorage.configKey)
@@ -696,6 +703,9 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     infoLines.append("---")
     infoLines.append("RESELECT: " + decodeDebug.prefix(40))
     infoLines.append("LATEST_ENC: " + (latestEncoded != nil ? "YES" : "nil"))
+    if !note.isEmpty {
+        infoLines.append("NOTE: " + note)
+    }
     freshConfigInfo = infoLines.joined(separator: "\n")
     
     return WidgetEntry(date: Date(), configuration: finalConfig,
@@ -976,25 +986,31 @@ struct LargeBroadcastProvider: AppIntentTimelineProvider {
         WidgetEntry(date: Date(), configuration: .defaultConfiguration)
     }
     func snapshot(for configuration: SelectLargeWidgetIntent, in context: Context) async -> WidgetEntry {
-        // Re-query entities to get FRESH data from SharedStorage (same as reselection!)
-        if let id = configuration.selectedWidget?.id {
-            let entities = try? await LargeWidgetQuery().entities(for: [id])
-            if let fresh = entities?.first {
-                return makeEntry(configID: fresh.id)
-            }
-        }
         return makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectLargeWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        // CRITICAL: Re-query entities to get FRESH data from SharedStorage!
-        if let id = configuration.selectedWidget?.id {
-            let entities = try? await LargeWidgetQuery().entities(for: [id])
-            if let fresh = entities?.first {
-                SharedStorage.shared.appendExtensionLog("Large timeline: RE-QUERIED fresh entity id.len=\(fresh.id.count)")
-                return makeTimeline(configID: fresh.id)
-            }
+        let storedID = configuration.selectedWidget?.id ?? "nil"
+        SharedStorage.shared.appendExtensionLog("LARGE_TL START id.len=\(storedID.count)")
+        
+        // Re-query entities to get FRESH data from SharedStorage (same as reselection!)
+        let entities = try? await LargeWidgetQuery().entities(for: [storedID])
+        SharedStorage.shared.appendExtensionLog("LARGE_TL entities.count=\(entities?.count ?? -1)")
+        
+        var freshID: String? = nil
+        if let fresh = entities?.first {
+            SharedStorage.shared.appendExtensionLog("LARGE_TL: RE-QUERIED fresh id.len=\(fresh.id.count) name=\(fresh.name)")
+            freshID = fresh.id
+            timelineDebugNote = "LARGE_TL:REQUERIED fresh.id.len=\(fresh.id.count)"
+        } else {
+            SharedStorage.shared.appendExtensionLog("LARGE_TL: FALLBACK to storedID")
+            timelineDebugNote = "LARGE_TL:FALLBACK stored.len=\(storedID.count)"
         }
-        return makeTimeline(configID: configuration.selectedWidget?.id)
+        
+        let entry = makeEntryInternal(configID: freshID ?? storedID, debugNote: nil)
+        timelineDebugNote = "" // Clear after use
+        
+        let next = Calendar.current.date(byAdding: .minute, value: 30, to: Date()) ?? Date()
+        return Timeline(entries: [entry], policy: .after(next))
     }
 }
 
