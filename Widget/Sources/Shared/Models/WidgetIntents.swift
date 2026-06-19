@@ -1011,27 +1011,42 @@ struct LargeWidgetEntity: AppEntity, Hashable {
 
 struct LargeWidgetQuery: EntityQuery {
     func entities(for identifiers: [String]) async throws -> [LargeWidgetEntity] {
-        // Debug: check what storage is accessible
         let storage = SharedStorage.shared
+        
+        // CRITICAL DEBUG: What can entities() see?
         let storageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
+        let liveConfigs = (try? storage.loadConfigurations()) ?? []
+        
+        // Log ALL storage sources
+        storage.appendExtensionLog("=== entities() CALLED ===")
+        storage.appendExtensionLog("identifiers.count=\(identifiers.count)")
+        storage.appendExtensionLog("storage.source=\(storageDebug.source)")
+        storage.appendExtensionLog("liveConfigs.count=\(liveConfigs.count)")
+        
+        // Check if swap wrote the widget-specific key
+        if let firstID = identifiers.first {
+            let uuid = uuidFromEntityID(firstID)
+            let swapKey = "SWAPPED_CONFIG_\(uuid.uppercased())"
+            for ag in SharedStorage.appGroupCandidates {
+                if let s = UserDefaults(suiteName: ag)?.string(forKey: swapKey) {
+                    storage.appendExtensionLog("entities: found SWAPPED_CONFIG in AG len=\(s.count)")
+                }
+            }
+        }
         
         let configs = filteredConfigs(size: .systemLarge)
+        storage.appendExtensionLog("filteredConfigs.count=\(configs.count)")
         
-        // Debug: Show what happened
-        let infoMsg = "entities(): configs.count=\(configs.count) storage=\(storageDebug.source)"
-        storage.appendExtensionLog(infoMsg)
-        
-        // CRITICAL: If configs found, we RE-ENCODE them with fresh data!
-        // This is how reselection gets fresh data - it re-encodes from SharedStorage
         return identifiers.map { storedID in
             let uuid = uuidFromEntityID(storedID)
             if let c = configs.first(where: { $0.id.uuidString == uuid }) {
-                // RE-ENCODE from fresh SharedStorage data!
+                // RE-ENCODE from SharedStorage!
                 let freshID = encodeEntityID(c)
-                storage.appendExtensionLog("entities: RE-ENCODED from liveConfigs id.hash=\(freshID.hashValue)")
+                storage.appendExtensionLog("entities: RE-ENCODE config.id=\(c.id.uuidString.prefix(8)) items=\(c.items.count)")
                 return LargeWidgetEntity(id: freshID, name: c.name)
             }
             if let c = decodeConfigFromID(storedID) {
+                storage.appendExtensionLog("entities: FALLBACK to storedID decode items=\(c.items.count)")
                 return LargeWidgetEntity(id: storedID, name: c.name)
             }
             return LargeWidgetEntity(id: storedID, name: "Widget")
@@ -1492,30 +1507,45 @@ struct RefreshWidgetIntent: AppIntent {
     init(entityUUID: String) { self.entityUUID = entityUUID }
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        // This intent runs in the MAIN APP context when user taps widget button
-        // But it seems to run in widget context sometimes. Try both approaches.
-        
         let storage = SharedStorage.shared
+        
+        // DEBUG: What can we see?
+        let now = Date()
         let storageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
+        storage.appendExtensionLog("=== REFRESH INTENT \(now.timeIntervalSince1970) ===")
+        storage.appendExtensionLog("entityUUID=\(entityUUID.prefix(8))")
+        storage.appendExtensionLog("storage.source=\(storageDebug.source)")
+        storage.appendExtensionLog("storage.bytes=\(storageDebug.data?.count ?? -1)")
         
-        // Try suggestedEntities first
+        // Check all storage sources manually
+        let udData = UserDefaults.standard.data(forKey: SharedStorage.configKey)
+        storage.appendExtensionLog("UD.std: \(udData != nil ? "HAS" : "empty")")
+        let kcData = storage.keychainRead(forKey: SharedStorage.configKey)
+        storage.appendExtensionLog("Keychain: \(kcData != nil ? "HAS" : "empty")")
+        
+        // Try suggestedEntities
         let candidates = try await LargeWidgetQuery().suggestedEntities()
-        let validCandidate = candidates.first { $0.id != "none" }
-        
-        if let fresh = validCandidate {
-            // Found fresh entity - write to keychain so widget can read it
-            let key = "REFRESH_ENTITY_\(entityUUID)"
-            if let data = fresh.id.data(using: .utf8) {
-                let status = storage.keychainWrite(data, forKey: key)
-                storage.appendExtensionLog("Refresh: wrote fresh entity to keychain status=\(status)")
-            }
-            
-            WidgetCenter.shared.reloadAllTimelines()
-            return .result(value: fresh.id, dialog: IntentDialog("Widget refreshed!"))
+        storage.appendExtensionLog("candidates.count=\(candidates.count)")
+        for (i, c) in candidates.enumerated() {
+            storage.appendExtensionLog("  candidate[\(i)]: id.len=\(c.id.count) name=\(c.name.prefix(10))")
         }
         
-        // Fallback: reload timelines
-        storage.appendExtensionLog("Refresh: no fresh entity found")
+        // Find the one matching our entity
+        let matchingEntity = candidates.first { uuidFromEntityID($0.id) == entityUUID }
+        
+        if let fresh = matchingEntity {
+            storage.appendExtensionLog("Found matching entity len=\(fresh.id.count)")
+            
+            // Post Darwin notification to ensure widget wakes up
+            DarwinNotificationCenter.shared.postSwapAction()
+            
+            return .result(value: fresh.id, dialog: IntentDialog("Widget refreshed with fresh data!"))
+        }
+        
+        storage.appendExtensionLog("No matching entity found")
+        
+        // Fallback
+        DarwinNotificationCenter.shared.postSwapAction()
         WidgetCenter.shared.reloadAllTimelines()
         return .result(value: "", dialog: IntentDialog("Widget refreshed."))
     }
