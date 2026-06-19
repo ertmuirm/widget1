@@ -306,14 +306,34 @@ struct SwapWidgetItemsIntent: AppIntent {
         // DEBUG: Log what UUID we're writing to
         storage.appendExtensionLog("SWAP_WRITE: widgetUUID=\(widgetUUID.prefix(20)) orderKey=\(orderKey) orderValue=\(orderValue)")
         
-        // Write to UserDefaults.standard (THIS IS WHAT WIDGET READS FROM!)
-        UserDefaults.standard.set(orderValue, forKey: orderKey)
+        // Write to ALL shared storage locations so widget extension can read it
+        // Widget extension has its own UserDefaults.standard, so we MUST use App Groups
+        UserDefaults.standard.set(orderValue, forKey: orderKey)  // Main app only
         
-        // Also write to App Groups for other storage mechanisms
+        // App Group UserDefaults - this IS shared with widget extension
+        for appGroupID in SharedStorage.appGroupCandidates {
+            if let ud = UserDefaults(suiteName: appGroupID) {
+                ud.set(orderValue, forKey: orderKey)
+                storage.appendExtensionLog("SWAP: wrote order to AppGroup \(appGroupID.prefix(15))")
+            }
+        }
+        
+        // Also write via SharedStorage's scatterWrite
         SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
+        
+        // CRITICAL: Write the FRESH encoded entity ID to App Group UserDefaults
+        // Widget extension will read this instead of using the cached entity ID
+        let freshEntityKey = "FRESH_ENTITY_ID_\(widgetUUID)"
+        for appGroupID in SharedStorage.appGroupCandidates {
+            if let ud = UserDefaults(suiteName: appGroupID) {
+                ud.set(freshEntityID, forKey: freshEntityKey)
+                ud.synchronize()
+                storage.appendExtensionLog("SWAP: wrote FRESH_ENTITY_ID to \(appGroupID.prefix(15))")
+            }
+        }
 
         // Debug info
-        let debugInfo = "RE_ENCODED|widgetID=\(widgetEntityID.prefix(15))|freshLen=\(freshEntityID.count)|key=LATEST"
+        let debugInfo = "RE_ENCODED|widgetID=\(widgetEntityID.prefix(15))|freshLen=\(freshEntityID.count)|key=FRESH_ENTITY"
         UserDefaults.standard.set(debugInfo, forKey: "swapDebug")
 
         // Increment version counter to signal data changed.

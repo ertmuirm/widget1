@@ -226,7 +226,30 @@ private func uuidFromEntityID(_ entityID: String) -> String {
 
 func decodeConfigFromID(_ entityID: String) -> WidgetConfig? {
     let parts = entityID.split(separator: "|", maxSplits: 1)
-    guard parts.count == 2, let data = Data(base64Encoded: String(parts[1])) else { return nil }
+    guard parts.count == 2 else { return nil }
+    
+    // Extract UUID to check for FRESH entity data
+    let uuid = String(parts[0])
+    let freshEntityKey = "FRESH_ENTITY_ID_\(uuid)"
+    
+    // Check App Groups for FRESH entity ID (written by swap action)
+    for appGroupID in SharedStorage.appGroupCandidates {
+        if let ud = UserDefaults(suiteName: appGroupID),
+           let freshEntityID = ud.string(forKey: freshEntityKey) {
+            // Found fresh entity - decode it!
+            let freshParts = freshEntityID.split(separator: "|", maxSplits: 1)
+            if freshParts.count == 2, let freshData = Data(base64Encoded: String(freshParts[1])) {
+                if let slim = try? JSONDecoder().decode(SlimConfig.self, from: freshData) {
+                    return slim.toWidgetConfig()
+                }
+                let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+                return try? dec.decode(WidgetConfig.self, from: freshData)
+            }
+        }
+    }
+    
+    // Fall back to decoding the provided entity ID
+    guard let data = Data(base64Encoded: String(parts[1])) else { return nil }
     // Try compact slim format first (current), then legacy full WidgetConfig JSON.
     if let slim = try? JSONDecoder().decode(SlimConfig.self, from: data) {
         return slim.toWidgetConfig()
@@ -693,14 +716,21 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     infoLines.append("src: \(configSource) | liveConfigs: \(liveConfigs.count)")
     infoLines.append("Storage: \(storageName)")
     infoLines.append("---")
-    infoLines.append("Storage checks:")
-    for check in storageChecks.prefix(4) {
-        infoLines.append("  \(check)")
+    // Check for FRESH_ENTITY_ID
+    let freshEntityKey = "FRESH_ENTITY_ID_\(entityUUID)"
+    var freshEntityFound = false
+    for appGroupID in SharedStorage.appGroupCandidates.prefix(2) {
+        if let ud = UserDefaults(suiteName: appGroupID),
+           let fresh = ud.string(forKey: freshEntityKey) {
+            infoLines.append("FRESH_ENTITY: YES in \(appGroupID.prefix(15))")
+            freshEntityFound = true
+            break
+        }
+    }
+    if !freshEntityFound {
+        infoLines.append("FRESH_ENTITY: NOT FOUND")
     }
     infoLines.append("---")
-    // RESELECTION: suggestedEntities() -> entities() -> filteredConfigs() -> loadConfigurations() -> gatherRead()
-    // REFRESH: cached entity ID used directly -> decodes embedded config -> OLD data
-    // FIX: re-query entities(for:) which should load fresh SharedStorage data
     if !note.isEmpty {
         infoLines.append("NOTE: \(note)")
     } else {
