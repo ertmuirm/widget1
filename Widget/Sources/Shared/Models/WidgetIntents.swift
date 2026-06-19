@@ -484,6 +484,19 @@ private func makeEntry(configID: String?) -> WidgetEntry {
         orderFound = true
         orderValue = orderStr
         storage.appendExtensionLog("ORDER: found in UserDefaults.standard: \(orderStr)")
+        // FIX: Apply reordering when read from UserDefaults.standard
+        // This was previously only done in the else-if branch for gatherReadOverride
+        let positions = orderStr.split(separator: ",").compactMap { Int($0) }
+        if positions.count == finalConfig.items.count {
+            var reordered = finalConfig.items
+            for (newIndex, oldIndex) in positions.enumerated() {
+                if oldIndex >= 0 && oldIndex < reordered.count {
+                    reordered[newIndex] = finalConfig.items[oldIndex]
+                }
+            }
+            finalConfig.items = reordered
+            storage.appendExtensionLog("ORDER: applied reordering from UserDefaults.standard")
+        }
     } else if let orderStr = SharedStorage.shared.gatherReadOverride(forKey: orderKey) {
         orderFound = true
         orderValue = orderStr
@@ -1181,7 +1194,23 @@ struct RefreshWidgetIntent: AppIntent {
         UserDefaults.standard.set("MARKER_\(upperUUID)_\(Date().timeIntervalSince1970)", forKey: "refreshMarker")
         UserDefaults.standard.synchronize()
 
-        // Try to reload widget timelines (may not work for sideloaded apps)
+        // Increment version counter to signal data changed.
+        // This triggers .atEnd policy in makeTimeline, causing iOS to call getTimeline
+        // when the widget is next displayed.
+        let versionKey = "dataVersion_\(upperUUID)"
+        let currentVersion = UserDefaults.standard.integer(forKey: versionKey)
+        let newVersion = currentVersion + 1
+        UserDefaults.standard.set(newVersion, forKey: versionKey)
+        for id in SharedStorage.appGroupCandidates {
+            UserDefaults(suiteName: id)?.set(newVersion, forKey: versionKey)
+        }
+
+        // Post Darwin notification to wake the widget extension (best effort for sideloaded apps)
+        // This is the most reliable way to trigger widget refresh since
+        // WidgetCenter.shared.reloadAllTimelines() may not work for sideloaded apps
+        DarwinNotificationCenter.shared.postWidgetUpdate()
+        
+        // Also try WidgetCenter reload as a fallback
         WidgetCenter.shared.reloadAllTimelines()
 
         return .result(dialog: IntentDialog(stringLiteral: "Widget '\(config.name)' refreshed with \(config.items.count) items."))
