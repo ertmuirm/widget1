@@ -132,7 +132,7 @@ final class SharedStorage {
         return status
     }
 
-    private func keychainRead(forKey key: String) -> Data? {
+    func keychainRead(forKey key: String) -> Data? {
         guard let group = Self.sharedKeychainGroup else { return nil }
         let query: [String: Any] = [
             kSecClass as String:           kSecClassGenericPassword,
@@ -160,7 +160,7 @@ final class SharedStorage {
         return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
     }
 
-    private func keychainDelete(forKey key: String) {
+    func keychainDelete(forKey key: String) {
         guard let group = Self.sharedKeychainGroup else { return }
         let query: [String: Any] = [
             kSecClass as String:           kSecClassGenericPassword,

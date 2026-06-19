@@ -1213,8 +1213,8 @@ struct RefreshWidgetIntent: AppIntent {
         let freshKeyByConfig = "freshEntityID_\(config.id.uuidString.uppercased())"
         
         if let data = freshEncodedEntityID.data(using: .utf8) {
-            storage.keychainWrite(data, forKey: freshKeyByEntity)
-            storage.keychainWrite(data, forKey: freshKeyByConfig)
+            SharedStorage.shared.keychainWrite(data, forKey: freshKeyByEntity)
+            SharedStorage.shared.keychainWrite(data, forKey: freshKeyByConfig)
         }
 
         // Write marker to UserDefaults.standard (for debugging only)
