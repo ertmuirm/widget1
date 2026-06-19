@@ -621,22 +621,14 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     
     var infoLines: [String] = []
     infoLines.append("=== REFRESH DEBUG ===")
-    infoLines.append("configID: " + configIDSample)
-    infoLines.append("entityUUID: " + entityUUID.prefix(8) + "...")
-    infoLines.append("config.id: " + config.id.uuidString.prefix(8) + "...")
-    infoLines.append("---")
+    infoLines.append("configID: " + configIDSample + " len=" + String(configID?.count ?? 0))
+    infoLines.append("uuid: " + entityUUID.prefix(8))
     infoLines.append("Storage: " + storageName + " (C: \(liveConfigs.count))")
-    infoLines.append("AppGroups(C/D/F): " + appGroupStatus)
     infoLines.append("ORDER: " + debugOrderInfo)
+    infoLines.append("AppGrps: " + (appGroupStatus.isEmpty ? "none" : appGroupStatus.prefix(50)))
     infoLines.append("---")
-    infoLines.append("=== WIDGET RESELECTION PATH ===")
-    infoLines.append(decodeDebug)
-    infoLines.append("---")
+    infoLines.append("RESELECT: " + decodeDebug.prefix(40))
     infoLines.append("LATEST_ENC: " + (latestEncoded != nil ? "YES" : "nil"))
-    infoLines.append("VERSION: " + versionKeyByEntity + " = " + String(dataVersion))
-    infoLines.append("---")
-    infoLines.append("SWAP: " + String(swapDebug.prefix(40)))
-    infoLines.append("MARKER: " + String(marker.prefix(30)))
     freshConfigInfo = infoLines.joined(separator: "\n")
     
     return WidgetEntry(date: Date(), configuration: finalConfig,

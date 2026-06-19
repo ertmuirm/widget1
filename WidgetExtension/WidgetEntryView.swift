@@ -131,27 +131,27 @@ struct WidgetEntryView: View {
                 itemsGrid
             }
             
-            // DEBUG: Larger debug panel for 6x6 widget
-            VStack(alignment: .leading, spacing: 4) {
+            // DEBUG: Expanded debug panel for 6x6 widget (double height)
+            VStack(alignment: .leading, spacing: 2) {
                 Text("DEBUG - \(entry.debugRefreshTime)")
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundStyle(.white)
                 Text("UUID: \(entry.debugEntityUUID)")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundStyle(.yellow)
                 Text("Order: \(entry.debugOrderInfo)")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundStyle(entry.debugOrderFound ? .green : .red)
                 Text("Storage: \(entry.debugStorageName) (C:\(entry.debugConfigCount))")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
                     .foregroundStyle(.cyan)
                 Text(entry.debugFreshConfigInfo)
                     .font(.system(size: 8, weight: .bold, design: .monospaced))
                     .foregroundStyle(.orange)
-                    .lineLimit(10)
+                    .lineLimit(20)
                     .textSelection(.enabled)
             }
-            .padding(8)
+            .padding(6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(Color.black.opacity(0.9))
             .cornerRadius(8)

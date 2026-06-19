@@ -355,6 +355,107 @@ struct DebugWidgetIntent: AppIntent {
     }
 }
 
+// MARK: - Debug Entity ID Intent
+
+/// Tests how the widget gets data - specifically the entity ID encoding/decoding
+struct DebugEntityIDIntent: AppIntent {
+    static var title: LocalizedStringResource = "Debug Entity ID"
+    static var description = IntentDescription("Shows entity ID details and decode test.")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Widget",
+               description: "The Grid Widget to debug.")
+    var widget: GridWidgetEntity
+
+    init() {}
+    init(widget: GridWidgetEntity) { self.widget = widget }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard widget.id != "none" else {
+            return .result(dialog: IntentDialog(stringLiteral: "No widgets found"))
+        }
+
+        var info = "=== ENTITY ID DEBUG ===\n\n"
+        
+        // Show the raw entity ID
+        let rawID = widget.id
+        info += "Raw ID length: \(rawID.count)\n"
+        info += "Raw ID prefix: \(rawID.prefix(20))...\n\n"
+        
+        // Check structure
+        let hasPipe = rawID.contains("|")
+        info += "Has pipe (|): \(hasPipe)\n"
+        
+        // Extract UUID
+        let uuidPart = rawID.split(separator: "|", maxSplits: 1).first ?? Substring(rawID)
+        info += "UUID part: \(uuidPart)\n\n"
+        
+        // Test decode
+        let configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
+        if let decoded = decodeConfigFromID(rawID) {
+            info += "✓ decodeConfigFromID: SUCCESS\n"
+            info += "  Name: \(decoded.name)\n"
+            info += "  Items: \(decoded.items.count)\n"
+            info += "  Kind: \(decoded.widgetKind?.rawValue ?? "nil")\n"
+            
+            // Write this decoded config to LATEST_ENCODED_CONFIG for widget to use
+            let freshID = encodeEntityID(decoded)
+            UserDefaults.standard.set(freshID, forKey: "LATEST_ENCODED_CONFIG")
+            for id in SharedStorage.appGroupCandidates {
+                UserDefaults(suiteName: id)?.set(freshID, forKey: "LATEST_ENCODED_CONFIG")
+            }
+            info += "\n→ Wrote fresh entity ID to LATEST_ENCODED_CONFIG\n"
+            info += "  Fresh ID length: \(freshID.count)\n"
+        } else {
+            info += "✗ decodeConfigFromID: FAILED\n"
+            
+            // Try to decode just the base64 part
+            let parts = rawID.split(separator: "|", maxSplits: 1)
+            if parts.count == 2 {
+                let b64 = String(parts[1])
+                info += "  Base64 length: \(b64.count)\n"
+                if let data = Data(base64Encoded: b64) {
+                    info += "  Base64 valid: YES (\(data.count) bytes)\n"
+                    
+                    // Try JSON decode
+                    if let json = try? JSONDecoder().decode(SlimConfig.self, from: data) {
+                        info += "  SlimConfig decode: SUCCESS\n"
+                        info += "    Name: \(json.name)\n"
+                        info += "    Items: \(json.items.count)\n"
+                    } else {
+                        info += "  SlimConfig decode: FAILED\n"
+                    }
+                } else {
+                    info += "  Base64 valid: NO\n"
+                }
+            } else {
+                info += "  No base64 part found\n"
+            }
+        }
+        
+        // Check config in SharedStorage
+        info += "\n--- SharedStorage ---\n"
+        info += "Configs loaded: \(configs.count)\n"
+        
+        // Find matching config
+        if let match = configs.first(where: { $0.id.uuidString.uppercased() == String(uuidPart).uppercased() }) {
+            info += "✓ Found in SharedStorage\n"
+            info += "  Name: \(match.name)\n"
+            info += "  Items: \(match.items.count)\n"
+            
+            // Re-encode from SharedStorage (this is what widget reselection does!)
+            let freshFromSS = encodeEntityID(match)
+            UserDefaults.standard.set(freshFromSS, forKey: "LATEST_FROM_SS")
+            info += "\n→ Re-encoded from SharedStorage:\n"
+            info += "  Length: \(freshFromSS.count)\n"
+        } else {
+            info += "✗ NOT found in SharedStorage\n"
+        }
+        
+        return .result(dialog: IntentDialog(stringLiteral: info))
+    }
+}
+
 // MARK: - Test Refresh Intent
 
 struct TestRefreshIntent: AppIntent {
