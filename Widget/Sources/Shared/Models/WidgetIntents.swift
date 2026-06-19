@@ -230,37 +230,22 @@ func decodeConfigFromID(_ entityID: String) -> WidgetConfig? {
     
     // Extract UUID to check for FRESH entity data
     let uuid = String(parts[0])
-    let freshEntityKey = "FRESH_ENTITY_ID_\(uuid)"
+    let freshEntityKey = "FRESH_ENTITY_\(uuid)"
     
-    // DEBUG: Log all App Group checks
-    for appGroupID in SharedStorage.appGroupCandidates {
-        if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
-            let fileURL = container.appendingPathComponent("\(freshEntityKey).txt")
-            let fileExists = FileManager.default.fileExists(atPath: fileURL.path)
-            SharedStorage.shared.appendExtensionLog("DECODE: checking AG=[\(appGroupID.prefix(15))] file=\(fileExists ? "EXISTS" : "NO") key=\(freshEntityKey.prefix(20))")
-        } else {
-            SharedStorage.shared.appendExtensionLog("DECODE: AG=[\(appGroupID.prefix(15))] NO_CONTAINER")
-        }
-    }
-    
-    // Check App Group CONTAINER FILES for FRESH entity ID (written by swap action)
-    // Using file instead of UserDefaults because sideloaded apps may not share UserDefaults
-    for appGroupID in SharedStorage.appGroupCandidates {
-        if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
-            let fileURL = container.appendingPathComponent("\(freshEntityKey).txt")
-            if let freshEntityID = try? String(contentsOf: fileURL, encoding: .utf8) {
-                SharedStorage.shared.appendExtensionLog("DECODE: FOUND fresh entity len=\(freshEntityID.count)")
-                // Found fresh entity - decode it!
-                let freshParts = freshEntityID.split(separator: "|", maxSplits: 1)
-                if freshParts.count == 2, let freshData = Data(base64Encoded: String(freshParts[1])) {
-                    if let slim = try? JSONDecoder().decode(SlimConfig.self, from: freshData) {
-                        return slim.toWidgetConfig()
-                    }
-                    let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
-                    if let config = try? dec.decode(WidgetConfig.self, from: freshData) {
-                        return config
-                    }
-                }
+    // CHECK KEYCHAIN FIRST - this works for sideloaded apps!
+    // SwapWidgetItemsIntent writes fresh entity ID to keychain
+    if let freshData = SharedStorage.shared.keychainRead(forKey: freshEntityKey),
+       let freshEntityID = String(data: freshData, encoding: .utf8) {
+        SharedStorage.shared.appendExtensionLog("DECODE: FOUND fresh via KEYCHAIN len=\(freshEntityID.count)")
+        // Found fresh entity - decode it!
+        let freshParts = freshEntityID.split(separator: "|", maxSplits: 1)
+        if freshParts.count == 2, let data = Data(base64Encoded: String(freshParts[1])) {
+            if let slim = try? JSONDecoder().decode(SlimConfig.self, from: data) {
+                return slim.toWidgetConfig()
+            }
+            let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+            if let config = try? dec.decode(WidgetConfig.self, from: data) {
+                return config
             }
         }
     }
@@ -1544,7 +1529,8 @@ struct AdvanceImageIntent: AppIntent {
 // MARK: - Refresh Widget Intent
 
 /// Intent triggered by widget button to refresh the widget.
-/// Triggers a reload - the widget will check for fresh data from swap action.
+/// The swap action writes fresh entity to KEYCHAIN, and this button triggers
+/// a reload so the widget reads the fresh data.
 struct RefreshWidgetIntent: AppIntent {
     static var title: LocalizedStringResource = "Refresh Widget"
     static var description = IntentDescription("Refreshes the widget with latest data from storage. Tap after making changes.")
@@ -1561,21 +1547,11 @@ struct RefreshWidgetIntent: AppIntent {
         
         // Write debug info
         UserDefaults.standard.set("tapped_\(timestamp)", forKey: "REFRESH_TAPPED")
-        for id in SharedStorage.appGroupCandidates {
-            UserDefaults(suiteName: id)?.set("tapped_\(timestamp)", forKey: "REFRESH_TAPPED")
-        }
         
-        // Get UUID and write to app group - this signals which widget needs refresh
-        let uuid = uuidFromEntityID(widgetEntity.id)
-        UserDefaults.standard.set(uuid, forKey: "REFRESH_TARGET_UUID")
-        for id in SharedStorage.appGroupCandidates {
-            UserDefaults(suiteName: id)?.set(uuid, forKey: "REFRESH_TARGET_UUID")
-        }
-        
-        // Post Darwin notification to trigger widget reload
+        // Trigger widget reload - widget will read fresh entity from keychain via decodeConfigFromID()
         DarwinNotificationCenter.shared.postSwapAction()
         WidgetCenter.shared.reloadAllTimelines()
         
-        return .result(value: widgetEntity.id, dialog: IntentDialog("Refresh triggered"))
+        return .result(value: widgetEntity.id, dialog: IntentDialog("Refresh tapped"))
     }
 }
