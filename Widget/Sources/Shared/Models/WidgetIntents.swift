@@ -751,25 +751,26 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     }
     
     var infoLines: [String] = []
-    infoLines.append("REFRESH BTN TAP:")
-    
-    // Check if refresh button was tapped - put this FIRST
-    var refreshTapped = "NO"
-    for ag in SharedStorage.appGroupCandidates.prefix(1) {
-        if let v = UserDefaults(suiteName: ag)?.string(forKey: "REFRESH_TAPPED") {
-            refreshTapped = "YES: \(v)"
-        }
-    }
-    if refreshTapped == "NO" {
-        if let v = UserDefaults.standard.string(forKey: "REFRESH_TAPPED") {
-            refreshTapped = "YES(UD): \(v)"
-        }
-    }
-    infoLines.append(refreshTapped)
+    infoLines.append("=== RESELECTION DEBUG ===")
     infoLines.append("uuid: \(entityUUIDForOrder.prefix(8))")
-    infoLines.append("storedID.hash: \(fullIDHash.prefix(10))")
+    infoLines.append("fullID.len: \(configID?.count ?? 0)")
+    let fullIDHash = configID.map { String($0.hashValue) } ?? "nil"
+    infoLines.append("fullID.hash: \(fullIDHash.prefix(10))")
+    infoLines.append("items: \(itemCount)")
+    infoLines.append("order: \(debugOrderInfo)")
+    infoLines.append("---")
     infoLines.append("src: \(configSource)")
-    infoLines.append("displayed: \(debugOrderInfo)")
+    infoLines.append("liveConfigs: \(liveConfigs.count)")
+    infoLines.append("Storage: \(storageName)")
+    if !note.isEmpty {
+        infoLines.append("caller: \(note)")
+    }
+    infoLines.append("---")
+    infoLines.append("KEY INSIGHT:")
+    infoLines.append("entities() re-encodes from")
+    infoLines.append("liveConfigs if available!")
+    infoLines.append("If liveConfigs>0, widget gets")
+    infoLines.append("FRESH data in entityID!")
     freshConfigInfo = infoLines.joined(separator: "\n")
     
     return WidgetEntry(date: Date(), configuration: finalConfig,
@@ -1053,38 +1054,29 @@ struct LargeWidgetQuery: EntityQuery {
     }
     func suggestedEntities() async throws -> [LargeWidgetEntity] {
         let storage = SharedStorage.shared
-        let timestamp = Int(Date().timeIntervalSince1970)
         
         // DEBUG: Step-by-step reselection process
-        storage.appendExtensionLog("=== SUGGESTED_ENTITIES_\(timestamp) ===")
+        storage.appendExtensionLog("=== SUGGESTED ENTITIES ===")
         
         // Step 1: Check what storage is accessible
         let storageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
-        storage.appendExtensionLog("SUGGESTED: storage=\(storageDebug.source) bytes=\(storageDebug.data?.count ?? -1)")
+        storage.appendExtensionLog("1. storage=\(storageDebug.source) bytes=\(storageDebug.data?.count ?? -1)")
         
         // Step 2: Check UD.standard
         let udData = UserDefaults.standard.data(forKey: SharedStorage.configKey)
-        storage.appendExtensionLog("SUGGESTED: UD.std=\(udData != nil ? "HAS(\(udData!.count)B)" : "empty")")
+        storage.appendExtensionLog("2. UD.std=\(udData != nil ? "HAS(\(udData!.count)B)" : "empty")")
         
         // Step 3: Get filtered configs
         let list = filteredConfigs(size: .systemLarge)
-        storage.appendExtensionLog("SUGGESTED: filteredConfigs.count=\(list.count)")
-        
-        // DEBUG: Show what we're re-encoding
-        for config in list.prefix(2) {
-            let freshID = encodeEntityID(config)
-            let orderStr = config.items.prefix(4).map { String($0.displayType.rawValue.prefix(4)) }.joined(separator: ",")
-            storage.appendExtensionLog("SUGGESTED: config[\(config.name.prefix(10))] order[0-3]=\(orderStr)")
-            storage.appendExtensionLog("SUGGESTED: freshID.hash=\(freshID.hashValue)")
-        }
+        storage.appendExtensionLog("3. filteredConfigs.count=\(list.count)")
         
         if list.isEmpty { 
-            storage.appendExtensionLog("SUGGESTED: RETURNING 'none'")
+            storage.appendExtensionLog("4. RETURNING: 'none' (no configs)")
             return [LargeWidgetEntity(id: "none", name: "No Large Widgets")] 
         }
         
-        // Step 4: Return encoded entities (these are what reselection gives to widget!)
-        storage.appendExtensionLog("SUGGESTED: RETURNING \(list.count) FRESH entities")
+        // Step 4: Return encoded entities
+        storage.appendExtensionLog("4. RETURNING: \(list.count) entities")
         for config in list.prefix(3) {
             let entityID = encodeEntityID(config)
             storage.appendExtensionLog("   - id.len=\(entityID.count) name=\(config.name)")
@@ -1514,21 +1506,47 @@ struct RefreshWidgetIntent: AppIntent {
     init() {}
     init(entityUUID: String) { self.entityUUID = entityUUID }
 
-    func perform() async throws -> some IntentResult {
+    func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let storage = SharedStorage.shared
-        let timestamp = Int(Date().timeIntervalSince1970) % 10000
         
-        // Write a flag that debug panel can read
-        UserDefaults.standard.set("tapped_\(timestamp)", forKey: "REFRESH_TAPPED")
-        for id in SharedStorage.appGroupCandidates {
-            UserDefaults(suiteName: id)?.set("tapped_\(timestamp)", forKey: "REFRESH_TAPPED")
+        // DEBUG: What can we see?
+        let now = Date()
+        let storageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
+        storage.appendExtensionLog("=== REFRESH INTENT \(now.timeIntervalSince1970) ===")
+        storage.appendExtensionLog("entityUUID=\(entityUUID.prefix(8))")
+        storage.appendExtensionLog("storage.source=\(storageDebug.source)")
+        storage.appendExtensionLog("storage.bytes=\(storageDebug.data?.count ?? -1)")
+        
+        // Check all storage sources manually
+        let udData = UserDefaults.standard.data(forKey: SharedStorage.configKey)
+        storage.appendExtensionLog("UD.std: \(udData != nil ? "HAS" : "empty")")
+        let kcData = storage.keychainRead(forKey: SharedStorage.configKey)
+        storage.appendExtensionLog("Keychain: \(kcData != nil ? "HAS" : "empty")")
+        
+        // Try suggestedEntities
+        let candidates = try await LargeWidgetQuery().suggestedEntities()
+        storage.appendExtensionLog("candidates.count=\(candidates.count)")
+        for (i, c) in candidates.enumerated() {
+            storage.appendExtensionLog("  candidate[\(i)]: id.len=\(c.id.count) name=\(c.name.prefix(10))")
         }
         
-        storage.appendExtensionLog("=== REFRESH_TAPPED_\(timestamp) ===")
+        // Find the one matching our entity
+        let matchingEntity = candidates.first { uuidFromEntityID($0.id) == entityUUID }
         
+        if let fresh = matchingEntity {
+            storage.appendExtensionLog("Found matching entity len=\(fresh.id.count)")
+            
+            // Post Darwin notification to ensure widget wakes up
+            DarwinNotificationCenter.shared.postSwapAction()
+            
+            return .result(value: fresh.id, dialog: IntentDialog("Widget refreshed with fresh data!"))
+        }
+        
+        storage.appendExtensionLog("No matching entity found")
+        
+        // Fallback
         DarwinNotificationCenter.shared.postSwapAction()
         WidgetCenter.shared.reloadAllTimelines()
-        
-        return .result(dialog: IntentDialog("Refresh tapped @ \(timestamp)"))
+        return .result(value: "", dialog: IntentDialog("Widget refreshed."))
     }
 }
