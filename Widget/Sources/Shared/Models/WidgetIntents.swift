@@ -343,9 +343,6 @@ struct WidgetEntry: TimelineEntry {
 private func makeEntry(configID: String?) -> WidgetEntry {
     let storage = SharedStorage.shared
     
-    // Get entityUUID for logging
-    let entityUUID = configID.flatMap { uuidFromEntityID($0) } ?? ""
-    
     // Debug: direct check of gatherReadDebug
     let directRead = storage.gatherReadDebug(forKey: SharedStorage.configKey)
     // Write debug info to shared container for main app to read
