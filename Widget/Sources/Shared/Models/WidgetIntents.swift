@@ -766,11 +766,20 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
         infoLines.append("caller: \(note)")
     }
     infoLines.append("---")
-    infoLines.append("KEY INSIGHT:")
-    infoLines.append("entities() re-encodes from")
-    infoLines.append("liveConfigs if available!")
-    infoLines.append("If liveConfigs>0, widget gets")
-    infoLines.append("FRESH data in entityID!")
+    infoLines.append("BTN TAP:")
+    // Check if refresh button was tapped
+    var refreshTapped = "NO"
+    for ag in SharedStorage.appGroupCandidates.prefix(1) {
+        if let v = UserDefaults(suiteName: ag)?.string(forKey: "REFRESH_TAPPED") {
+            refreshTapped = "YES: \(v)"
+        }
+    }
+    if refreshTapped == "NO" {
+        if let v = UserDefaults.standard.string(forKey: "REFRESH_TAPPED") {
+            refreshTapped = "YES(UD): \(v)"
+        }
+    }
+    infoLines.append(refreshTapped)
     freshConfigInfo = infoLines.joined(separator: "\n")
     
     return WidgetEntry(date: Date(), configuration: finalConfig,
@@ -1507,46 +1516,17 @@ struct RefreshWidgetIntent: AppIntent {
     init(entityUUID: String) { self.entityUUID = entityUUID }
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
-        let storage = SharedStorage.shared
+        let timestamp = Int(Date().timeIntervalSince1970) % 10000
         
-        // DEBUG: What can we see?
-        let now = Date()
-        let storageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
-        storage.appendExtensionLog("=== REFRESH INTENT \(now.timeIntervalSince1970) ===")
-        storage.appendExtensionLog("entityUUID=\(entityUUID.prefix(8))")
-        storage.appendExtensionLog("storage.source=\(storageDebug.source)")
-        storage.appendExtensionLog("storage.bytes=\(storageDebug.data?.count ?? -1)")
-        
-        // Check all storage sources manually
-        let udData = UserDefaults.standard.data(forKey: SharedStorage.configKey)
-        storage.appendExtensionLog("UD.std: \(udData != nil ? "HAS" : "empty")")
-        let kcData = storage.keychainRead(forKey: SharedStorage.configKey)
-        storage.appendExtensionLog("Keychain: \(kcData != nil ? "HAS" : "empty")")
-        
-        // Try suggestedEntities
-        let candidates = try await LargeWidgetQuery().suggestedEntities()
-        storage.appendExtensionLog("candidates.count=\(candidates.count)")
-        for (i, c) in candidates.enumerated() {
-            storage.appendExtensionLog("  candidate[\(i)]: id.len=\(c.id.count) name=\(c.name.prefix(10))")
+        // Write flag that debug panel can read
+        UserDefaults.standard.set("tapped_\(timestamp)", forKey: "REFRESH_TAPPED")
+        for id in SharedStorage.appGroupCandidates {
+            UserDefaults(suiteName: id)?.set("tapped_\(timestamp)", forKey: "REFRESH_TAPPED")
         }
         
-        // Find the one matching our entity
-        let matchingEntity = candidates.first { uuidFromEntityID($0.id) == entityUUID }
-        
-        if let fresh = matchingEntity {
-            storage.appendExtensionLog("Found matching entity len=\(fresh.id.count)")
-            
-            // Post Darwin notification to ensure widget wakes up
-            DarwinNotificationCenter.shared.postSwapAction()
-            
-            return .result(value: fresh.id, dialog: IntentDialog("Widget refreshed with fresh data!"))
-        }
-        
-        storage.appendExtensionLog("No matching entity found")
-        
-        // Fallback
         DarwinNotificationCenter.shared.postSwapAction()
         WidgetCenter.shared.reloadAllTimelines()
-        return .result(value: "", dialog: IntentDialog("Widget refreshed."))
+        
+        return .result(value: "refreshed_\(timestamp)", dialog: IntentDialog("Refresh tapped @ \(timestamp)"))
     }
 }
