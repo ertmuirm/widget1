@@ -248,7 +248,7 @@ struct SwapWidgetItemsIntent: AppIntent {
         for id in SharedStorage.appGroupCandidates {
             if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
                 let url = container.appendingPathComponent("\(freshEntityIDKey).txt")
-                try? freshEntityID.write(to: url, atomically: true, encoding: .utf8)
+                try? freshEntityID.write(to: url, atomically: true, encoding: String.Encoding.utf8)
             }
         }
         

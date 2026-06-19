@@ -213,7 +213,7 @@ private extension SlimConfig {
 
 // MARK: - Encode / decode helpers
 
-private func encodeEntityID(_ config: WidgetConfig) -> String {
+func encodeEntityID(_ config: WidgetConfig) -> String {
     guard let data = try? JSONEncoder().encode(SlimConfig(config)) else {
         return config.id.uuidString
     }
