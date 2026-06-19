@@ -1045,22 +1045,20 @@ struct LargeBroadcastProvider: AppIntentTimelineProvider {
         let storedID = configuration.selectedWidget?.id ?? "nil"
         
         // Key insight: suggestedEntities() returns entities with FRESH encoded data.
-        // Even if the UUID is the same, the base64-encoded portion is NEW after a swap.
-        // We should ALWAYS use the fresh entity from suggestedEntities() if available.
+        // But if Storage is empty, it returns "none" - we should NOT use that.
         
         let candidates = try? await LargeWidgetQuery().suggestedEntities()
         var freshID: String? = nil
         var note: String
         
+        // Only use fresh entity if it's valid (not "none")
         if let candidates = candidates, !candidates.isEmpty {
-            // Find entity with matching UUID
-            let uuid = uuidFromEntityID(storedID)
-            if let fresh = candidates.first(where: { uuidFromEntityID($0.id) == uuid }) {
-                freshID = fresh.id
+            let validCandidate = candidates.first { $0.id != "none" }
+            if let valid = validCandidate {
+                freshID = valid.id
                 note = "RESELECTION: using fresh entity"
             } else {
-                freshID = candidates.first?.id
-                note = "RESELECTION: using first candidate"
+                note = "REFRESH: only 'none' candidates"
             }
         } else {
             note = "REFRESH: no candidates"
