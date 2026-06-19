@@ -718,18 +718,18 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     infoLines.append("uuid: \(entityUUID.prefix(8)) items: \(itemCount)")
     infoLines.append("order: \(debugOrderInfo)")
     infoLines.append("---")
+    // Reselection flow:
+    // 1. suggestedEntities() calls filteredConfigs() -> loads from SharedStorage
+    // 2. If configs found, encodeEntityID() creates FRESH 633-char entity ID
+    // 3. Widget stores this new entity ID
+    // 4. Timeline decodes entity ID -> gets fresh config
+    if !note.isEmpty {
+        infoLines.append("MODE: \(note)")
+    }
+    infoLines.append("---")
     infoLines.append("src: \(configSource)")
     infoLines.append("liveConfigs: \(liveConfigs.count)")
     infoLines.append("Storage: \(storageName)")
-    infoLines.append("---")
-    // Key question: Was this entry generated via RESELECTION or REFRESH?
-    // RESELECTION: suggestedEntities() -> encodeEntityID() -> FRESH data encoded
-    // REFRESH: timeline() -> cached entity ID -> OLD embedded data decoded
-    if !note.isEmpty {
-        infoLines.append("MODE: \(note)")
-    } else {
-        infoLines.append("MODE: REFRESH (cached)")
-    }
     freshConfigInfo = infoLines.joined(separator: "\n")
     
     return WidgetEntry(date: Date(), configuration: finalConfig,
@@ -990,27 +990,31 @@ struct LargeWidgetQuery: EntityQuery {
     func suggestedEntities() async throws -> [LargeWidgetEntity] {
         let storage = SharedStorage.shared
         
-        // DEBUG: Check what storage is accessible during reselection
+        // DEBUG: Step-by-step reselection process
+        storage.appendExtensionLog("=== SUGGESTED ENTITIES ===")
+        
+        // Step 1: Check what storage is accessible
         let storageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
-        storage.appendExtensionLog("=== RESELECTION DEBUG ===")
-        storage.appendExtensionLog("suggestedEntities: storage=\(storageDebug.source) bytes=\(storageDebug.data?.count ?? -1)")
+        storage.appendExtensionLog("1. storage=\(storageDebug.source) bytes=\(storageDebug.data?.count ?? -1)")
         
-        // Also check UserDefaults.standard
+        // Step 2: Check UD.standard
         let udData = UserDefaults.standard.data(forKey: SharedStorage.configKey)
-        storage.appendExtensionLog("suggestedEntities: UD.std=\(udData != nil ? "HAS(\(udData!.count)B)" : "empty")")
+        storage.appendExtensionLog("2. UD.std=\(udData != nil ? "HAS(\(udData!.count)B)" : "empty")")
         
+        // Step 3: Get filtered configs
         let list = filteredConfigs(size: .systemLarge)
-        storage.appendExtensionLog("suggestedEntities: list.count=\(list.count)")
+        storage.appendExtensionLog("3. filteredConfigs.count=\(list.count)")
         
         if list.isEmpty { 
-            storage.appendExtensionLog("suggestedEntities: NO CONFIGS - returning 'none'")
+            storage.appendExtensionLog("4. RETURNING: 'none' (no configs)")
             return [LargeWidgetEntity(id: "none", name: "No Large Widgets")] 
         }
         
-        // Log what we're returning
+        // Step 4: Return encoded entities
+        storage.appendExtensionLog("4. RETURNING: \(list.count) entities")
         for config in list.prefix(3) {
             let entityID = encodeEntityID(config)
-            storage.appendExtensionLog("suggestedEntities: returning id.len=\(entityID.count) name=\(config.name)")
+            storage.appendExtensionLog("   - id.len=\(entityID.count) name=\(config.name)")
         }
         
         return list.map { LargeWidgetEntity(id: encodeEntityID($0), name: $0.name) }
@@ -1042,29 +1046,10 @@ struct LargeBroadcastProvider: AppIntentTimelineProvider {
         return makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectLargeWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
+        // Just use the stored entity ID - debug will show what happens
         let storedID = configuration.selectedWidget?.id ?? "nil"
-        
-        // Key insight: suggestedEntities() returns entities with FRESH encoded data.
-        // But if Storage is empty, it returns "none" - we should NOT use that.
-        
-        let candidates = try? await LargeWidgetQuery().suggestedEntities()
-        var freshID: String? = nil
-        var note: String
-        
-        // Only use fresh entity if it's valid (not "none")
-        if let candidates = candidates, !candidates.isEmpty {
-            let validCandidate = candidates.first { $0.id != "none" }
-            if let valid = validCandidate {
-                freshID = valid.id
-                note = "RESELECTION: using fresh entity"
-            } else {
-                note = "REFRESH: only 'none' candidates"
-            }
-        } else {
-            note = "REFRESH: no candidates"
-        }
-        
-        let entry = makeEntryInternal(configID: freshID ?? storedID, debugNote: note)
+        let note = "timeline using storedID.len=\(storedID.count)"
+        let entry = makeEntryInternal(configID: storedID, debugNote: note)
         let next = Calendar.current.date(byAdding: .minute, value: 30, to: Date()) ?? Date()
         return Timeline(entries: [entry], policy: .after(next))
     }
