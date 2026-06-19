@@ -343,24 +343,8 @@ struct WidgetEntry: TimelineEntry {
 private func makeEntry(configID: String?) -> WidgetEntry {
     let storage = SharedStorage.shared
     
-    // Get entityUUID early for fresh config key
-    let entityUUIDForKey = configID.flatMap { uuidFromEntityID($0) } ?? ""
-    let normalizedUUIDForKey = entityUUIDForKey.uppercased()
-    
-    // KEY INSIGHT: UserDefaults.standard is process-specific. The refresh button runs in the
-    // main app and writes to ITS UserDefaults.standard. The widget extension runs in a SEPARATE
-    // process and has its OWN UserDefaults.standard. They don't share data!
-    //
-    // SOLUTION: Read freshEntityID from KEYCHAIN which IS shared across processes.
-    let freshEntityIDKeyByEntity = "freshEntityID_\(normalizedUUIDForKey)"
-    let freshEntityIDKeyByConfig = "freshEntityID_\(configID.flatMap { uuidFromEntityID($0).uppercased() } ?? normalizedUUIDForKey)"
-    
-    // Check for fresh entity ID written by RefreshWidgetIntent - read from KEYCHAIN
-    let freshEntityIDByEntity = storage.keychainRead(forKey: freshEntityIDKeyByEntity).flatMap { String(data: $0, encoding: .utf8) }
-    let freshEntityIDByConfig = storage.keychainRead(forKey: freshEntityIDKeyByConfig).flatMap { String(data: $0, encoding: .utf8) }
-    let freshEntityID = freshEntityIDByEntity ?? freshEntityIDByConfig
-    
-    storage.appendExtensionLog("makeEntry: freshEntityIDByEntity=\(freshEntityIDByEntity != nil) freshEntityIDByConfig=\(freshEntityIDByConfig != nil)")
+    // Get entityUUID for logging
+    let entityUUID = configID.flatMap { uuidFromEntityID($0) } ?? ""
     
     // Debug: direct check of gatherReadDebug
     let directRead = storage.gatherReadDebug(forKey: SharedStorage.configKey)
@@ -372,62 +356,14 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let liveStorageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
     storage.appendExtensionLog("makeEntry liveConfigs count=\(liveConfigs.count) storage=\(liveStorageDebug.source)")
 
-    // Check for refresh key written by RefreshWidgetIntent button.
-    // When detected, force re-read from SharedStorage on next line.
-    var refreshDetected = false
-    let tempEntityUUID = configID.flatMap { uuidFromEntityID($0) } ?? ""
-    let tempNormalizedUUID = tempEntityUUID.uppercased()
-    let tempRefreshKey = "widgetRefresh_\(tempNormalizedUUID)"
-    
-    // Debug: check what we can read
-    let standardRefresh = UserDefaults.standard.string(forKey: tempRefreshKey)
-    let gatherRefresh = storage.gatherReadOverride(forKey: tempRefreshKey)
-    storage.appendExtensionLog("REFRESH: key=\(tempRefreshKey) standard=\(standardRefresh ?? "nil") gather=\(gatherRefresh ?? "nil")")
-    
-    if gatherRefresh != nil {
-        refreshDetected = true
-        storage.scatterWriteOverride("", forKey: tempRefreshKey)
-        storage.appendExtensionLog("REFRESH: detected, re-reading config")
-    }
-
-    // Check for fresh entity ID written by RefreshWidgetIntent.
-    // This is the ONLY way to get fresh data for sideloaded apps since
-    // entity ID data is captured at widget-add time and never updates.
-    
+    // Load config - widget reselection just calls SharedStorage which should have fresh data
     var config: WidgetConfig
-    if let entityID = freshEntityID, !entityID.isEmpty {
-        // Fresh entity ID available from refresh button - decode embedded config
-        storage.appendExtensionLog("FRESH: using entityID from keychain")
-        if let decoded = decodeConfigFromID(entityID) {
-            config = decoded
-            // Clear the fresh entity ID so it's only used once - delete from keychain
-            storage.keychainDelete(forKey: freshEntityIDKeyByEntity)
-            storage.keychainDelete(forKey: freshEntityIDKeyByConfig)
-        } else {
-            storage.appendExtensionLog("FRESH: failed to decode entityID")
-            config = .defaultConfiguration
-        }
-    } else if let id = configID, id != "none" {
-        // No fresh entity ID - use stale entity ID data (standard behavior)
+    if let id = configID, id != "none" {
         let uuid = uuidFromEntityID(id)
         if let found = liveConfigs.first(where: { $0.id.uuidString == uuid }) {
             config = found
-        } else if var embedded = decodeConfigFromID(id) {
-            // Embedded config found - check if there's a fresh entity ID for embedded's UUID
-            let embeddedUUID = embedded.id.uuidString.uppercased()
-            let freshEntityIDKeyEmbedded = "freshEntityID_\(embeddedUUID)"
-            let embeddedEntityIDData = storage.keychainRead(forKey: freshEntityIDKeyEmbedded)
-            if let embeddedEntityID = embeddedEntityIDData.flatMap({ String(data: $0, encoding: .utf8) }), !embeddedEntityID.isEmpty {
-                storage.appendExtensionLog("FRESH: using embedded entityID key \(embeddedUUID.prefix(8))")
-                if let decoded = decodeConfigFromID(embeddedEntityID) {
-                    config = decoded
-                    storage.keychainDelete(forKey: freshEntityIDKeyEmbedded)
-                } else {
-                    config = embedded
-                }
-            } else {
-                config = embedded
-            }
+        } else if let embedded = decodeConfigFromID(id) {
+            config = embedded
             
             // Populate imageData for slides/items not already populated by loadConfigurations
             if config.slides != nil {
@@ -554,47 +490,24 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let storageName = storage.debugReadSource(forKey: SharedStorage.configKey)
     let configCount = liveConfigs.count
     
-    // Fresh config debug info - comprehensive debug output
-    // Note: freshEntityID, freshEntityIDKeyByEntity, freshEntityIDKeyByConfig are already defined above
+    // Fresh config debug info - simplified
     let freshConfigInfo: String
     let marker = UserDefaults.standard.string(forKey: "refreshMarker") ?? "NO_MARKER"
     
-    // Build all the keys we're checking - use existing variables from above
+    // Build info string
     let configIDSample = configID.map { $0.count > 20 ? String($0.prefix(20)) + "..." : $0 } ?? "nil"
     let versionKeyByEntity = "dataVersion_" + entityUUID.uppercased()
     let swapDebug = UserDefaults.standard.string(forKey: "swapDebug") ?? "NO_SWAP_DEBUG"
     let orderByEntity = UserDefaults.standard.string(forKey: orderKey)
     let dataVersion = UserDefaults.standard.integer(forKey: versionKeyByEntity)
     
-    // Check freshEntityID from keychain (process-shared)
-    let kcDataByEntity = storage.keychainRead(forKey: freshEntityIDKeyByEntity)
-    let kcDataByConfig = storage.keychainRead(forKey: freshEntityIDKeyByConfig)
-    let freshEntityIDInKcByEntity = kcDataByEntity != nil
-    let freshEntityIDInKcByConfig = kcDataByConfig != nil
-    let kcGroup = SharedStorage.sharedKeychainGroup ?? "nil"
-    
-    // Data source explanation
-    let dataSource: String
-    if freshEntityID != nil && !(freshEntityID ?? "").isEmpty {
-        dataSource = "SOURCE: freshEntityID (refresh button wrote - WORKS!)"
-    } else if storageName == "NOT_FOUND" {
-        dataSource = "SOURCE: embedded config.id (stale at widget-add time)"
-    } else {
-        dataSource = "SOURCE: SharedStorage (live from app)"
-    }
-    
-    // Build the info string
     var infoLines: [String] = []
     infoLines.append("=== REFRESH DEBUG ===")
     infoLines.append("configID: " + configIDSample)
     infoLines.append("entityUUID: " + entityUUID.prefix(8) + "...")
     infoLines.append("config.id: " + config.id.uuidString.prefix(8) + "...")
     infoLines.append("---")
-    infoLines.append(dataSource)
-    infoLines.append("---")
-    infoLines.append("KC_GROUP: " + kcGroup)
-    infoLines.append("freshEntityID_KC_BY_ENTITY: " + String(freshEntityIDInKcByEntity) + " (len=" + String(kcDataByEntity?.count ?? -1) + ")")
-    infoLines.append("freshEntityID_KC_BY_CONFIG: " + String(freshEntityIDInKcByConfig) + " (len=" + String(kcDataByConfig?.count ?? -1) + ")")
+    infoLines.append("Storage: " + storageName + " (C: \(liveConfigs.count))")
     infoLines.append("ORDER_KEY: " + orderKey + " = " + (orderByEntity ?? "nil"))
     infoLines.append("VERSION: " + versionKeyByEntity + " = " + String(dataVersion))
     infoLines.append("---")
@@ -1197,54 +1110,14 @@ struct RefreshWidgetIntent: AppIntent {
     init(entityUUID: String) { self.entityUUID = entityUUID }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        // Get fresh config from SharedStorage (runs in main app context)
-        let configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
-        let upperUUID = entityUUID.uppercased()
-        
-        guard let config = configs.first(where: { $0.id.uuidString.uppercased() == upperUUID }) else {
-            return .result(dialog: IntentDialog(stringLiteral: "Widget config not found. Please re-add the widget."))
-        }
-
-        // KEY INSIGHT: UserDefaults.standard is process-specific - main app and widget extension
-        // have SEPARATE UserDefaults.standard! But the KEYCHAIN is shared across processes.
-        //
-        // SOLUTION: Write fresh entity ID to KEYCHAIN (shared) instead of UserDefaults.standard.
-        // The keychain is accessible from both the main app and widget extension processes.
-        let freshEncodedEntityID = encodeEntityID(config)
-        
-        // Write to keychain (shared across processes)
-        let freshKeyByEntity = "freshEntityID_\(upperUUID)"
-        let freshKeyByConfig = "freshEntityID_\(config.id.uuidString.uppercased())"
-        
-        // DEBUG: Log keychain group and write status
-        let kcGroup = SharedStorage.sharedKeychainGroup ?? "nil"
-        var writeStatus = "kcGroup=\(kcGroup)"
-        
-        if let data = freshEncodedEntityID.data(using: .utf8) {
-            let status1 = SharedStorage.shared.keychainWrite(data, forKey: freshKeyByEntity)
-            let status2 = SharedStorage.shared.keychainWrite(data, forKey: freshKeyByConfig)
-            writeStatus += " write1=\(status1) write2=\(status2)"
-        }
-        
-        // Write marker to UserDefaults.standard (for debugging only)
-        UserDefaults.standard.set("MARKER_\(Date().timeIntervalSince1970)_\(writeStatus)", forKey: "refreshMarker")
-        UserDefaults.standard.synchronize()
-
-        // Increment version counter
-        let versionKey = "dataVersion_\(upperUUID)"
-        let currentVersion = UserDefaults.standard.integer(forKey: versionKey)
-        let newVersion = currentVersion + 1
-        UserDefaults.standard.set(newVersion, forKey: versionKey)
-        for id in SharedStorage.appGroupCandidates {
-            UserDefaults(suiteName: id)?.set(newVersion, forKey: versionKey)
-        }
-
-        // Post Darwin notification to wake the widget extension
-        DarwinNotificationCenter.shared.postWidgetUpdate()
-        
-        // Also try WidgetCenter reload as a fallback
+        // Simply trigger widget timeline reload - this is the same mechanism iOS uses
+        // when the user manually reselects the widget. The widget will rebuild its
+        // timeline and read fresh data from SharedStorage.
         WidgetCenter.shared.reloadAllTimelines()
+        
+        // Also post Darwin notification as backup
+        DarwinNotificationCenter.shared.postWidgetUpdate()
 
-        return .result(dialog: IntentDialog(stringLiteral: "Widget '\(config.name)' refreshed with \(config.items.count) items."))
+        return .result(dialog: IntentDialog(stringLiteral: "Widget refreshed. Tap widget to see changes."))
     }
 }
