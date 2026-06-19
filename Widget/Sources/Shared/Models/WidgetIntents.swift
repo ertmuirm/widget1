@@ -381,8 +381,14 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     // Load configs
     let liveConfigs = (try? storage.loadConfigurations()) ?? []
     
+    // CRITICAL DEBUG: Log storage access
+    storage.appendExtensionLog("=== TIMELINE_RELOAD ===")
+    storage.appendExtensionLog("liveConfigs count: \(liveConfigs.count)")
+    storage.appendExtensionLog("configID: \(configID?.prefix(20) ?? "nil")")
+    
     // Direct check of gatherRead for debugging
     let directRead = storage.gatherReadDebug(forKey: SharedStorage.configKey)
+    storage.appendExtensionLog("gatherRead source: \(directRead.source) data: \(directRead.data?.count ?? -1)")
 
     // Load config - widget reselection just calls SharedStorage which should have fresh data
     // BUT: For sideloaded apps, SharedStorage may not be shared. So we check multiple sources:
@@ -554,6 +560,9 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     } else {
         config = .defaultConfiguration
     }
+    
+    // Log which config source was used
+    storage.appendExtensionLog("CONFIG_SOURCE: items=\(config.items.count) name=\(config.name.prefix(15))")
 
     // Apply slide index written by AdvanceImageIntent as a lightweight override.
     // This fires when saveConfigurations didn't cross the process boundary so the
@@ -1529,12 +1538,11 @@ struct AdvanceImageIntent: AppIntent {
 // MARK: - Refresh Widget Intent
 
 /// Intent triggered by widget button to refresh the widget.
-/// The swap action writes fresh entity to KEYCHAIN, and this button triggers
-/// a reload so the widget reads the fresh data.
+/// Uses openAppWhenRun=true to run in main app context, mimicking reselection.
 struct RefreshWidgetIntent: AppIntent {
     static var title: LocalizedStringResource = "Refresh Widget"
     static var description = IntentDescription("Refreshes the widget with latest data from storage. Tap after making changes.")
-    static var openAppWhenRun: Bool = false
+    static var openAppWhenRun: Bool = true  // KEY: This makes it run in main app context!
     
     @Parameter(title: "Widget")
     var widgetEntity: LargeWidgetEntity
@@ -1548,10 +1556,16 @@ struct RefreshWidgetIntent: AppIntent {
         // Write debug info
         UserDefaults.standard.set("tapped_\(timestamp)", forKey: "REFRESH_TAPPED")
         
-        // Trigger widget reload - widget will read fresh entity from keychain via decodeConfigFromID()
+        // Extract UUID and write to keychain - this tells the widget which entity to re-encode
+        let uuid = uuidFromEntityID(widgetEntity.id)
+        if let uuidData = uuid.data(using: .utf8) {
+            _ = SharedStorage.shared.keychainWrite(uuidData, forKey: "REFRESH_TARGET_UUID")
+        }
+        
+        // Trigger widget reload
         DarwinNotificationCenter.shared.postSwapAction()
         WidgetCenter.shared.reloadAllTimelines()
         
-        return .result(value: widgetEntity.id, dialog: IntentDialog("Refresh tapped"))
+        return .result(value: widgetEntity.id, dialog: IntentDialog("Refresh @ \(uuid.prefix(8))"))
     }
 }
