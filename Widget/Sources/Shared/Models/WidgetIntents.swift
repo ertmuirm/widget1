@@ -564,22 +564,21 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let configIDSample = configID.map { $0.count > 20 ? String($0.prefix(20)) + "..." : $0 } ?? "nil"
     let configIDSuffix = configID.map { String($0.suffix(8)) } ?? "nil"
     
-    // Keys being checked
+    // Keys being checked - note: orderKey already exists above at line 477
     let freshConfigKeyByEntity = "freshConfig_" + normalizedUUIDForKey
     let freshConfigKeyByConfig = "freshConfig_" + config.id.uuidString.uppercased()
-    let orderKey = "itemOrder_" + entityUUID.uppercased()
-    let versionKey = "dataVersion_" + entityUUID.uppercased()
+    let versionKeyByEntity = "dataVersion_" + entityUUID.uppercased()
     let swapDebug = UserDefaults.standard.string(forKey: "swapDebug") ?? "NO_SWAP_DEBUG"
     
     // Check all keys for freshConfig (both entity UUID and config.id UUID)
     let freshConfigByEntity = UserDefaults.standard.string(forKey: freshConfigKeyByEntity) != nil
     let freshConfigByConfig = UserDefaults.standard.string(forKey: freshConfigKeyByConfig) != nil
     
-    // Check order key
+    // Check order key (already defined above)
     let orderByEntity = UserDefaults.standard.string(forKey: orderKey)
     
     // Check version
-    let dataVersion = UserDefaults.standard.integer(forKey: versionKey)
+    let dataVersion = UserDefaults.standard.integer(forKey: versionKeyByEntity)
     
     // Data source explanation
     let dataSource: String
@@ -603,7 +602,7 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     infoLines.append("KEY_BY_ENTITY: " + freshConfigKeyByEntity + " = " + String(freshConfigByEntity))
     infoLines.append("KEY_BY_CONFIG: " + freshConfigKeyByConfig + " = " + String(freshConfigByConfig))
     infoLines.append("ORDER_KEY: " + orderKey + " = " + (orderByEntity ?? "nil"))
-    infoLines.append("VERSION: " + versionKey + " = " + String(dataVersion))
+    infoLines.append("VERSION: " + versionKeyByEntity + " = " + String(dataVersion))
     infoLines.append("---")
     infoLines.append("SWAP: " + String(swapDebug.prefix(30)))
     infoLines.append("MARKER: " + String(marker.prefix(15)))
