@@ -321,14 +321,15 @@ struct SwapWidgetItemsIntent: AppIntent {
         // Also write via SharedStorage's scatterWrite
         SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
         
-        // CRITICAL: Write the FRESH encoded entity ID to App Group UserDefaults
+        // CRITICAL: Write the FRESH encoded entity ID to App Group container FILE
         // Widget extension will read this instead of using the cached entity ID
+        // Using FILE instead of UserDefaults because sideloaded apps may not share UserDefaults
         let freshEntityKey = "FRESH_ENTITY_ID_\(widgetUUID)"
         for appGroupID in SharedStorage.appGroupCandidates {
-            if let ud = UserDefaults(suiteName: appGroupID) {
-                ud.set(freshEntityID, forKey: freshEntityKey)
-                ud.synchronize()
-                storage.appendExtensionLog("SWAP: wrote FRESH_ENTITY_ID to \(appGroupID.prefix(15))")
+            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
+                let url = container.appendingPathComponent("\(freshEntityKey).txt")
+                try? freshEntityID.write(to: url, atomically: true, encoding: .utf8)
+                storage.appendExtensionLog("SWAP: wrote FRESH_ENTITY to file \(appGroupID.prefix(15))")
             }
         }
 

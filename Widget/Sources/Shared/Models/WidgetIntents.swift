@@ -232,18 +232,21 @@ func decodeConfigFromID(_ entityID: String) -> WidgetConfig? {
     let uuid = String(parts[0])
     let freshEntityKey = "FRESH_ENTITY_ID_\(uuid)"
     
-    // Check App Groups for FRESH entity ID (written by swap action)
+    // Check App Group CONTAINER FILES for FRESH entity ID (written by swap action)
+    // Using file instead of UserDefaults because sideloaded apps may not share UserDefaults
     for appGroupID in SharedStorage.appGroupCandidates {
-        if let ud = UserDefaults(suiteName: appGroupID),
-           let freshEntityID = ud.string(forKey: freshEntityKey) {
-            // Found fresh entity - decode it!
-            let freshParts = freshEntityID.split(separator: "|", maxSplits: 1)
-            if freshParts.count == 2, let freshData = Data(base64Encoded: String(freshParts[1])) {
-                if let slim = try? JSONDecoder().decode(SlimConfig.self, from: freshData) {
-                    return slim.toWidgetConfig()
+        if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
+            let fileURL = container.appendingPathComponent("\(freshEntityKey).txt")
+            if let freshEntityID = try? String(contentsOf: fileURL, encoding: .utf8) {
+                // Found fresh entity - decode it!
+                let freshParts = freshEntityID.split(separator: "|", maxSplits: 1)
+                if freshParts.count == 2, let freshData = Data(base64Encoded: String(freshParts[1])) {
+                    if let slim = try? JSONDecoder().decode(SlimConfig.self, from: freshData) {
+                        return slim.toWidgetConfig()
+                    }
+                    let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+                    return try? dec.decode(WidgetConfig.self, from: freshData)
                 }
-                let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
-                return try? dec.decode(WidgetConfig.self, from: freshData)
             }
         }
     }
@@ -716,19 +719,21 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     infoLines.append("src: \(configSource) | liveConfigs: \(liveConfigs.count)")
     infoLines.append("Storage: \(storageName)")
     infoLines.append("---")
-    // Check for FRESH_ENTITY_ID
+    // Check for FRESH_ENTITY_ID file (written by swap action)
     let freshEntityKey = "FRESH_ENTITY_ID_\(entityUUID)"
     var freshEntityFound = false
     for appGroupID in SharedStorage.appGroupCandidates.prefix(2) {
-        if let ud = UserDefaults(suiteName: appGroupID),
-           let fresh = ud.string(forKey: freshEntityKey) {
-            infoLines.append("FRESH_ENTITY: YES in \(appGroupID.prefix(15))")
-            freshEntityFound = true
-            break
+        if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
+            let fileURL = container.appendingPathComponent("\(freshEntityKey).txt")
+            if let exists = try? fileURL.checkResourceIsReachable(), exists {
+                infoLines.append("FRESH_FILE: YES in \(appGroupID.prefix(15))")
+                freshEntityFound = true
+                break
+            }
         }
     }
     if !freshEntityFound {
-        infoLines.append("FRESH_ENTITY: NOT FOUND")
+        infoLines.append("FRESH_FILE: NOT FOUND")
     }
     infoLines.append("---")
     if !note.isEmpty {
