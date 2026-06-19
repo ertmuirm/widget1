@@ -346,11 +346,22 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     // Get entityUUID early for fresh config key
     let entityUUIDForKey = configID.flatMap { uuidFromEntityID($0) } ?? ""
     let normalizedUUIDForKey = entityUUIDForKey.uppercased()
-    let freshConfigKey = "freshConfig_\(normalizedUUIDForKey)"
     
-    // Debug: check fresh config BEFORE anything else
-    let freshConfigJSON = UserDefaults.standard.string(forKey: freshConfigKey)
-    storage.appendExtensionLog("makeEntry START: freshConfigKey=\(freshConfigKey) jsonLen=\(freshConfigJSON?.count ?? -1)")
+    // KEY INSIGHT: UserDefaults.standard is process-specific. The refresh button runs in the
+    // main app and writes to ITS UserDefaults.standard. The widget extension runs in a SEPARATE
+    // process and has its OWN UserDefaults.standard. They don't share data!
+    //
+    // SOLUTION: Check for freshEntityID key which contains an encoded entity ID string
+    // (same format as manual reselection). This bypasses the UserDefaults.standard issue.
+    let freshEntityIDKeyByEntity = "freshEntityID_\(normalizedUUIDForKey)"
+    let freshEntityIDKeyByConfig = "freshEntityID_\(configID.flatMap { uuidFromEntityID($0).uppercased() } ?? normalizedUUIDForKey)"
+    
+    // Check for fresh entity ID written by RefreshWidgetIntent
+    let freshEntityIDByEntity = UserDefaults.standard.string(forKey: freshEntityIDKeyByEntity)
+    let freshEntityIDByConfig = UserDefaults.standard.string(forKey: freshEntityIDKeyByConfig)
+    let freshEntityID = freshEntityIDByEntity ?? freshEntityIDByConfig
+    
+    storage.appendExtensionLog("makeEntry: freshEntityIDByEntity=\(freshEntityIDByEntity != nil) freshEntityIDByConfig=\(freshEntityIDByConfig != nil)")
     
     // Debug: direct check of gatherReadDebug
     let directRead = storage.gatherReadDebug(forKey: SharedStorage.configKey)
@@ -380,50 +391,37 @@ private func makeEntry(configID: String?) -> WidgetEntry {
         storage.appendExtensionLog("REFRESH: detected, re-reading config")
     }
 
-    // Check for fresh config written by RefreshWidgetIntent.
+    // Check for fresh entity ID written by RefreshWidgetIntent.
     // This is the ONLY way to get fresh data for sideloaded apps since
     // entity ID data is captured at widget-add time and never updates.
-    // Uses freshConfigKey already defined earlier in the function.
     
     var config: WidgetConfig
-    if let jsonStr = freshConfigJSON, !jsonStr.isEmpty {
-        // Fresh config available from refresh button - decode and use it directly
-        storage.appendExtensionLog("FRESH: using config from UserDefaults.standard")
-        if let configData = Data(base64Encoded: jsonStr) {
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            if let decoded = try? decoder.decode(WidgetConfig.self, from: configData) {
-                config = decoded
-                // Clear the fresh config so it's only used once
-                UserDefaults.standard.removeObject(forKey: freshConfigKey)
-            } else {
-                storage.appendExtensionLog("FRESH: failed to decode config")
-                config = .defaultConfiguration
-            }
+    if let entityID = freshEntityID, !entityID.isEmpty {
+        // Fresh entity ID available from refresh button - decode embedded config
+        storage.appendExtensionLog("FRESH: using entityID from UserDefaults.standard")
+        if let decoded = decodeConfigFromID(entityID) {
+            config = decoded
+            // Clear the fresh entity ID so it's only used once
+            UserDefaults.standard.removeObject(forKey: freshEntityIDKeyByEntity)
+            UserDefaults.standard.removeObject(forKey: freshEntityIDKeyByConfig)
         } else {
+            storage.appendExtensionLog("FRESH: failed to decode entityID")
             config = .defaultConfiguration
         }
     } else if let id = configID, id != "none" {
-        // No fresh config - use stale entity ID data (standard behavior)
+        // No fresh entity ID - use stale entity ID data (standard behavior)
         let uuid = uuidFromEntityID(id)
         if let found = liveConfigs.first(where: { $0.id.uuidString == uuid }) {
             config = found
         } else if var embedded = decodeConfigFromID(id) {
-            // Embedded config found - check if there's a fresh config for embedded's UUID
-            // This handles case where freshConfig was written with config.id vs entity ID UUID
+            // Embedded config found - check if there's a fresh entity ID for embedded's UUID
             let embeddedUUID = embedded.id.uuidString.uppercased()
-            let freshConfigKeyEmbedded = "freshConfig_\(embeddedUUID)"
-            if let embeddedJSON = UserDefaults.standard.string(forKey: freshConfigKeyEmbedded), !embeddedJSON.isEmpty {
-                storage.appendExtensionLog("FRESH: using embedded key \(embeddedUUID.prefix(8))")
-                if let configData = Data(base64Encoded: embeddedJSON) {
-                    let decoder = JSONDecoder()
-                    decoder.dateDecodingStrategy = .iso8601
-                    if let decoded = try? decoder.decode(WidgetConfig.self, from: configData) {
-                        config = decoded
-                        UserDefaults.standard.removeObject(forKey: freshConfigKeyEmbedded)
-                    } else {
-                        config = embedded
-                    }
+            let freshEntityIDKeyEmbedded = "freshEntityID_\(embeddedUUID)"
+            if let embeddedEntityID = UserDefaults.standard.string(forKey: freshEntityIDKeyEmbedded), !embeddedEntityID.isEmpty {
+                storage.appendExtensionLog("FRESH: using embedded entityID key \(embeddedUUID.prefix(8))")
+                if let decoded = decodeConfigFromID(embeddedEntityID) {
+                    config = decoded
+                    UserDefaults.standard.removeObject(forKey: freshEntityIDKeyEmbedded)
                 } else {
                     config = embedded
                 }
@@ -565,14 +563,14 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let configIDSuffix = configID.map { String($0.suffix(8)) } ?? "nil"
     
     // Keys being checked - note: orderKey already exists above at line 477
-    let freshConfigKeyByEntity = "freshConfig_" + normalizedUUIDForKey
-    let freshConfigKeyByConfig = "freshConfig_" + config.id.uuidString.uppercased()
+    let freshEntityIDKeyByEntity = "freshEntityID_" + normalizedUUIDForKey
+    let freshEntityIDKeyByConfig = "freshEntityID_" + config.id.uuidString.uppercased()
     let versionKeyByEntity = "dataVersion_" + entityUUID.uppercased()
     let swapDebug = UserDefaults.standard.string(forKey: "swapDebug") ?? "NO_SWAP_DEBUG"
     
-    // Check all keys for freshConfig (both entity UUID and config.id UUID)
-    let freshConfigByEntity = UserDefaults.standard.string(forKey: freshConfigKeyByEntity) != nil
-    let freshConfigByConfig = UserDefaults.standard.string(forKey: freshConfigKeyByConfig) != nil
+    // Check freshEntityID keys (the NEW way refresh button communicates)
+    let freshEntityIDByEntity = UserDefaults.standard.string(forKey: freshEntityIDKeyByEntity) != nil
+    let freshEntityIDByConfig = UserDefaults.standard.string(forKey: freshEntityIDKeyByConfig) != nil
     
     // Check order key (already defined above)
     let orderByEntity = UserDefaults.standard.string(forKey: orderKey)
@@ -582,8 +580,8 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     
     // Data source explanation
     let dataSource: String
-    if freshConfigJSON != nil && !(freshConfigJSON ?? "").isEmpty {
-        dataSource = "SOURCE: freshConfig (refresh button wrote this)"
+    if freshEntityID != nil && !(freshEntityID ?? "").isEmpty {
+        dataSource = "SOURCE: freshEntityID (refresh button wrote - WORKS!)"
     } else if storageName == "NOT_FOUND" {
         dataSource = "SOURCE: embedded config.id (stale at widget-add time)"
     } else {
@@ -599,8 +597,8 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     infoLines.append("---")
     infoLines.append(dataSource)
     infoLines.append("---")
-    infoLines.append("KEY_BY_ENTITY: " + freshConfigKeyByEntity + " = " + String(freshConfigByEntity))
-    infoLines.append("KEY_BY_CONFIG: " + freshConfigKeyByConfig + " = " + String(freshConfigByConfig))
+    infoLines.append("freshEntityID_BY_ENTITY: " + String(freshEntityIDByEntity))
+    infoLines.append("freshEntityID_BY_CONFIG: " + String(freshEntityIDByConfig))
     infoLines.append("ORDER_KEY: " + orderKey + " = " + (orderByEntity ?? "nil"))
     infoLines.append("VERSION: " + versionKeyByEntity + " = " + String(dataVersion))
     infoLines.append("---")
@@ -1211,30 +1209,27 @@ struct RefreshWidgetIntent: AppIntent {
             return .result(dialog: IntentDialog(stringLiteral: "Widget config not found. Please re-add the widget."))
         }
 
-        // Write the FULL fresh config JSON to UserDefaults.standard
-        // The widget will decode this directly, bypassing stale entity ID data.
-        // Key format: "freshConfig_<UUID>" contains JSON-encoded WidgetConfig
-        // Write to BOTH keys to handle UUID mismatch between entityUUID and config.id
-        let freshConfigKeyByEntity = "freshConfig_\(upperUUID)"
-        let freshConfigKeyByConfig = "freshConfig_\(config.id.uuidString.uppercased())"
+        // KEY INSIGHT: UserDefaults.standard is process-specific - main app and widget extension
+        // have SEPARATE UserDefaults.standard! So UserDefaults writes don't transfer.
+        //
+        // SOLUTION: Write a fresh ENCODED ENTITY ID to UserDefaults.standard, exactly like
+        // manual widget reselection does. The widget extension will read this and use it
+        // to decode fresh config data embedded directly in the entity ID.
+        let freshEncodedEntityID = encodeEntityID(config)
         
-        // Encode the fresh config (with current item order) to JSON
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        if let configData = try? encoder.encode(config) {
-            let configJSON = configData.base64EncodedString()
-            UserDefaults.standard.set(configJSON, forKey: freshConfigKeyByEntity)
-            UserDefaults.standard.set(configJSON, forKey: freshConfigKeyByConfig)
-            UserDefaults.standard.synchronize()
-        }
+        // Write to both possible keys (by entity UUID and by config.id UUID)
+        let freshConfigKeyByEntity = "freshEntityID_\(upperUUID)"
+        let freshConfigKeyByConfig = "freshEntityID_\(config.id.uuidString.uppercased())"
+        
+        UserDefaults.standard.set(freshEncodedEntityID, forKey: freshConfigKeyByEntity)
+        UserDefaults.standard.set(freshEncodedEntityID, forKey: freshConfigKeyByConfig)
+        UserDefaults.standard.synchronize()
 
-        // Write a simple marker to test if widget can see UserDefaults.standard
-        UserDefaults.standard.set("MARKER_\(upperUUID)_\(Date().timeIntervalSince1970)", forKey: "refreshMarker")
+        // Write a marker for debugging
+        UserDefaults.standard.set("MARKER_\(Date().timeIntervalSince1970)", forKey: "refreshMarker")
         UserDefaults.standard.synchronize()
 
         // Increment version counter to signal data changed.
-        // This triggers .atEnd policy in makeTimeline, causing iOS to call getTimeline
-        // when the widget is next displayed.
         let versionKey = "dataVersion_\(upperUUID)"
         let currentVersion = UserDefaults.standard.integer(forKey: versionKey)
         let newVersion = currentVersion + 1
@@ -1243,9 +1238,7 @@ struct RefreshWidgetIntent: AppIntent {
             UserDefaults(suiteName: id)?.set(newVersion, forKey: versionKey)
         }
 
-        // Post Darwin notification to wake the widget extension (best effort for sideloaded apps)
-        // This is the most reliable way to trigger widget refresh since
-        // WidgetCenter.shared.reloadAllTimelines() may not work for sideloaded apps
+        // Post Darwin notification to wake the widget extension
         DarwinNotificationCenter.shared.postWidgetUpdate()
         
         // Also try WidgetCenter reload as a fallback
