@@ -420,8 +420,8 @@ struct DebugEntityIDIntent: AppIntent {
                     // Try JSON decode
                     if let json = try? JSONDecoder().decode(SlimConfig.self, from: data) {
                         info += "  SlimConfig decode: SUCCESS\n"
-                        info += "    Name: \(json.name)\n"
-                        info += "    Items: \(json.items.count)\n"
+                        info += "    Name: \(json.n)\n"
+                        info += "    Items: \(json.it.count)\n"
                     } else {
                         info += "  SlimConfig decode: FAILED\n"
                     }
