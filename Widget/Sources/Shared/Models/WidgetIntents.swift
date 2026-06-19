@@ -715,31 +715,20 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     
     var infoLines: [String] = []
     infoLines.append("=== DEBUG ===")
-    infoLines.append("uuid: \(entityUUID.prefix(8)) items: \(itemCount) order: \(debugOrderInfo)")
-    infoLines.append("src: \(configSource) | liveConfigs: \(liveConfigs.count)")
+    infoLines.append("uuid: \(entityUUID.prefix(8)) items: \(itemCount)")
+    infoLines.append("order: \(debugOrderInfo)")
+    infoLines.append("---")
+    infoLines.append("src: \(configSource)")
+    infoLines.append("liveConfigs: \(liveConfigs.count)")
     infoLines.append("Storage: \(storageName)")
     infoLines.append("---")
-    // Check for FRESH_ENTITY_ID file (written by swap action)
-    let freshEntityKey = "FRESH_ENTITY_ID_\(entityUUID)"
-    var freshEntityFound = false
-    for appGroupID in SharedStorage.appGroupCandidates.prefix(2) {
-        if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID) {
-            let fileURL = container.appendingPathComponent("\(freshEntityKey).txt")
-            if let exists = try? fileURL.checkResourceIsReachable(), exists {
-                infoLines.append("FRESH_FILE: YES in \(appGroupID.prefix(15))")
-                freshEntityFound = true
-                break
-            }
-        }
-    }
-    if !freshEntityFound {
-        infoLines.append("FRESH_FILE: NOT FOUND")
-    }
-    infoLines.append("---")
+    // Key question: Was this entry generated via RESELECTION or REFRESH?
+    // RESELECTION: suggestedEntities() -> encodeEntityID() -> FRESH data encoded
+    // REFRESH: timeline() -> cached entity ID -> OLD embedded data decoded
     if !note.isEmpty {
-        infoLines.append("NOTE: \(note)")
+        infoLines.append("MODE: \(note)")
     } else {
-        infoLines.append("REFRESH: Uses cached entity")
+        infoLines.append("MODE: REFRESH (cached)")
     }
     freshConfigInfo = infoLines.joined(separator: "\n")
     
@@ -999,7 +988,13 @@ struct LargeWidgetQuery: EntityQuery {
         }
     }
     func suggestedEntities() async throws -> [LargeWidgetEntity] {
+        let storage = SharedStorage.shared
+        let storageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
+        storage.appendExtensionLog("suggestedEntities: storage=\(storageDebug.source) bytes=\(storageDebug.data?.count ?? -1)")
+        
         let list = filteredConfigs(size: .systemLarge)
+        storage.appendExtensionLog("suggestedEntities: list.count=\(list.count)")
+        
         if list.isEmpty { return [LargeWidgetEntity(id: "none", name: "No Large Widgets")] }
         return list.map { LargeWidgetEntity(id: encodeEntityID($0), name: $0.name) }
     }
@@ -1021,6 +1016,12 @@ struct LargeBroadcastProvider: AppIntentTimelineProvider {
         WidgetEntry(date: Date(), configuration: .defaultConfiguration)
     }
     func snapshot(for configuration: SelectLargeWidgetIntent, in context: Context) async -> WidgetEntry {
+        // snapshot() is called during widget reselection - this gets FRESH data!
+        let storage = SharedStorage.shared
+        let storageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
+        storage.appendExtensionLog("SNAPSHOT: storage=\(storageDebug.source) bytes=\(storageDebug.data?.count ?? -1)")
+        
+        // During reselection, the widget shows preview. This gets fresh data.
         return makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectLargeWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
@@ -1030,20 +1031,30 @@ struct LargeBroadcastProvider: AppIntentTimelineProvider {
         let storageDebug = SharedStorage.shared.gatherReadDebug(forKey: SharedStorage.configKey)
         let queryConfigs = filteredConfigs(size: .systemLarge)
         
+        // DEBUG: Show if this is reselection vs refresh
+        var isReselection = false
+        if !queryConfigs.isEmpty {
+            let freshEntities = try? await LargeWidgetQuery().entities(for: [storedID])
+            if let fresh = freshEntities?.first, fresh.id != storedID {
+                isReselection = true
+            }
+        }
+        
         var freshID: String? = nil
         var note: String
         
         if queryConfigs.isEmpty {
-            // filteredConfigs returns empty = SharedStorage not accessible
-            note = "QRY:EMPTY storage=\(storageDebug.source)"
+            note = "REFRESH: no fresh storage"
+        } else if isReselection {
+            note = "RESELECTION: got fresh entity"
         } else {
-            // Found configs via query - re-query entities
+            note = "REFRESH: using cached entity"
+        }
+        
+        if !queryConfigs.isEmpty {
             let entities = try? await LargeWidgetQuery().entities(for: [storedID])
             if let fresh = entities?.first {
                 freshID = fresh.id
-                note = "QRY:GOT_CONFIGS fresh.id.len=\(fresh.id.count)"
-            } else {
-                note = "QRY:NO_ENTITY storage=\(storageDebug.source)"
             }
         }
         
