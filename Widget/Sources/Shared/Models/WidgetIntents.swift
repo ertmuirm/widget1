@@ -780,6 +780,13 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
         }
     }
     infoLines.append(refreshTapped)
+    
+    // Check what refresh intent could access
+    let refreshSource = UserDefaults.standard.string(forKey: "REFRESH_SOURCE") ?? "?"
+    let refreshStorage = UserDefaults.standard.string(forKey: "REFRESH_STORAGE") ?? "?"
+    infoLines.append("REFRESH source: \(refreshSource)")
+    infoLines.append("REFRESH configs: \(refreshStorage)")
+    
     freshConfigInfo = infoLines.joined(separator: "\n")
     
     return WidgetEntry(date: Date(), configuration: finalConfig,
@@ -1523,6 +1530,15 @@ struct RefreshWidgetIntent: AppIntent {
         for id in SharedStorage.appGroupCandidates {
             UserDefaults(suiteName: id)?.set("tapped_\(timestamp)", forKey: "REFRESH_TAPPED")
         }
+        
+        // DEBUG: Try to access SharedStorage (like reselection does)
+        let storage = SharedStorage.shared
+        let configs = (try? storage.loadConfigurations()) ?? []
+        let storageName = storage.debugReadSource(forKey: SharedStorage.configKey)
+        
+        // Write storage access info
+        UserDefaults.standard.set("configs_\(configs.count)", forKey: "REFRESH_STORAGE")
+        UserDefaults.standard.set(storageName, forKey: "REFRESH_SOURCE")
         
         DarwinNotificationCenter.shared.postSwapAction()
         WidgetCenter.shared.reloadAllTimelines()
