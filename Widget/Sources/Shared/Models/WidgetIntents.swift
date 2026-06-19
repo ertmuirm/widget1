@@ -567,8 +567,11 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let dataVersion = UserDefaults.standard.integer(forKey: versionKeyByEntity)
     
     // Check freshEntityID from keychain (process-shared)
-    let freshEntityIDInKcByEntity = storage.keychainRead(forKey: freshEntityIDKeyByEntity) != nil
-    let freshEntityIDInKcByConfig = storage.keychainRead(forKey: freshEntityIDKeyByConfig) != nil
+    let kcDataByEntity = storage.keychainRead(forKey: freshEntityIDKeyByEntity)
+    let kcDataByConfig = storage.keychainRead(forKey: freshEntityIDKeyByConfig)
+    let freshEntityIDInKcByEntity = kcDataByEntity != nil
+    let freshEntityIDInKcByConfig = kcDataByConfig != nil
+    let kcGroup = SharedStorage.sharedKeychainGroup ?? "nil"
     
     // Data source explanation
     let dataSource: String
@@ -589,13 +592,14 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     infoLines.append("---")
     infoLines.append(dataSource)
     infoLines.append("---")
-    infoLines.append("freshEntityID_KC_BY_ENTITY: " + String(freshEntityIDInKcByEntity))
-    infoLines.append("freshEntityID_KC_BY_CONFIG: " + String(freshEntityIDInKcByConfig))
+    infoLines.append("KC_GROUP: " + kcGroup)
+    infoLines.append("freshEntityID_KC_BY_ENTITY: " + String(freshEntityIDInKcByEntity) + " (len=" + String(kcDataByEntity?.count ?? -1) + ")")
+    infoLines.append("freshEntityID_KC_BY_CONFIG: " + String(freshEntityIDInKcByConfig) + " (len=" + String(kcDataByConfig?.count ?? -1) + ")")
     infoLines.append("ORDER_KEY: " + orderKey + " = " + (orderByEntity ?? "nil"))
     infoLines.append("VERSION: " + versionKeyByEntity + " = " + String(dataVersion))
     infoLines.append("---")
     infoLines.append("SWAP: " + String(swapDebug.prefix(30)))
-    infoLines.append("MARKER: " + String(marker.prefix(15)))
+    infoLines.append("MARKER: " + String(marker.prefix(40)))
     freshConfigInfo = infoLines.joined(separator: "\n")
     
     return WidgetEntry(date: Date(), configuration: finalConfig,
@@ -1212,13 +1216,18 @@ struct RefreshWidgetIntent: AppIntent {
         let freshKeyByEntity = "freshEntityID_\(upperUUID)"
         let freshKeyByConfig = "freshEntityID_\(config.id.uuidString.uppercased())"
         
+        // DEBUG: Log keychain group and write status
+        let kcGroup = SharedStorage.sharedKeychainGroup ?? "nil"
+        var writeStatus = "kcGroup=\(kcGroup)"
+        
         if let data = freshEncodedEntityID.data(using: .utf8) {
-            SharedStorage.shared.keychainWrite(data, forKey: freshKeyByEntity)
-            SharedStorage.shared.keychainWrite(data, forKey: freshKeyByConfig)
+            let status1 = SharedStorage.shared.keychainWrite(data, forKey: freshKeyByEntity)
+            let status2 = SharedStorage.shared.keychainWrite(data, forKey: freshKeyByConfig)
+            writeStatus += " write1=\(status1) write2=\(status2)"
         }
-
+        
         // Write marker to UserDefaults.standard (for debugging only)
-        UserDefaults.standard.set("MARKER_\(Date().timeIntervalSince1970)", forKey: "refreshMarker")
+        UserDefaults.standard.set("MARKER_\(Date().timeIntervalSince1970)_\(writeStatus)", forKey: "refreshMarker")
         UserDefaults.standard.synchronize()
 
         // Increment version counter
