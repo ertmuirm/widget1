@@ -555,27 +555,15 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let configCount = liveConfigs.count
     
     // Fresh config debug info - comprehensive debug output
+    // Note: freshEntityID, freshEntityIDKeyByEntity, freshEntityIDKeyByConfig are already defined above
     let freshConfigInfo: String
     let marker = UserDefaults.standard.string(forKey: "refreshMarker") ?? "NO_MARKER"
     
-    // Build all the keys we're checking
+    // Build all the keys we're checking - use existing variables from above
     let configIDSample = configID.map { $0.count > 20 ? String($0.prefix(20)) + "..." : $0 } ?? "nil"
-    let configIDSuffix = configID.map { String($0.suffix(8)) } ?? "nil"
-    
-    // Keys being checked - note: orderKey already exists above at line 477
-    let freshEntityIDKeyByEntity = "freshEntityID_" + normalizedUUIDForKey
-    let freshEntityIDKeyByConfig = "freshEntityID_" + config.id.uuidString.uppercased()
     let versionKeyByEntity = "dataVersion_" + entityUUID.uppercased()
     let swapDebug = UserDefaults.standard.string(forKey: "swapDebug") ?? "NO_SWAP_DEBUG"
-    
-    // Check freshEntityID keys (the NEW way refresh button communicates)
-    let freshEntityIDByEntity = UserDefaults.standard.string(forKey: freshEntityIDKeyByEntity) != nil
-    let freshEntityIDByConfig = UserDefaults.standard.string(forKey: freshEntityIDKeyByConfig) != nil
-    
-    // Check order key (already defined above)
     let orderByEntity = UserDefaults.standard.string(forKey: orderKey)
-    
-    // Check version
     let dataVersion = UserDefaults.standard.integer(forKey: versionKeyByEntity)
     
     // Data source explanation
@@ -597,8 +585,8 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     infoLines.append("---")
     infoLines.append(dataSource)
     infoLines.append("---")
-    infoLines.append("freshEntityID_BY_ENTITY: " + String(freshEntityIDByEntity))
-    infoLines.append("freshEntityID_BY_CONFIG: " + String(freshEntityIDByConfig))
+    infoLines.append("freshEntityID_BY_ENTITY: " + String(freshEntityIDByEntity != nil))
+    infoLines.append("freshEntityID_BY_CONFIG: " + String(freshEntityIDByConfig != nil))
     infoLines.append("ORDER_KEY: " + orderKey + " = " + (orderByEntity ?? "nil"))
     infoLines.append("VERSION: " + versionKeyByEntity + " = " + String(dataVersion))
     infoLines.append("---")
