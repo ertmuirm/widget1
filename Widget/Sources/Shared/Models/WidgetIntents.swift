@@ -351,14 +351,13 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     // main app and writes to ITS UserDefaults.standard. The widget extension runs in a SEPARATE
     // process and has its OWN UserDefaults.standard. They don't share data!
     //
-    // SOLUTION: Check for freshEntityID key which contains an encoded entity ID string
-    // (same format as manual reselection). This bypasses the UserDefaults.standard issue.
+    // SOLUTION: Read freshEntityID from KEYCHAIN which IS shared across processes.
     let freshEntityIDKeyByEntity = "freshEntityID_\(normalizedUUIDForKey)"
     let freshEntityIDKeyByConfig = "freshEntityID_\(configID.flatMap { uuidFromEntityID($0).uppercased() } ?? normalizedUUIDForKey)"
     
-    // Check for fresh entity ID written by RefreshWidgetIntent
-    let freshEntityIDByEntity = UserDefaults.standard.string(forKey: freshEntityIDKeyByEntity)
-    let freshEntityIDByConfig = UserDefaults.standard.string(forKey: freshEntityIDKeyByConfig)
+    // Check for fresh entity ID written by RefreshWidgetIntent - read from KEYCHAIN
+    let freshEntityIDByEntity = storage.keychainRead(forKey: freshEntityIDKeyByEntity).flatMap { String(data: $0, encoding: .utf8) }
+    let freshEntityIDByConfig = storage.keychainRead(forKey: freshEntityIDKeyByConfig).flatMap { String(data: $0, encoding: .utf8) }
     let freshEntityID = freshEntityIDByEntity ?? freshEntityIDByConfig
     
     storage.appendExtensionLog("makeEntry: freshEntityIDByEntity=\(freshEntityIDByEntity != nil) freshEntityIDByConfig=\(freshEntityIDByConfig != nil)")
@@ -398,12 +397,12 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     var config: WidgetConfig
     if let entityID = freshEntityID, !entityID.isEmpty {
         // Fresh entity ID available from refresh button - decode embedded config
-        storage.appendExtensionLog("FRESH: using entityID from UserDefaults.standard")
+        storage.appendExtensionLog("FRESH: using entityID from keychain")
         if let decoded = decodeConfigFromID(entityID) {
             config = decoded
-            // Clear the fresh entity ID so it's only used once
-            UserDefaults.standard.removeObject(forKey: freshEntityIDKeyByEntity)
-            UserDefaults.standard.removeObject(forKey: freshEntityIDKeyByConfig)
+            // Clear the fresh entity ID so it's only used once - delete from keychain
+            storage.keychainDelete(forKey: freshEntityIDKeyByEntity)
+            storage.keychainDelete(forKey: freshEntityIDKeyByConfig)
         } else {
             storage.appendExtensionLog("FRESH: failed to decode entityID")
             config = .defaultConfiguration
@@ -417,11 +416,12 @@ private func makeEntry(configID: String?) -> WidgetEntry {
             // Embedded config found - check if there's a fresh entity ID for embedded's UUID
             let embeddedUUID = embedded.id.uuidString.uppercased()
             let freshEntityIDKeyEmbedded = "freshEntityID_\(embeddedUUID)"
-            if let embeddedEntityID = UserDefaults.standard.string(forKey: freshEntityIDKeyEmbedded), !embeddedEntityID.isEmpty {
+            let embeddedEntityIDData = storage.keychainRead(forKey: freshEntityIDKeyEmbedded)
+            if let embeddedEntityID = embeddedEntityIDData.flatMap({ String(data: $0, encoding: .utf8) }), !embeddedEntityID.isEmpty {
                 storage.appendExtensionLog("FRESH: using embedded entityID key \(embeddedUUID.prefix(8))")
                 if let decoded = decodeConfigFromID(embeddedEntityID) {
                     config = decoded
-                    UserDefaults.standard.removeObject(forKey: freshEntityIDKeyEmbedded)
+                    storage.keychainDelete(forKey: freshEntityIDKeyEmbedded)
                 } else {
                     config = embedded
                 }
@@ -566,6 +566,10 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let orderByEntity = UserDefaults.standard.string(forKey: orderKey)
     let dataVersion = UserDefaults.standard.integer(forKey: versionKeyByEntity)
     
+    // Check freshEntityID from keychain (process-shared)
+    let freshEntityIDInKcByEntity = storage.keychainRead(forKey: freshEntityIDKeyByEntity) != nil
+    let freshEntityIDInKcByConfig = storage.keychainRead(forKey: freshEntityIDKeyByConfig) != nil
+    
     // Data source explanation
     let dataSource: String
     if freshEntityID != nil && !(freshEntityID ?? "").isEmpty {
@@ -585,8 +589,8 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     infoLines.append("---")
     infoLines.append(dataSource)
     infoLines.append("---")
-    infoLines.append("freshEntityID_BY_ENTITY: " + String(freshEntityIDByEntity != nil))
-    infoLines.append("freshEntityID_BY_CONFIG: " + String(freshEntityIDByConfig != nil))
+    infoLines.append("freshEntityID_KC_BY_ENTITY: " + String(freshEntityIDInKcByEntity))
+    infoLines.append("freshEntityID_KC_BY_CONFIG: " + String(freshEntityIDInKcByConfig))
     infoLines.append("ORDER_KEY: " + orderKey + " = " + (orderByEntity ?? "nil"))
     infoLines.append("VERSION: " + versionKeyByEntity + " = " + String(dataVersion))
     infoLines.append("---")
@@ -1198,26 +1202,26 @@ struct RefreshWidgetIntent: AppIntent {
         }
 
         // KEY INSIGHT: UserDefaults.standard is process-specific - main app and widget extension
-        // have SEPARATE UserDefaults.standard! So UserDefaults writes don't transfer.
+        // have SEPARATE UserDefaults.standard! But the KEYCHAIN is shared across processes.
         //
-        // SOLUTION: Write a fresh ENCODED ENTITY ID to UserDefaults.standard, exactly like
-        // manual widget reselection does. The widget extension will read this and use it
-        // to decode fresh config data embedded directly in the entity ID.
+        // SOLUTION: Write fresh entity ID to KEYCHAIN (shared) instead of UserDefaults.standard.
+        // The keychain is accessible from both the main app and widget extension processes.
         let freshEncodedEntityID = encodeEntityID(config)
         
-        // Write to both possible keys (by entity UUID and by config.id UUID)
-        let freshConfigKeyByEntity = "freshEntityID_\(upperUUID)"
-        let freshConfigKeyByConfig = "freshEntityID_\(config.id.uuidString.uppercased())"
+        // Write to keychain (shared across processes)
+        let freshKeyByEntity = "freshEntityID_\(upperUUID)"
+        let freshKeyByConfig = "freshEntityID_\(config.id.uuidString.uppercased())"
         
-        UserDefaults.standard.set(freshEncodedEntityID, forKey: freshConfigKeyByEntity)
-        UserDefaults.standard.set(freshEncodedEntityID, forKey: freshConfigKeyByConfig)
-        UserDefaults.standard.synchronize()
+        if let data = freshEncodedEntityID.data(using: .utf8) {
+            storage.keychainWrite(data, forKey: freshKeyByEntity)
+            storage.keychainWrite(data, forKey: freshKeyByConfig)
+        }
 
-        // Write a marker for debugging
+        // Write marker to UserDefaults.standard (for debugging only)
         UserDefaults.standard.set("MARKER_\(Date().timeIntervalSince1970)", forKey: "refreshMarker")
         UserDefaults.standard.synchronize()
 
-        // Increment version counter to signal data changed.
+        // Increment version counter
         let versionKey = "dataVersion_\(upperUUID)"
         let currentVersion = UserDefaults.standard.integer(forKey: versionKey)
         let newVersion = currentVersion + 1
