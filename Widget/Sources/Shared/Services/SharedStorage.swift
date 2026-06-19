@@ -109,7 +109,7 @@ final class SharedStorage {
     // MARK: - Keychain helpers
 
     @discardableResult
-    private func keychainWrite(_ data: Data, forKey key: String) -> OSStatus {
+    func keychainWrite(_ data: Data, forKey key: String) -> OSStatus {
         guard let group = Self.sharedKeychainGroup else { return errSecMissingEntitlement }
         var query: [String: Any] = [
             kSecClass as String:           kSecClassGenericPassword,
