@@ -825,10 +825,25 @@ struct SmallBroadcastProvider: AppIntentTimelineProvider {
         WidgetEntry(date: Date(), configuration: .defaultConfiguration)
     }
     func snapshot(for configuration: SelectSmallWidgetIntent, in context: Context) async -> WidgetEntry {
-        makeEntry(configID: configuration.selectedWidget?.id)
+        // Re-query entities to get FRESH data from SharedStorage (same as reselection!)
+        if let id = configuration.selectedWidget?.id {
+            let entities = try? await SmallWidgetQuery().entities(for: [id])
+            if let fresh = entities?.first {
+                return makeEntry(configID: fresh.id)
+            }
+        }
+        return makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectSmallWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        makeTimeline(configID: configuration.selectedWidget?.id)
+        // CRITICAL: Re-query entities to get FRESH data from SharedStorage!
+        if let id = configuration.selectedWidget?.id {
+            let entities = try? await SmallWidgetQuery().entities(for: [id])
+            if let fresh = entities?.first {
+                storage.appendExtensionLog("Small timeline: RE-QUERIED fresh entity id.len=\(fresh.id.count)")
+                return makeTimeline(configID: fresh.id)
+            }
+        }
+        return makeTimeline(configID: configuration.selectedWidget?.id)
     }
 }
 
@@ -884,10 +899,25 @@ struct MediumBroadcastProvider: AppIntentTimelineProvider {
         WidgetEntry(date: Date(), configuration: .defaultConfiguration)
     }
     func snapshot(for configuration: SelectMediumWidgetIntent, in context: Context) async -> WidgetEntry {
-        makeEntry(configID: configuration.selectedWidget?.id)
+        // Re-query entities to get FRESH data from SharedStorage (same as reselection!)
+        if let id = configuration.selectedWidget?.id {
+            let entities = try? await MediumWidgetQuery().entities(for: [id])
+            if let fresh = entities?.first {
+                return makeEntry(configID: fresh.id)
+            }
+        }
+        return makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectMediumWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        makeTimeline(configID: configuration.selectedWidget?.id)
+        // CRITICAL: Re-query entities to get FRESH data from SharedStorage!
+        if let id = configuration.selectedWidget?.id {
+            let entities = try? await MediumWidgetQuery().entities(for: [id])
+            if let fresh = entities?.first {
+                storage.appendExtensionLog("Medium timeline: RE-QUERIED fresh entity id.len=\(fresh.id.count)")
+                return makeTimeline(configID: fresh.id)
+            }
+        }
+        return makeTimeline(configID: configuration.selectedWidget?.id)
     }
 }
 
@@ -948,10 +978,25 @@ struct LargeBroadcastProvider: AppIntentTimelineProvider {
         WidgetEntry(date: Date(), configuration: .defaultConfiguration)
     }
     func snapshot(for configuration: SelectLargeWidgetIntent, in context: Context) async -> WidgetEntry {
-        makeEntry(configID: configuration.selectedWidget?.id)
+        // Re-query entities to get FRESH data from SharedStorage (same as reselection!)
+        if let id = configuration.selectedWidget?.id {
+            let entities = try? await LargeWidgetQuery().entities(for: [id])
+            if let fresh = entities?.first {
+                return makeEntry(configID: fresh.id)
+            }
+        }
+        return makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectLargeWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        makeTimeline(configID: configuration.selectedWidget?.id)
+        // CRITICAL: Re-query entities to get FRESH data from SharedStorage!
+        if let id = configuration.selectedWidget?.id {
+            let entities = try? await LargeWidgetQuery().entities(for: [id])
+            if let fresh = entities?.first {
+                storage.appendExtensionLog("Large timeline: RE-QUERIED fresh entity id.len=\(fresh.id.count)")
+                return makeTimeline(configID: fresh.id)
+            }
+        }
+        return makeTimeline(configID: configuration.selectedWidget?.id)
     }
 }
 
@@ -1068,10 +1113,53 @@ struct BroadcastProvider: AppIntentTimelineProvider {
         WidgetEntry(date: Date(), configuration: .defaultConfiguration)
     }
     func snapshot(for configuration: SelectWidgetIntent, in context: Context) async -> WidgetEntry {
-        makeEntry(configID: configuration.selectedWidget?.id)
+        // Re-query entities to get FRESH data from SharedStorage (same as reselection!)
+        if let id = configuration.selectedWidget?.id {
+            let entities = try? await SelectWidgetIntentEntityQuery().entities(for: [id])
+            if let fresh = entities?.first {
+                return makeEntry(configID: fresh.id)
+            }
+        }
+        return makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        makeTimeline(configID: configuration.selectedWidget?.id)
+        // CRITICAL: Re-query entities to get FRESH data from SharedStorage!
+        // This mimics what happens during widget reselection.
+        if let id = configuration.selectedWidget?.id {
+            let entities = try? await SelectWidgetIntentEntityQuery().entities(for: [id])
+            if let fresh = entities?.first {
+                storage.appendExtensionLog("timeline: RE-QUERIED fresh entity id.len=\(fresh.id.count)")
+                return makeTimeline(configID: fresh.id)
+            }
+        }
+        return makeTimeline(configID: configuration.selectedWidget?.id)
+    }
+}
+
+// Entity query for the main widget
+struct SelectWidgetIntentEntityQuery: EntityQuery {
+    func entities(for identifiers: [String]) async throws -> [SelectWidgetEntity] {
+        let configs = filteredConfigs(size: nil)  // Get all non-XL configs
+        return identifiers.map { storedID in
+            let uuid = uuidFromEntityID(storedID)
+            // Fresh data from live storage
+            if let c = configs.first(where: { $0.id.uuidString.uppercased() == uuid.uppercased() }) {
+                return SelectWidgetEntity(id: encodeEntityID(c), name: c.name)
+            }
+            // Reconstruct from embedded config
+            if let c = decodeConfigFromID(storedID) {
+                return SelectWidgetEntity(id: storedID, name: c.name)
+            }
+            return SelectWidgetEntity(id: storedID, name: "Widget")
+        }
+    }
+    func suggestedEntities() async throws -> [SelectWidgetEntity] {
+        let list = filteredConfigs(size: nil)
+        if list.isEmpty { return [SelectWidgetEntity(id: "none", name: "No Widgets")] }
+        return list.map { SelectWidgetEntity(id: encodeEntityID($0), name: $0.name) }
+    }
+    func defaultResult() async -> SelectWidgetEntity? {
+        filteredConfigs(size: nil).first.map { SelectWidgetEntity(id: encodeEntityID($0), name: $0.name) }
     }
 }
 
@@ -1131,10 +1219,25 @@ struct ImageBroadcastProvider: AppIntentTimelineProvider {
         WidgetEntry(date: Date(), configuration: .defaultConfiguration)
     }
     func snapshot(for configuration: SelectImageWidgetIntent, in context: Context) async -> WidgetEntry {
-        makeEntry(configID: configuration.selectedWidget?.id)
+        // Re-query entities to get FRESH data from SharedStorage (same as reselection!)
+        if let id = configuration.selectedWidget?.id {
+            let entities = try? await ImageWidgetQuery().entities(for: [id])
+            if let fresh = entities?.first {
+                return makeEntry(configID: fresh.id)
+            }
+        }
+        return makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectImageWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        makeTimeline(configID: configuration.selectedWidget?.id)
+        // CRITICAL: Re-query entities to get FRESH data from SharedStorage!
+        if let id = configuration.selectedWidget?.id {
+            let entities = try? await ImageWidgetQuery().entities(for: [id])
+            if let fresh = entities?.first {
+                storage.appendExtensionLog("Image timeline: RE-QUERIED fresh entity id.len=\(fresh.id.count)")
+                return makeTimeline(configID: fresh.id)
+            }
+        }
+        return makeTimeline(configID: configuration.selectedWidget?.id)
     }
 }
 
@@ -1201,10 +1304,26 @@ struct ClockBroadcastProvider: AppIntentTimelineProvider {
         return WidgetEntry(date: Date(), configuration: config)
     }
     func snapshot(for configuration: SelectClockWidgetIntent, in context: Context) async -> WidgetEntry {
-        makeEntry(configID: configuration.selectedWidget?.id)
+        // Re-query entities to get FRESH data from SharedStorage (same as reselection!)
+        if let id = configuration.selectedWidget?.id {
+            let entities = try? await ClockWidgetQuery().entities(for: [id])
+            if let fresh = entities?.first {
+                return makeEntry(configID: fresh.id)
+            }
+        }
+        return makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectClockWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        let entry = makeEntry(configID: configuration.selectedWidget?.id)
+        // CRITICAL: Re-query entities to get FRESH data from SharedStorage!
+        var freshID = configuration.selectedWidget?.id
+        if let id = freshID {
+            let entities = try? await ClockWidgetQuery().entities(for: [id])
+            if let fresh = entities?.first {
+                storage.appendExtensionLog("Clock timeline: RE-QUERIED fresh entity id.len=\(fresh.id.count)")
+                freshID = fresh.id
+            }
+        }
+        let entry = makeEntry(configID: freshID)
         // Update every minute
         let next = Calendar.current.date(byAdding: .minute, value: 1, to: Date()) ?? Date()
         return Timeline(entries: [entry], policy: .after(next))
