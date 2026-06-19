@@ -429,22 +429,26 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     if let id = configID, id != "none" {
         let uuid = uuidFromEntityID(id)
         
-        // 1. First check LATEST_ENCODED_CONFIG
-        if let encoded = latestEncoded, let decoded = decodeConfigFromID(encoded) {
+        // DEBUG: Log all data sources
+        storage.appendExtensionLog("DATA_SOURCES: latestEnc=\(latestEncoded != nil)|specificEnc=\(specificEncoded != nil)|liveConfigs=\(liveConfigs.count)|id.len=\(id.count)")
+        
+        // 1. FIRST: Check live configs from SharedStorage (THIS HAS FRESH DATA!)
+        // Widget reselection loads configs via loadConfigurations() which is accessible!
+        if let found = liveConfigs.first(where: { $0.id.uuidString.uppercased() == uuid.uppercased() }) {
+            config = found
+            storage.appendExtensionLog("makeEntry: USING liveConfigs[FRESCOK] items=\(config.items.count)")
+        }
+        // 2. Then check LATEST_ENCODED_CONFIG
+        else if let encoded = latestEncoded, let decoded = decodeConfigFromID(encoded) {
             config = decoded
             storage.appendExtensionLog("makeEntry: using LATEST_ENCODED_CONFIG")
         }
-        // 2. Then check ENCODED_CONFIG_<configID>
+        // 3. Then check ENCODED_CONFIG_<configID>
         else if let encoded = specificEncoded, let decoded = decodeConfigFromID(encoded) {
             config = decoded
             storage.appendExtensionLog("makeEntry: using ENCODED_CONFIG")
         }
-        // 3. Then check live configs
-        else if let found = liveConfigs.first(where: { $0.id.uuidString == uuid }) {
-            config = found
-            storage.appendExtensionLog("makeEntry: using liveConfigs")
-        }
-        // 4. Fall back to embedded config from stored entity ID (THIS IS WIDGET RESELECTION PATH)
+        // 4. Fall back to embedded config from stored entity ID
         else if let embedded = decodeConfigFromID(id) {
             config = embedded
             storage.appendExtensionLog("makeEntry: using EMBEDDED id.len=\(id.count)")
