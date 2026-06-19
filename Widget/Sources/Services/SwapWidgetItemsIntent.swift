@@ -261,6 +261,7 @@ struct SwapWidgetItemsIntent: AppIntent {
         }
 
         // Write item-order override using WIDGET's UUID
+        let storage = SharedStorage.shared
         let widgetUUID = (widget.id.split(separator: "|").first ?? Substring(widget.id)).uppercased()
         let orderKey = "itemOrder_\(widgetUUID)"
         let orderValue = (0..<config.items.count).map(String.init).joined(separator: ",")
