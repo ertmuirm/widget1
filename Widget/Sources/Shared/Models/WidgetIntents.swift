@@ -668,19 +668,43 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     let itemCount = finalConfig.items.count
     
     // Check if order key exists in UserDefaults.standard
+    // Check storage accessibility
+    var storageChecks: [String] = []
+    
+    // UserDefaults.standard
+    let udData = UserDefaults.standard.data(forKey: SharedStorage.configKey)
+    storageChecks.append("UD.std: \(udData != nil ? "HAS(\(udData!.count)B)" : "empty")")
+    
+    // Keychain
+    let kcData = storage.keychainRead(forKey: SharedStorage.configKey)
+    storageChecks.append("Keychain: \(kcData != nil ? "HAS(\(kcData!.count)B)" : "empty")")
+    
+    // App Groups
+    for ag in SharedStorage.appGroupCandidates.prefix(2) {
+        if let ud = UserDefaults(suiteName: ag) {
+            let d = ud.data(forKey: SharedStorage.configKey)
+            storageChecks.append("AG[\(ag.prefix(15))]: \(d != nil ? "HAS" : "empty")")
+        }
+    }
+    
     var infoLines: [String] = []
     infoLines.append("=== DEBUG ===")
     infoLines.append("uuid: \(entityUUID.prefix(8)) items: \(itemCount) order: \(debugOrderInfo)")
-    infoLines.append("CONFIG_SRC: \(configSource) | liveConfigs: \(liveConfigs.count)")
-    infoLines.append("Storage: \(storageName) (C:\(liveConfigs.count))")
+    infoLines.append("src: \(configSource) | liveConfigs: \(liveConfigs.count)")
+    infoLines.append("Storage: \(storageName)")
     infoLines.append("---")
-    // RESELECTION: works because suggestedEntities() calls loadConfigurations()
-    // REFRESH: fails because cached entity ID decodes OLD embedded data
-    // FIX: re-query entities(for:) which loads fresh SharedStorage data
+    infoLines.append("Storage checks:")
+    for check in storageChecks.prefix(4) {
+        infoLines.append("  \(check)")
+    }
+    infoLines.append("---")
+    // RESELECTION: suggestedEntities() -> entities() -> filteredConfigs() -> loadConfigurations() -> gatherRead()
+    // REFRESH: cached entity ID used directly -> decodes embedded config -> OLD data
+    // FIX: re-query entities(for:) which should load fresh SharedStorage data
     if !note.isEmpty {
         infoLines.append("NOTE: \(note)")
     } else {
-        infoLines.append("REFRESH: Uses cached entity (NOT re-queried)")
+        infoLines.append("REFRESH: Uses cached entity")
     }
     freshConfigInfo = infoLines.joined(separator: "\n")
     
