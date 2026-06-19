@@ -227,33 +227,43 @@ struct SwapWidgetItemsIntent: AppIntent {
 
         try SharedStorage.shared.saveConfigurations(configs)
 
-        // Write item-order override using POSITION INDICES (not UUIDs)
-        // Since SlimItem creates new UUIDs on load, we use array positions instead.
-        // Format: "0,2,1,3,4" means position 0 stays at 0, position 1 moves to 2, etc.
-        // NOTE: Use uppercase UUID to match makeEntry() which normalizes entityUUID.uppercased()
-        let widgetUUIDFromID = (widget.id.split(separator: "|").first ?? Substring(widget.id)).uppercased()
-        // Use the actual config.id.uuidString (not widget.id) since they may differ
-        let actualConfigUUID = config.id.uuidString.uppercased()
-        // Debug: write info to UserDefaults for Shortcuts to read
-        UserDefaults.standard.set("widgetUUID: \(widgetUUIDFromID.prefix(8)) configUUID: \(actualConfigUUID.prefix(8))", forKey: "swapDebug")
+        // CRITICAL: Write fresh encoded entity ID to App Group
+        // This is the SAME mechanism widget reselection uses!
+        // When user reselects widget, iOS calls entities() which creates fresh entity ID via encodeEntityID().
+        // We replicate this by writing the fresh entity ID to App Group for widget to read.
+        let freshEntityID = encodeEntityID(config)
         
-        let orderKey = "itemOrder_\(actualConfigUUID)"
+        // Write to App Group UserDefaults using the WIDGET's entity ID as the key
+        // This ensures makeEntry can find it using the same key
+        let widgetEntityID = widget.id  // This is what makeEntry's configID contains
+        let freshEntityIDKey = "FRESH_ENTITY_ID_\(widgetEntityID)"
+        
+        // Write to App Group UserDefaults (should be shared)
+        for id in SharedStorage.appGroupCandidates {
+            UserDefaults(suiteName: id)?.set(freshEntityID, forKey: freshEntityIDKey)
+            UserDefaults(suiteName: id)?.synchronize()
+        }
+        
+        // Also write to App Group container file (guaranteed shared file system)
+        for id in SharedStorage.appGroupCandidates {
+            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                let url = container.appendingPathComponent("\(freshEntityIDKey).txt")
+                try? freshEntityID.write(to: url, atomically: true, encoding: .utf8)
+            }
+        }
+        
+        // Write item-order override using WIDGET's UUID
+        let widgetUUID = (widget.id.split(separator: "|").first ?? Substring(widget.id)).uppercased()
+        let orderKey = "itemOrder_\(widgetUUID)"
         let orderValue = (0..<config.items.count).map(String.init).joined(separator: ",")
         SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
 
-        // Write fresh config JSON to UserDefaults.standard using actual config UUID
-        let freshConfigKey = "freshConfig_\(actualConfigUUID)"
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        if let configData = try? encoder.encode(config) {
-            let configJSON = configData.base64EncodedString()
-            UserDefaults.standard.set(configJSON, forKey: freshConfigKey)
-            UserDefaults.standard.synchronize()
-        }
+        // Debug info
+        let debugInfo = "FRESH_ID_WRITTEN|widgetID=\(widget.id.prefix(20))|freshLen=\(freshEntityID.count)"
+        UserDefaults.standard.set(debugInfo, forKey: "swapDebug")
 
         // Increment version counter to signal data changed.
-        // actualConfigUUID is already uppercase
-        let versionKey = "dataVersion_\(actualConfigUUID)"
+        let versionKey = "dataVersion_\(widgetUUID)"
         let currentVersion = UserDefaults.standard.integer(forKey: versionKey)
         let newVersion = currentVersion + 1
         UserDefaults.standard.set(newVersion, forKey: versionKey)

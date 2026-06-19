@@ -354,12 +354,50 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     storage.appendExtensionLog("makeEntry liveConfigs count=\(liveConfigs.count) storage=\(liveStorageDebug.source)")
 
     // Load config - widget reselection just calls SharedStorage which should have fresh data
+    // BUT: For sideloaded apps, SharedStorage may not be shared. So we also check for
+    // a "fresh entity ID" written by SwapWidgetItemsIntent to App Group.
     var config: WidgetConfig
+    
+    // Try to read fresh entity ID from App Group (written by swap intent)
+    // Key is "FRESH_ENTITY_ID_<configID>" - matches what swap intent writes
+    var freshEntityID: String? = nil
+    if let cid = configID {
+        let freshEntityIDKey = "FRESH_ENTITY_ID_\(cid)"
+        
+        // Check App Group UserDefaults
+        for id in SharedStorage.appGroupCandidates {
+            if let s = UserDefaults(suiteName: id)?.string(forKey: freshEntityIDKey), !s.isEmpty {
+                freshEntityID = s; break
+            }
+        }
+        // Also check App Group container files
+        if freshEntityID == nil {
+            for id in SharedStorage.appGroupCandidates {
+                if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                    let url = container.appendingPathComponent("\(freshEntityIDKey).txt")
+                    if let s = try? String(contentsOf: url, encoding: .utf8), !s.isEmpty {
+                        freshEntityID = s; break
+                    }
+                }
+            }
+        }
+    }
+    storage.appendExtensionLog("makeEntry: freshEntityID=\(freshEntityID != nil ? "FOUND" : "nil") source=\(freshEntityID?.prefix(20) ?? "nil")")
+    
     if let id = configID, id != "none" {
         let uuid = uuidFromEntityID(id)
-        if let found = liveConfigs.first(where: { $0.id.uuidString == uuid }) {
+        
+        // First check if we have a fresh entity ID - decode it (contains fresh config data!)
+        if let freshID = freshEntityID, let decoded = decodeConfigFromID(freshID) {
+            config = decoded
+            storage.appendExtensionLog("makeEntry: using FRESH entity ID")
+        }
+        // Then check live configs
+        else if let found = liveConfigs.first(where: { $0.id.uuidString == uuid }) {
             config = found
-        } else if let embedded = decodeConfigFromID(id) {
+        }
+        // Fall back to embedded config from stored entity ID
+        else if let embedded = decodeConfigFromID(id) {
             config = embedded
             
             // Populate imageData for slides/items not already populated by loadConfigurations
@@ -487,15 +525,22 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let storageName = storage.debugReadSource(forKey: SharedStorage.configKey)
     let configCount = liveConfigs.count
     
-    // Fresh config debug info - simplified
+    // Fresh config debug info - comprehensive
     let freshConfigInfo: String
     let marker = UserDefaults.standard.string(forKey: "refreshMarker") ?? "NO_MARKER"
+    let swapDebug = UserDefaults.standard.string(forKey: "swapDebug") ?? "NO_SWAP_DEBUG"
+    
+    // Check App Group containers
+    var appGroupStatus = ""
+    for id in SharedStorage.appGroupCandidates {
+        let hasContainer = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) != nil
+        let hasData = UserDefaults(suiteName: id)?.data(forKey: SharedStorage.configKey) != nil
+        appGroupStatus += "\(id.prefix(20)):\(hasContainer ? "Y" : "N")/\(hasData ? "D" : "_") "
+    }
     
     // Build info string
     let configIDSample = configID.map { $0.count > 20 ? String($0.prefix(20)) + "..." : $0 } ?? "nil"
     let versionKeyByEntity = "dataVersion_" + entityUUID.uppercased()
-    let swapDebug = UserDefaults.standard.string(forKey: "swapDebug") ?? "NO_SWAP_DEBUG"
-    let orderByEntity = UserDefaults.standard.string(forKey: orderKey)
     let dataVersion = UserDefaults.standard.integer(forKey: versionKeyByEntity)
     
     var infoLines: [String] = []
@@ -505,11 +550,12 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     infoLines.append("config.id: " + config.id.uuidString.prefix(8) + "...")
     infoLines.append("---")
     infoLines.append("Storage: " + storageName + " (C: \(liveConfigs.count))")
-    infoLines.append("ORDER_KEY: " + orderKey + " = " + (orderByEntity ?? "nil"))
+    infoLines.append("AppGroups: " + appGroupStatus)
+    infoLines.append("ORDER_KEY: " + orderKey + " = " + (debugOrderInfo.prefix(20)))
     infoLines.append("VERSION: " + versionKeyByEntity + " = " + String(dataVersion))
     infoLines.append("---")
-    infoLines.append("SWAP: " + String(swapDebug.prefix(30)))
-    infoLines.append("MARKER: " + String(marker.prefix(40)))
+    infoLines.append("SWAP: " + String(swapDebug.prefix(40)))
+    infoLines.append("MARKER: " + String(marker.prefix(30)))
     freshConfigInfo = infoLines.joined(separator: "\n")
     
     return WidgetEntry(date: Date(), configuration: finalConfig,
