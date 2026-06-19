@@ -628,6 +628,7 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     infoLines.append("configID: " + configIDSample + " len=" + String(configID?.count ?? 0))
     infoLines.append("uuid: " + entityUUID.prefix(8))
     infoLines.append("Storage: " + storageName + " (C: \(liveConfigs.count))")
+    infoLines.append("  Raw: " + directRead.source)
     infoLines.append("ORDER: " + debugOrderInfo)
     infoLines.append("AppGrps: " + (appGroupStatus.isEmpty ? "none" : appGroupStatus.prefix(50)))
     infoLines.append("---")
