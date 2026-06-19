@@ -70,13 +70,30 @@ final class SharedStorage {
         }
 
         // Probe candidates: dynamic discovery first, then hardcoded fallbacks.
+        // Add many candidates for SideStore compatibility - SideStore may use different team IDs
         var seen = Set<String>()
-        let candidates = ([discoveredCandidate, "J3D2F4SMVD.com.ioswidget.shared",
-                           "com.ioswidget.shared"] as [String?])
-            .compactMap { $0 }
-            .filter { seen.insert($0).inserted }
-
-        for group in candidates {
+        var allCandidates: [String] = []
+        
+        // Dynamic discovery
+        if let disc = discoveredCandidate {
+            allCandidates.append(disc)
+            seen.insert(disc)
+        }
+        
+        // Hardcoded candidates with various team ID patterns
+        let hardcoded = [
+            "J3D2F4SMVD.com.ioswidget.shared",
+            "com.ioswidget.shared",
+            "$(AppIdentifierPrefix)com.ioswidget.shared"
+        ]
+        for c in hardcoded where seen.insert(c).inserted {
+            allCandidates.append(c)
+        }
+        
+        // DEBUG: Log discovery status
+        print("KEYCHAIN_DISCOVERY: discovered=\(discoveredCandidate ?? "nil") candidates=\(allCandidates)")
+        
+        for group in allCandidates {
             var q: [String: Any] = [
                 kSecClass as String:           kSecClassGenericPassword,
                 kSecAttrService as String:     "com.ioswidget.widgetdata",
@@ -87,11 +104,31 @@ final class SharedStorage {
             q[kSecValueData as String]      = Data([0x01])
             q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
             let status = SecItemAdd(q as CFDictionary, nil)
+            print("KEYCHAIN_PROBE: group=\(group) status=\(status)")
             if status == errSecSuccess {
                 SecItemDelete(q as CFDictionary)
+                print("KEYCHAIN_SUCCESS: found valid group=\(group)")
                 return group
             }
         }
+        
+        // LAST RESORT: Try without specifying access group (might work for same-team apps)
+        print("KEYCHAIN_WARNING: All group probes failed, trying without access group")
+        var lastQ: [String: Any] = [
+            kSecClass as String:       kSecClassGenericPassword,
+            kSecAttrService as String: "com.ioswidget.widgetdata",
+            kSecAttrAccount as String: "__writeprobe__"
+        ]
+        SecItemDelete(lastQ as CFDictionary)
+        lastQ[kSecValueData as String]      = Data([0x01])
+        lastQ[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        let lastStatus = SecItemAdd(lastQ as CFDictionary, nil)
+        print("KEYCHAIN_NO_GROUP: status=\(lastStatus)")
+        if lastStatus == errSecSuccess {
+            SecItemDelete(lastQ as CFDictionary)
+            return "__no_group__" // Special marker meaning write without group
+        }
+        
         return nil
     }()
 
@@ -114,9 +151,12 @@ final class SharedStorage {
         var query: [String: Any] = [
             kSecClass as String:           kSecClassGenericPassword,
             kSecAttrService as String:     Self.keychainService,
-            kSecAttrAccount as String:     key,
-            kSecAttrAccessGroup as String: group
+            kSecAttrAccount as String:     key
         ]
+        // Only add access group if not using no-group mode
+        if group != "__no_group__" {
+            query[kSecAttrAccessGroup as String] = group
+        }
         SecItemDelete(query as CFDictionary)
         query[kSecValueData as String]      = data
         query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
@@ -134,14 +174,17 @@ final class SharedStorage {
 
     func keychainRead(forKey key: String) -> Data? {
         guard let group = Self.sharedKeychainGroup else { return nil }
-        let query: [String: Any] = [
+        var query: [String: Any] = [
             kSecClass as String:           kSecClassGenericPassword,
             kSecAttrService as String:     Self.keychainService,
             kSecAttrAccount as String:     key,
-            kSecAttrAccessGroup as String: group,
             kSecReturnData as String:      true,
             kSecMatchLimit as String:      kSecMatchLimitOne
         ]
+        // Only add access group if not using no-group mode
+        if group != "__no_group__" {
+            query[kSecAttrAccessGroup as String] = group
+        }
         var result: AnyObject?
         guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return nil }
         return result as? Data
@@ -149,25 +192,31 @@ final class SharedStorage {
 
     var keychainHasConfigs: Bool {
         guard let group = Self.sharedKeychainGroup else { return false }
-        let query: [String: Any] = [
+        var query: [String: Any] = [
             kSecClass as String:           kSecClassGenericPassword,
             kSecAttrService as String:     Self.keychainService,
             kSecAttrAccount as String:     Self.configKey,
-            kSecAttrAccessGroup as String: group,
             kSecReturnData as String:      false,
             kSecMatchLimit as String:      kSecMatchLimitOne
         ]
+        // Only add access group if not using no-group mode
+        if group != "__no_group__" {
+            query[kSecAttrAccessGroup as String] = group
+        }
         return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
     }
 
     func keychainDelete(forKey key: String) {
         guard let group = Self.sharedKeychainGroup else { return }
-        let query: [String: Any] = [
+        var query: [String: Any] = [
             kSecClass as String:           kSecClassGenericPassword,
             kSecAttrService as String:     Self.keychainService,
-            kSecAttrAccount as String:     key,
-            kSecAttrAccessGroup as String: group
+            kSecAttrAccount as String:     key
         ]
+        // Only add access group if not using no-group mode
+        if group != "__no_group__" {
+            query[kSecAttrAccessGroup as String] = group
+        }
         SecItemDelete(query as CFDictionary)
     }
 
