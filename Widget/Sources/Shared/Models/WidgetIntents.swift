@@ -1037,18 +1037,20 @@ struct LargeBroadcastProvider: AppIntentTimelineProvider {
         WidgetEntry(date: Date(), configuration: .defaultConfiguration)
     }
     func snapshot(for configuration: SelectLargeWidgetIntent, in context: Context) async -> WidgetEntry {
-        // snapshot() is called during widget reselection - this gets FRESH data!
+        // snapshot() is called during widget reselection
         let storage = SharedStorage.shared
+        storage.appendExtensionLog("=== SNAPSHOT CALLED ===")
         let storageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
         storage.appendExtensionLog("SNAPSHOT: storage=\(storageDebug.source) bytes=\(storageDebug.data?.count ?? -1)")
         
-        // During reselection, the widget shows preview. This gets fresh data.
+        let udData = UserDefaults.standard.data(forKey: SharedStorage.configKey)
+        storage.appendExtensionLog("SNAPSHOT: UD.std=\(udData != nil ? "HAS" : "empty")")
+        
         return makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectLargeWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        // Just use the stored entity ID - debug will show what happens
         let storedID = configuration.selectedWidget?.id ?? "nil"
-        let note = "timeline using storedID.len=\(storedID.count)"
+        let note = "timeline storedID.len=\(storedID.count)"
         let entry = makeEntryInternal(configID: storedID, debugNote: note)
         let next = Calendar.current.date(byAdding: .minute, value: 30, to: Date()) ?? Date()
         return Timeline(entries: [entry], policy: .after(next))
