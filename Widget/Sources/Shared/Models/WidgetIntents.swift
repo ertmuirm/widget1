@@ -716,9 +716,7 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     var infoLines: [String] = []
     infoLines.append("=== RESELECTION DEBUG ===")
     infoLines.append("uuid: \(entityUUID.prefix(8))")
-    // Show full entity ID info
     infoLines.append("fullID.len: \(configID?.count ?? 0)")
-    // Hash of full entity ID to detect if it changes
     let fullIDHash = configID.map { String($0.hashValue) } ?? "nil"
     infoLines.append("fullID.hash: \(fullIDHash.prefix(10))")
     infoLines.append("items: \(itemCount)")
@@ -731,9 +729,11 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
         infoLines.append("caller: \(note)")
     }
     infoLines.append("---")
-    infoLines.append("KEY: If fullID.hash changes")
-    infoLines.append("after reselection, the entity")
-    infoLines.append("has fresh swapped data!")
+    infoLines.append("KEY INSIGHT:")
+    infoLines.append("entities() re-encodes from")
+    infoLines.append("liveConfigs if available!")
+    infoLines.append("If liveConfigs>0, widget gets")
+    infoLines.append("FRESH data in entityID!")
     freshConfigInfo = infoLines.joined(separator: "\n")
     
     return WidgetEntry(date: Date(), configuration: finalConfig,
@@ -977,13 +977,22 @@ struct LargeWidgetQuery: EntityQuery {
         // Debug: check what storage is accessible
         let storage = SharedStorage.shared
         let storageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
-        storage.appendExtensionLog("LargeQuery: storage=\(storageDebug.source)")
         
         let configs = filteredConfigs(size: .systemLarge)
+        
+        // Debug: Show what happened
+        let infoMsg = "entities(): configs.count=\(configs.count) storage=\(storageDebug.source)"
+        storage.appendExtensionLog(infoMsg)
+        
+        // CRITICAL: If configs found, we RE-ENCODE them with fresh data!
+        // This is how reselection gets fresh data - it re-encodes from SharedStorage
         return identifiers.map { storedID in
             let uuid = uuidFromEntityID(storedID)
             if let c = configs.first(where: { $0.id.uuidString == uuid }) {
-                return LargeWidgetEntity(id: encodeEntityID(c), name: c.name)
+                // RE-ENCODE from fresh SharedStorage data!
+                let freshID = encodeEntityID(c)
+                storage.appendExtensionLog("entities: RE-ENCODED from liveConfigs id.hash=\(freshID.hashValue)")
+                return LargeWidgetEntity(id: freshID, name: c.name)
             }
             if let c = decodeConfigFromID(storedID) {
                 return LargeWidgetEntity(id: storedID, name: c.name)
