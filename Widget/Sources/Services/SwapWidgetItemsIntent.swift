@@ -140,7 +140,12 @@ struct GridWidgetQuery: EntityQuery {
     func entities(for identifiers: [String]) async throws -> [GridWidgetEntity] {
         let configs = gridConfigs()
         return identifiers.compactMap { storedID in
-            configs.first(where: { $0.id.uuidString == storedID })
+            // First try decoding as encoded entity ID
+            if let decoded = decodeConfigFromID(storedID) {
+                return GridWidgetEntity(id: storedID, name: decoded.name, sizeLabel: decoded.size.displayName)
+            }
+            // Fall back to UUID lookup
+            return configs.first(where: { $0.id.uuidString == storedID })
                 .map { GridWidgetEntity(id: $0.id.uuidString, name: $0.name, sizeLabel: $0.size.displayName) }
         }
     }
@@ -150,11 +155,12 @@ struct GridWidgetQuery: EntityQuery {
         guard !list.isEmpty else {
             return [GridWidgetEntity(id: "none", name: "No Grid Widgets saved", sizeLabel: "")]
         }
-        return list.map { GridWidgetEntity(id: $0.id.uuidString, name: $0.name, sizeLabel: $0.size.displayName) }
+        // Use encodeEntityID like other entities - embeds full config for cross-process sharing
+        return list.map { GridWidgetEntity(id: encodeEntityID($0), name: $0.name, sizeLabel: $0.size.displayName) }
     }
 
     func defaultResult() async -> GridWidgetEntity? {
-        gridConfigs().first.map { GridWidgetEntity(id: $0.id.uuidString, name: $0.name, sizeLabel: $0.size.displayName) }
+        gridConfigs().first.map { GridWidgetEntity(id: encodeEntityID($0), name: $0.name, sizeLabel: $0.size.displayName) }
     }
 
     private func gridConfigs() -> [WidgetConfig] {
@@ -199,8 +205,12 @@ struct SwapWidgetItemsIntent: AppIntent {
 
         var configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
 
-        // Find the config - widget.id is already the UUID string
-        guard let configIdx = configs.firstIndex(where: { $0.id.uuidString == widget.id }) else {
+        // Extract config UUID from widget.id (handle both encoded and UUID-only formats)
+        let widgetUUID = widget.id.contains("|") 
+            ? uuidFromEntityID(widget.id)  // encoded format: UUID|base64
+            : widget.id                     // plain UUID format
+        
+        guard let configIdx = configs.firstIndex(where: { $0.id.uuidString.uppercased() == widgetUUID.uppercased() }) else {
             return .result(dialog: IntentDialog(stringLiteral: "Widget \"\(widget.name)\" not found"))
         }
 
@@ -246,10 +256,35 @@ struct SwapWidgetItemsIntent: AppIntent {
         UserDefaults.standard.set(freshEntityID, forKey: "LATEST_ENCODED_CONFIG")
         UserDefaults.standard.synchronize()
         
-        // Strategy 3: Write to App Group (may not work but worth trying)
+        // Strategy 3: Write to App Group (CRITICAL for cross-process communication!)
+        var wroteToAppGroup = false
         for id in SharedStorage.appGroupCandidates {
-            UserDefaults(suiteName: id)?.set(freshEntityID, forKey: "LATEST_ENCODED_CONFIG")
-            UserDefaults(suiteName: id)?.synchronize()
+            if let ud = UserDefaults(suiteName: id) {
+                ud.set(freshEntityID, forKey: "LATEST_ENCODED_CONFIG")
+                ud.synchronize()
+                storage.appendExtensionLog("SWAP_WRITE: wrote to AppGroup[\(id.prefix(15))] len=\(freshEntityID.count)")
+                wroteToAppGroup = true
+            } else {
+                storage.appendExtensionLog("SWAP_WRITE: AppGroup[\(id.prefix(15))]=FAILED")
+            }
+        }
+        
+        // DEBUG: Verify by reading back from App Group
+        if wroteToAppGroup {
+            for id in SharedStorage.appGroupCandidates {
+                if let ud = UserDefaults(suiteName: id),
+                   let readBack = ud.string(forKey: "LATEST_ENCODED_CONFIG") {
+                    storage.appendExtensionLog("SWAP_VERIFY: AppGroup[\(id.prefix(15))] READ BACK len=\(readBack.count)")
+                    break
+                }
+            }
+        }
+        
+        // ALTERNATIVE: Write to a file in shared Documents folder
+        if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let url = docs.appendingPathComponent("latest_entity_id.txt")
+            try? freshEntityID.write(to: url, atomically: true, encoding: .utf8)
+            storage.appendExtensionLog("SWAP_WRITE: wrote to Documents/lastest_entity_id.txt len=\(freshEntityID.count)")
         }
         
         // Also try App Group container file

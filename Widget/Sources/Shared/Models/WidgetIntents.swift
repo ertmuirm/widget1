@@ -395,6 +395,16 @@ private func makeEntry(configID: String?) -> WidgetEntry {
             }
         }
     }
+    // Check shared Documents folder (written by SwapWidgetItemsIntent)
+    if latestEncoded == nil {
+        if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let url = docs.appendingPathComponent("latest_entity_id.txt")
+            if let s = try? String(contentsOf: url, encoding: .utf8), !s.isEmpty {
+                latestEncoded = s
+                storage.appendExtensionLog("makeEntry: latestEncoded=FROM_DOCS len=\(latestEncoded!.count)")
+            }
+        }
+    }
     storage.appendExtensionLog("makeEntry: latestEncoded=\(latestEncoded != nil ? "FOUND(\(latestEncoded!.count)chars)" : "nil")")
     
     // Check for specific encoded config
