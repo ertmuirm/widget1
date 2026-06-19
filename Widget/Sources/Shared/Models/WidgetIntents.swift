@@ -398,6 +398,34 @@ private func makeEntry(configID: String?) -> WidgetEntry {
         }
     }
     
+    // DEBUG: Show how widget reselection gets data
+    // Widget reselection decodes the entity ID to get config data
+    let decodeDebug: String
+    if let id = configID {
+        let hasPipe = id.contains("|")
+        let uuidPart = uuidFromEntityID(id)
+        let canDecode = decodeConfigFromID(id) != nil
+        decodeDebug = "id.len=\(id.count)|pipe=\(hasPipe)|uuid=\(uuidPart.prefix(8))|decode=\(canDecode)"
+        
+        // Try to decode and show what we get
+        if let decoded = decodeConfigFromID(id) {
+            decodeDebug += "|items=\(decoded.items.count)|name=\(decoded.name.prefix(10))"
+        } else {
+            // Try to decode the base64 part separately
+            let parts = id.split(separator: "|", maxSplits: 1)
+            if parts.count == 2 {
+                let b64 = String(parts[1])
+                let validB64 = Data(base64Encoded: b64) != nil
+                decodeDebug += "|b64.valid=\(validB64)"
+            } else {
+                decodeDebug += "|no.b64.part"
+            }
+        }
+    } else {
+        decodeDebug = "configID=nil"
+    }
+    storage.appendExtensionLog("RESELECTION_DEBUG: \(decodeDebug)")
+    
     if let id = configID, id != "none" {
         let uuid = uuidFromEntityID(id)
         
@@ -416,7 +444,7 @@ private func makeEntry(configID: String?) -> WidgetEntry {
             config = found
             storage.appendExtensionLog("makeEntry: using liveConfigs")
         }
-        // 4. Fall back to embedded config from stored entity ID
+        // 4. Fall back to embedded config from stored entity ID (THIS IS WIDGET RESELECTION PATH)
         else if let embedded = decodeConfigFromID(id) {
             config = embedded
             storage.appendExtensionLog("makeEntry: using EMBEDDED id.len=\(id.count)")
@@ -600,6 +628,9 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     infoLines.append("Storage: " + storageName + " (C: \(liveConfigs.count))")
     infoLines.append("AppGroups(C/D/F): " + appGroupStatus)
     infoLines.append("ORDER: " + debugOrderInfo)
+    infoLines.append("---")
+    infoLines.append("=== WIDGET RESELECTION PATH ===")
+    infoLines.append(decodeDebug)
     infoLines.append("---")
     infoLines.append("LATEST_ENC: " + (latestEncoded != nil ? "YES" : "nil"))
     infoLines.append("VERSION: " + versionKeyByEntity + " = " + String(dataVersion))
