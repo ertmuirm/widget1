@@ -354,51 +354,72 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     storage.appendExtensionLog("makeEntry liveConfigs count=\(liveConfigs.count) storage=\(liveStorageDebug.source)")
 
     // Load config - widget reselection just calls SharedStorage which should have fresh data
-    // BUT: For sideloaded apps, SharedStorage may not be shared. So we also check for
-    // a "fresh entity ID" written by SwapWidgetItemsIntent to App Group.
+    // BUT: For sideloaded apps, SharedStorage may not be shared. So we check multiple sources:
+    // 1. LATEST_ENCODED_CONFIG - written by SwapWidgetItemsIntent to UserDefaults.standard
+    // 2. ENCODED_CONFIG_<configID> - specific encoded config
+    // 3. App Group - might work for some configs
+    // 4. liveConfigs from SharedStorage
+    // 5. decodeConfigFromID() from stored entity ID
     var config: WidgetConfig
     
-    // Try to read fresh entity ID from App Group (written by swap intent)
-    // Key is "FRESH_ENTITY_ID_<configID>" - matches what swap intent writes
-    var freshEntityID: String? = nil
-    if let cid = configID {
-        let freshEntityIDKey = "FRESH_ENTITY_ID_\(cid)"
-        
-        // Check App Group UserDefaults
-        for id in SharedStorage.appGroupCandidates {
-            if let s = UserDefaults(suiteName: id)?.string(forKey: freshEntityIDKey), !s.isEmpty {
-                freshEntityID = s; break
-            }
+    // Check for latest encoded config (written by swap intent)
+    var latestEncoded: String? = nil
+    for id in SharedStorage.appGroupCandidates {
+        if let s = UserDefaults(suiteName: id)?.string(forKey: "LATEST_ENCODED_CONFIG"), !s.isEmpty {
+            latestEncoded = s; break
         }
-        // Also check App Group container files
-        if freshEntityID == nil {
-            for id in SharedStorage.appGroupCandidates {
-                if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
-                    let url = container.appendingPathComponent("\(freshEntityIDKey).txt")
-                    if let s = try? String(contentsOf: url, encoding: .utf8), !s.isEmpty {
-                        freshEntityID = s; break
-                    }
+    }
+    if latestEncoded == nil {
+        latestEncoded = UserDefaults.standard.string(forKey: "LATEST_ENCODED_CONFIG")
+    }
+    // Also check App Group container file
+    if latestEncoded == nil {
+        for id in SharedStorage.appGroupCandidates {
+            if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+                let url = container.appendingPathComponent("latest_encoded_config.txt")
+                if let s = try? String(contentsOf: url, encoding: .utf8), !s.isEmpty {
+                    latestEncoded = s; break
                 }
             }
         }
     }
-    storage.appendExtensionLog("makeEntry: freshEntityID=\(freshEntityID != nil ? "FOUND" : "nil") source=\(freshEntityID?.prefix(20) ?? "nil")")
+    storage.appendExtensionLog("makeEntry: latestEncoded=\(latestEncoded != nil ? "FOUND(\(latestEncoded!.count)chars)" : "nil")")
+    
+    // Check for specific encoded config
+    var specificEncoded: String? = nil
+    if let cid = configID {
+        specificEncoded = UserDefaults.standard.string(forKey: "ENCODED_CONFIG_\(cid)")
+        if specificEncoded == nil {
+            for id in SharedStorage.appGroupCandidates {
+                if let s = UserDefaults(suiteName: id)?.string(forKey: "ENCODED_CONFIG_\(cid)"), !s.isEmpty {
+                    specificEncoded = s; break
+                }
+            }
+        }
+    }
     
     if let id = configID, id != "none" {
         let uuid = uuidFromEntityID(id)
         
-        // First check if we have a fresh entity ID - decode it (contains fresh config data!)
-        if let freshID = freshEntityID, let decoded = decodeConfigFromID(freshID) {
+        // 1. First check LATEST_ENCODED_CONFIG
+        if let encoded = latestEncoded, let decoded = decodeConfigFromID(encoded) {
             config = decoded
-            storage.appendExtensionLog("makeEntry: using FRESH entity ID")
+            storage.appendExtensionLog("makeEntry: using LATEST_ENCODED_CONFIG")
         }
-        // Then check live configs
+        // 2. Then check ENCODED_CONFIG_<configID>
+        else if let encoded = specificEncoded, let decoded = decodeConfigFromID(encoded) {
+            config = decoded
+            storage.appendExtensionLog("makeEntry: using ENCODED_CONFIG")
+        }
+        // 3. Then check live configs
         else if let found = liveConfigs.first(where: { $0.id.uuidString == uuid }) {
             config = found
+            storage.appendExtensionLog("makeEntry: using liveConfigs")
         }
-        // Fall back to embedded config from stored entity ID
+        // 4. Fall back to embedded config from stored entity ID
         else if let embedded = decodeConfigFromID(id) {
             config = embedded
+            storage.appendExtensionLog("makeEntry: using EMBEDDED id.len=\(id.count)")
             
             // Populate imageData for slides/items not already populated by loadConfigurations
             if config.slides != nil {
@@ -414,6 +435,7 @@ private func makeEntry(configID: String?) -> WidgetEntry {
             // for 7+ items exceeds the 30 MB WidgetKit memory limit.
         } else {
             config = .defaultConfiguration
+            storage.appendExtensionLog("makeEntry: DEFAULT_CONFIG id.len=\(id.count) uuid=\(uuid.prefix(8))")
         }
     } else {
         config = .defaultConfiguration
@@ -445,48 +467,69 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let normalizedEntityUUID = entityUUID.uppercased()
     let orderKey = "itemOrder_\(normalizedEntityUUID)"
     
-    // Check order override and track for debug display
-    // Read from UserDefaults.standard directly since it may be shared for sideloaded apps
+    // Check order override from ALL sources - App Group files are most likely to work
     var orderFound = false
     var orderValue: String? = nil
-    if let orderStr = UserDefaults.standard.string(forKey: orderKey), !orderStr.isEmpty {
-        orderFound = true
-        orderValue = orderStr
-        storage.appendExtensionLog("ORDER: found in UserDefaults.standard: \(orderStr)")
-        // FIX: Apply reordering when read from UserDefaults.standard
-        // This was previously only done in the else-if branch for gatherReadOverride
-        let positions = orderStr.split(separator: ",").compactMap { Int($0) }
-        if positions.count == finalConfig.items.count {
-            var reordered = finalConfig.items
-            for (newIndex, oldIndex) in positions.enumerated() {
-                if oldIndex >= 0 && oldIndex < reordered.count {
-                    reordered[newIndex] = finalConfig.items[oldIndex]
-                }
+    var orderSource = "none"
+    
+    // 1. Check App Group container files (.dat) - most reliable for sideloaded
+    for id in SharedStorage.appGroupCandidates {
+        if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+            let url = container.appendingPathComponent("\(orderKey).dat")
+            if let data = try? Data(contentsOf: url),
+               let str = String(data: data, encoding: .utf8), !str.isEmpty {
+                orderFound = true
+                orderValue = str
+                orderSource = "AppGroupFile(\(id.prefix(15)))"
+                break
             }
-            finalConfig.items = reordered
-            storage.appendExtensionLog("ORDER: applied reordering from UserDefaults.standard")
-        }
-    } else if let orderStr = SharedStorage.shared.gatherReadOverride(forKey: orderKey) {
-        orderFound = true
-        orderValue = orderStr
-        let positions = orderStr.split(separator: ",").compactMap { Int($0) }
-        if positions.count == finalConfig.items.count {
-            var reordered = finalConfig.items
-            for (newIndex, oldIndex) in positions.enumerated() {
-                if oldIndex >= 0 && oldIndex < reordered.count {
-                    reordered[newIndex] = finalConfig.items[oldIndex]
-                }
-            }
-            finalConfig.items = reordered
         }
     }
     
+    // 2. Check App Group UserDefaults
+    if !orderFound {
+        for id in SharedStorage.appGroupCandidates {
+            if let str = UserDefaults(suiteName: id)?.string(forKey: orderKey), !str.isEmpty {
+                orderFound = true
+                orderValue = str
+                orderSource = "AppGroupUD(\(id.prefix(15)))"
+                break
+            }
+        }
+    }
+    
+    // 3. Check UserDefaults.standard
+    if !orderFound {
+        if let str = UserDefaults.standard.string(forKey: orderKey), !str.isEmpty {
+            orderFound = true
+            orderValue = str
+            orderSource = "UserDefaults.standard"
+        }
+    }
+    
+    // Apply reordering if found
+    if orderFound, let orderStr = orderValue {
+        let positions = orderStr.split(separator: ",").compactMap { Int($0) }
+        if positions.count == finalConfig.items.count {
+            var reordered = finalConfig.items
+            for (newIndex, oldIndex) in positions.enumerated() {
+                if oldIndex >= 0 && oldIndex < reordered.count {
+                    reordered[newIndex] = finalConfig.items[oldIndex]
+                }
+            }
+            finalConfig.items = reordered
+            storage.appendExtensionLog("ORDER: applied from \(orderSource)")
+        }
+    } else {
+        storage.appendExtensionLog("ORDER: not found for key=\(orderKey.prefix(20))")
+    }
+    
     // Create debug info string for widget display
-    // Show: "NO:" + last 6 of UUID if not found, or order value if found
+    // Show: order source and value, or "DEF:" / "NO:" + last 6 of UUID
     let uuidSuffix = String(normalizedEntityUUID.suffix(6))
     let debugOrderInfo: String
     if orderFound {
-        debugOrderInfo = "OK:\(orderValue ?? "")"
+        debugOrderInfo = "OK(\(orderSource.prefix(8))):\(orderValue ?? "")"
     } else {
         // Also show if config came from default (random UUID) vs saved config
         let isDefaultConfig = (configID == nil || configID == "none" || 
@@ -530,12 +573,17 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let marker = UserDefaults.standard.string(forKey: "refreshMarker") ?? "NO_MARKER"
     let swapDebug = UserDefaults.standard.string(forKey: "swapDebug") ?? "NO_SWAP_DEBUG"
     
-    // Check App Group containers
+    // Check App Group containers - both UserDefaults and files
     var appGroupStatus = ""
     for id in SharedStorage.appGroupCandidates {
         let hasContainer = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) != nil
         let hasData = UserDefaults(suiteName: id)?.data(forKey: SharedStorage.configKey) != nil
-        appGroupStatus += "\(id.prefix(20)):\(hasContainer ? "Y" : "N")/\(hasData ? "D" : "_") "
+        var hasOrderFile = false
+        if hasContainer, let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
+            let orderFileURL = container.appendingPathComponent("\(orderKey).dat")
+            hasOrderFile = FileManager.default.fileExists(atPath: orderFileURL.path)
+        }
+        appGroupStatus += "\(id.prefix(15)):\(hasContainer ? "Y" : "N")/\(hasData ? "D" : "_")/\(hasOrderFile ? "F" : "_") "
     }
     
     // Build info string
@@ -550,8 +598,10 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     infoLines.append("config.id: " + config.id.uuidString.prefix(8) + "...")
     infoLines.append("---")
     infoLines.append("Storage: " + storageName + " (C: \(liveConfigs.count))")
-    infoLines.append("AppGroups: " + appGroupStatus)
-    infoLines.append("ORDER_KEY: " + orderKey + " = " + (debugOrderInfo.prefix(20)))
+    infoLines.append("AppGroups(C/D/F): " + appGroupStatus)
+    infoLines.append("ORDER: " + debugOrderInfo)
+    infoLines.append("---")
+    infoLines.append("LATEST_ENC: " + (latestEncoded != nil ? "YES" : "nil"))
     infoLines.append("VERSION: " + versionKeyByEntity + " = " + String(dataVersion))
     infoLines.append("---")
     infoLines.append("SWAP: " + String(swapDebug.prefix(40)))

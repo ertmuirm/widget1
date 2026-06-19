@@ -227,31 +227,39 @@ struct SwapWidgetItemsIntent: AppIntent {
 
         try SharedStorage.shared.saveConfigurations(configs)
 
-        // CRITICAL: Write fresh encoded entity ID to App Group
+        // CRITICAL: Create a RE-ENCODED entity ID with the swapped config
         // This is the SAME mechanism widget reselection uses!
-        // When user reselects widget, iOS calls entities() which creates fresh entity ID via encodeEntityID().
-        // We replicate this by writing the fresh entity ID to App Group for widget to read.
+        // When user reselects widget, iOS re-encodes the config into the entity ID.
+        // We replicate this by re-encoding the EXISTING entity ID with swapped config.
         let freshEntityID = encodeEntityID(config)
         
-        // Write to App Group UserDefaults using the WIDGET's entity ID as the key
-        // This ensures makeEntry can find it using the same key
+        // Write to UserDefaults.standard with the EXISTING entity ID as key
+        // The widget will find it when it decodes its configID
         let widgetEntityID = widget.id  // This is what makeEntry's configID contains
-        let freshEntityIDKey = "FRESH_ENTITY_ID_\(widgetEntityID)"
         
-        // Write to App Group UserDefaults (should be shared)
+        // Strategy 1: Write fresh entity ID using the SAME key as the widget's configID
+        // This way makeEntry can decode it directly
+        UserDefaults.standard.set(freshEntityID, forKey: "ENCODED_CONFIG_\(widgetEntityID)")
+        UserDefaults.standard.synchronize()
+        
+        // Strategy 2: Also write to a well-known key that the widget checks
+        UserDefaults.standard.set(freshEntityID, forKey: "LATEST_ENCODED_CONFIG")
+        UserDefaults.standard.synchronize()
+        
+        // Strategy 3: Write to App Group (may not work but worth trying)
         for id in SharedStorage.appGroupCandidates {
-            UserDefaults(suiteName: id)?.set(freshEntityID, forKey: freshEntityIDKey)
+            UserDefaults(suiteName: id)?.set(freshEntityID, forKey: "LATEST_ENCODED_CONFIG")
             UserDefaults(suiteName: id)?.synchronize()
         }
         
-        // Also write to App Group container file (guaranteed shared file system)
+        // Also try App Group container file
         for id in SharedStorage.appGroupCandidates {
             if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
-                let url = container.appendingPathComponent("\(freshEntityIDKey).txt")
+                let url = container.appendingPathComponent("latest_encoded_config.txt")
                 try? freshEntityID.write(to: url, atomically: true, encoding: String.Encoding.utf8)
             }
         }
-        
+
         // Write item-order override using WIDGET's UUID
         let widgetUUID = (widget.id.split(separator: "|").first ?? Substring(widget.id)).uppercased()
         let orderKey = "itemOrder_\(widgetUUID)"
@@ -259,7 +267,7 @@ struct SwapWidgetItemsIntent: AppIntent {
         SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
 
         // Debug info
-        let debugInfo = "FRESH_ID_WRITTEN|widgetID=\(widget.id.prefix(20))|freshLen=\(freshEntityID.count)"
+        let debugInfo = "RE_ENCODED|widgetID=\(widgetEntityID.prefix(15))|freshLen=\(freshEntityID.count)|key=LATEST"
         UserDefaults.standard.set(debugInfo, forKey: "swapDebug")
 
         // Increment version counter to signal data changed.
