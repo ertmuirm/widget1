@@ -385,7 +385,7 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     // entity ID data is captured at widget-add time and never updates.
     // Uses freshConfigKey already defined earlier in the function.
     
-    let config: WidgetConfig
+    var config: WidgetConfig
     if let jsonStr = freshConfigJSON, !jsonStr.isEmpty {
         // Fresh config available from refresh button - decode and use it directly
         storage.appendExtensionLog("FRESH: using config from UserDefaults.standard")
