@@ -264,6 +264,14 @@ struct SwapWidgetItemsIntent: AppIntent {
         let widgetUUID = (widget.id.split(separator: "|").first ?? Substring(widget.id)).uppercased()
         let orderKey = "itemOrder_\(widgetUUID)"
         let orderValue = (0..<config.items.count).map(String.init).joined(separator: ",")
+        
+        // DEBUG: Log what UUID we're writing to
+        storage.appendExtensionLog("SWAP_WRITE: widgetUUID=\(widgetUUID.prefix(20)) orderKey=\(orderKey) orderValue=\(orderValue)")
+        
+        // Write to UserDefaults.standard (THIS IS WHAT WIDGET READS FROM!)
+        UserDefaults.standard.set(orderValue, forKey: orderKey)
+        
+        // Also write to App Groups for other storage mechanisms
         SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
 
         // Debug info
