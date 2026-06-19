@@ -343,15 +343,27 @@ struct WidgetEntry: TimelineEntry {
 private func makeEntry(configID: String?) -> WidgetEntry {
     let storage = SharedStorage.shared
     
+    // EXTENSIVE DEBUG: Trace exactly where data comes from
+    let debugTimestamp = Date().timeIntervalSince1970
+    storage.appendExtensionLog("=== makeEntry START id=\(configID?.prefix(20) ?? "nil") ts=\(debugTimestamp) ===")
+    
     // Debug: direct check of gatherReadDebug
     let directRead = storage.gatherReadDebug(forKey: SharedStorage.configKey)
+    storage.appendExtensionLog("makeEntry directRead source=\(directRead.source) bytes=\(directRead.data?.count ?? -1)")
+    
     // Write debug info to shared container for main app to read
     storage.writeWidgetDebugInfo()
-    // This will show in the extension log
-    storage.appendExtensionLog("makeEntry directRead source=\(directRead.source) data=\(directRead.data?.count ?? -1)")
+    
     let liveConfigs = (try? storage.loadConfigurations()) ?? []
-    let liveStorageDebug = storage.gatherReadDebug(forKey: SharedStorage.configKey)
-    storage.appendExtensionLog("makeEntry liveConfigs count=\(liveConfigs.count) storage=\(liveStorageDebug.source)")
+    storage.appendExtensionLog("makeEntry liveConfigs count=\(liveConfigs.count)")
+    
+    // Check all UserDefaults.standard keys related to configs
+    let udKeys = ["widgetConfigurations", "LATEST_ENCODED_CONFIG", "ENCODED_CONFIG", "dataVersion", "refreshMarker"]
+    for key in udKeys {
+        let val = UserDefaults.standard.object(forKey: key)
+        let hasVal = val != nil
+        storage.appendExtensionLog("makeEntry UD.standard[\(key)]=\(hasVal ? "YES" : "nil")")
+    }
 
     // Load config - widget reselection just calls SharedStorage which should have fresh data
     // BUT: For sideloaded apps, SharedStorage may not be shared. So we check multiple sources:
@@ -623,12 +635,32 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let versionKeyByEntity = "dataVersion_" + entityUUID.uppercased()
     let dataVersion = UserDefaults.standard.integer(forKey: versionKeyByEntity)
     
+    // Debug: Show what config we ended up with
+    let configSource: String
+    if liveConfigs.contains(where: { $0.id.uuidString.uppercased() == entityUUID.uppercased() }) {
+        configSource = "liveConfigs"
+    } else if latestEncoded != nil {
+        configSource = "LATEST_ENC"
+    } else if specificEncoded != nil {
+        configSource = "SPECIFIC_ENC"
+    } else if decodeConfigFromID(configID ?? "") != nil {
+        configSource = "EMBEDDED"
+    } else {
+        configSource = "DEFAULT"
+    }
+    
+    // Get first 3 item names from finalConfig to verify
+    let itemNames = finalConfig.items.prefix(3).map { $0.displayType.rawValue }.joined(separator: ",")
+    let itemCount = finalConfig.items.count
+    
     var infoLines: [String] = []
     infoLines.append("=== REFRESH DEBUG ===")
     infoLines.append("configID: " + configIDSample + " len=" + String(configID?.count ?? 0))
     infoLines.append("uuid: " + entityUUID.prefix(8))
     infoLines.append("Storage: " + storageName + " (C: \(liveConfigs.count))")
     infoLines.append("  Raw: " + directRead.source)
+    infoLines.append("CONFIG_SRC: " + configSource)
+    infoLines.append("ITEMS: \(itemCount) [\(itemNames)]")
     infoLines.append("ORDER: " + debugOrderInfo)
     infoLines.append("AppGrps: " + (appGroupStatus.isEmpty ? "none" : appGroupStatus.prefix(50)))
     infoLines.append("---")
