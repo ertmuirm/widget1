@@ -511,6 +511,10 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     let normalizedEntityUUID = entityUUID.uppercased()
     let orderKey = "itemOrder_\(normalizedEntityUUID)"
     
+    // DEBUG: Log exact keys being checked
+    storage.appendExtensionLog("ORDER_KEY_DEBUG: entityUUID=\(entityUUID.prefix(8)) normalized=\(normalizedEntityUUID.prefix(20)) orderKey=\(orderKey)")
+    storage.appendExtensionLog("ORDER_KEY_DEBUG: UD.st[\(orderKey)]=\(UserDefaults.standard.string(forKey: orderKey) != nil ? "YES" : "nil")")
+    
     // Check order override from ALL sources - App Group files are most likely to work
     var orderFound = false
     var orderValue: String? = nil
@@ -520,6 +524,8 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     for id in SharedStorage.appGroupCandidates {
         if let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: id) {
             let url = container.appendingPathComponent("\(orderKey).dat")
+            let fileExists = FileManager.default.fileExists(atPath: url.path)
+            storage.appendExtensionLog("ORDER_KEY_DEBUG: file[\(id.prefix(10))]=\(fileExists ? "EXISTS" : "NO")")
             if let data = try? Data(contentsOf: url),
                let str = String(data: data, encoding: .utf8), !str.isEmpty {
                 orderFound = true
