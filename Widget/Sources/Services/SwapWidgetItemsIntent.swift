@@ -203,12 +203,16 @@ struct SwapWidgetItemsIntent: AppIntent {
             return .result(dialog: IntentDialog(stringLiteral: "No grid widgets found"))
         }
 
+        let storage = SharedStorage.shared
         var configs = (try? SharedStorage.shared.loadConfigurations()) ?? []
 
         // Extract config UUID from widget.id (handle both encoded and UUID-only formats)
-        let widgetUUID = widget.id.contains("|") 
-            ? uuidFromEntityID(widget.id)  // encoded format: UUID|base64
-            : widget.id                     // plain UUID format
+        let widgetUUID: String
+        if widget.id.contains("|") {
+            widgetUUID = String(widget.id.split(separator: "|").first ?? Substring(widget.id))
+        } else {
+            widgetUUID = widget.id
+        }
         
         guard let configIdx = configs.firstIndex(where: { $0.id.uuidString.uppercased() == widgetUUID.uppercased() }) else {
             return .result(dialog: IntentDialog(stringLiteral: "Widget \"\(widget.name)\" not found"))
@@ -283,8 +287,8 @@ struct SwapWidgetItemsIntent: AppIntent {
         // ALTERNATIVE: Write to a file in shared Documents folder
         if let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
             let url = docs.appendingPathComponent("latest_entity_id.txt")
-            try? freshEntityID.write(to: url, atomically: true, encoding: .utf8)
-            storage.appendExtensionLog("SWAP_WRITE: wrote to Documents/lastest_entity_id.txt len=\(freshEntityID.count)")
+            try? freshEntityID.write(to: url, atomically: true, encoding: String.Encoding.utf8)
+            storage.appendExtensionLog("SWAP_WRITE: wrote to Documents/latest_entity_id.txt len=\(freshEntityID.count)")
         }
         
         // Also try App Group container file
