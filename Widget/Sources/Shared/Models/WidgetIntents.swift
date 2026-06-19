@@ -1044,35 +1044,26 @@ struct LargeBroadcastProvider: AppIntentTimelineProvider {
     func timeline(for configuration: SelectLargeWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
         let storedID = configuration.selectedWidget?.id ?? "nil"
         
-        // Check storage in query context
-        let storageDebug = SharedStorage.shared.gatherReadDebug(forKey: SharedStorage.configKey)
-        let queryConfigs = filteredConfigs(size: .systemLarge)
+        // Key insight: suggestedEntities() returns entities with FRESH encoded data.
+        // Even if the UUID is the same, the base64-encoded portion is NEW after a swap.
+        // We should ALWAYS use the fresh entity from suggestedEntities() if available.
         
-        // DEBUG: Show if this is reselection vs refresh
-        var isReselection = false
-        if !queryConfigs.isEmpty {
-            let freshEntities = try? await LargeWidgetQuery().entities(for: [storedID])
-            if let fresh = freshEntities?.first, fresh.id != storedID {
-                isReselection = true
-            }
-        }
-        
+        let candidates = try? await LargeWidgetQuery().suggestedEntities()
         var freshID: String? = nil
         var note: String
         
-        if queryConfigs.isEmpty {
-            note = "REFRESH: no fresh storage"
-        } else if isReselection {
-            note = "RESELECTION: got fresh entity"
-        } else {
-            note = "REFRESH: using cached entity"
-        }
-        
-        if !queryConfigs.isEmpty {
-            let entities = try? await LargeWidgetQuery().entities(for: [storedID])
-            if let fresh = entities?.first {
+        if let candidates = candidates, !candidates.isEmpty {
+            // Find entity with matching UUID
+            let uuid = uuidFromEntityID(storedID)
+            if let fresh = candidates.first(where: { uuidFromEntityID($0.id) == uuid }) {
                 freshID = fresh.id
+                note = "RESELECTION: using fresh entity"
+            } else {
+                freshID = candidates.first?.id
+                note = "RESELECTION: using first candidate"
             }
+        } else {
+            note = "REFRESH: no candidates"
         }
         
         let entry = makeEntryInternal(configID: freshID ?? storedID, debugNote: note)
