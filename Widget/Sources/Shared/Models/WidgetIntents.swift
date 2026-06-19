@@ -825,25 +825,23 @@ struct SmallBroadcastProvider: AppIntentTimelineProvider {
         WidgetEntry(date: Date(), configuration: .defaultConfiguration)
     }
     func snapshot(for configuration: SelectSmallWidgetIntent, in context: Context) async -> WidgetEntry {
-        // Re-query entities to get FRESH data from SharedStorage (same as reselection!)
-        if let id = configuration.selectedWidget?.id {
-            let entities = try? await SmallWidgetQuery().entities(for: [id])
-            if let fresh = entities?.first {
-                return makeEntry(configID: fresh.id)
-            }
-        }
         return makeEntry(configID: configuration.selectedWidget?.id)
     }
     func timeline(for configuration: SelectSmallWidgetIntent, in context: Context) async -> Timeline<WidgetEntry> {
-        // CRITICAL: Re-query entities to get FRESH data from SharedStorage!
-        if let id = configuration.selectedWidget?.id {
-            let entities = try? await SmallWidgetQuery().entities(for: [id])
-            if let fresh = entities?.first {
-                SharedStorage.shared.appendExtensionLog("Small timeline: RE-QUERIED fresh entity id.len=\(fresh.id.count)")
-                return makeTimeline(configID: fresh.id)
-            }
+        let storedID = configuration.selectedWidget?.id ?? "nil"
+        SharedStorage.shared.appendExtensionLog("SmallTimeline START storedID.len=\(storedID.count)")
+        
+        // Re-query entities to get FRESH data from SharedStorage (same as reselection!)
+        let entities = try? await SmallWidgetQuery().entities(for: [storedID])
+        SharedStorage.shared.appendExtensionLog("SmallTimeline entities.count=\(entities?.count ?? -1)")
+        
+        if let fresh = entities?.first {
+            SharedStorage.shared.appendExtensionLog("SmallTimeline: RE-QUERIED fresh entity id.len=\(fresh.id.count) items=\(fresh.name)")
+            return makeTimeline(configID: fresh.id)
         }
-        return makeTimeline(configID: configuration.selectedWidget?.id)
+        
+        SharedStorage.shared.appendExtensionLog("SmallTimeline: FALLBACK to storedID")
+        return makeTimeline(configID: storedID)
     }
 }
 
