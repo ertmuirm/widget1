@@ -162,7 +162,7 @@ struct WidgetEntryView: View {
                     Spacer()
                     HStack {
                         Spacer()
-                        Button(intent: RefreshWidgetIntent(entityUUID: entry.entityUUID)) {
+                        Button(intent: RefreshWidgetIntent(widgetEntity: LargeWidgetEntity(id: entry.entityUUID, name: entry.configuration.name))) {
                             Image(systemName: "arrow.clockwise")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundStyle(.white)

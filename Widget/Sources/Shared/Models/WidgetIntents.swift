@@ -781,11 +781,11 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     }
     infoLines.append(refreshTapped)
     
-    // Check fresh ID from intent
-    let freshIDSource = UserDefaults.standard.string(forKey: "REFRESH_ID_SOURCE") ?? "?"
-    let freshIDLen = UserDefaults.standard.string(forKey: "REFRESH_FRESH_ID")?.count ?? 0
-    infoLines.append("freshID source: \(freshIDSource)")
-    infoLines.append("freshID len: \(freshIDLen)")
+    // Check fresh ID from entity param
+    let freshHash = UserDefaults.standard.integer(forKey: "REFRESH_FRESH_HASH")
+    let freshLen = UserDefaults.standard.string(forKey: "REFRESH_FRESH_ID")?.count ?? 0
+    infoLines.append("freshID hash: \(freshHash)")
+    infoLines.append("freshID len: \(freshLen)")
     
     freshConfigInfo = infoLines.joined(separator: "\n")
     
@@ -1510,17 +1510,16 @@ struct AdvanceImageIntent: AppIntent {
 // MARK: - Refresh Widget Intent
 
 /// Intent triggered by widget button to refresh the widget with fresh data.
-/// This runs in the main app's context, giving full access to SharedStorage.
 struct RefreshWidgetIntent: AppIntent {
     static var title: LocalizedStringResource = "Refresh Widget"
     static var description = IntentDescription("Refreshes the widget with latest data from storage. Tap after making changes.")
     static var openAppWhenRun: Bool = false
-
-    @Parameter(title: "Widget Entity ID")
-    var entityUUID: String  // The UUID of the widget config
+    
+    @Parameter(title: "Widget")
+    var widgetEntity: LargeWidgetEntity
 
     init() {}
-    init(entityUUID: String) { self.entityUUID = entityUUID }
+    init(widgetEntity: LargeWidgetEntity) { self.widgetEntity = widgetEntity }
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
         let timestamp = Int(Date().timeIntervalSince1970) % 10000
@@ -1531,28 +1530,13 @@ struct RefreshWidgetIntent: AppIntent {
             UserDefaults(suiteName: id)?.set("tapped_\(timestamp)", forKey: "REFRESH_TAPPED")
         }
         
-        // Try to call suggestedEntities() like reselection does
-        // Even if SharedStorage isn't accessible, this might give us fresh data
-        let candidates = try await LargeWidgetQuery().suggestedEntities()
-        let matchingEntity = candidates.first { uuidFromEntityID($0.id).uppercased() == entityUUID.uppercased() }
-        
-        let freshID: String
-        let freshIDSource: String
-        if let found = matchingEntity {
-            freshID = found.id
-            freshIDSource = "suggestedEntities"
-        } else {
-            freshID = ""
-            freshIDSource = "NOT_FOUND"
-        }
-        
-        // Write fresh ID for widget to read
-        UserDefaults.standard.set(freshID, forKey: "REFRESH_FRESH_ID")
-        UserDefaults.standard.set(freshIDSource, forKey: "REFRESH_ID_SOURCE")
+        // widgetEntity.id should be fresh (re-encoded in main app context via EntityQuery)
+        UserDefaults.standard.set(widgetEntity.id, forKey: "REFRESH_FRESH_ID")
+        UserDefaults.standard.set(widgetEntity.id.hashValue, forKey: "REFRESH_FRESH_HASH")
         
         DarwinNotificationCenter.shared.postSwapAction()
         WidgetCenter.shared.reloadAllTimelines()
         
-        return .result(value: freshID, dialog: IntentDialog("Refresh @ \(freshIDSource)"))
+        return .result(value: widgetEntity.id, dialog: IntentDialog("Refresh @ \(widgetEntity.id.hashValue)"))
     }
 }
