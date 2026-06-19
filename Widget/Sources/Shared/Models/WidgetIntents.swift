@@ -400,7 +400,7 @@ private func makeEntry(configID: String?) -> WidgetEntry {
     
     // DEBUG: Show how widget reselection gets data
     // Widget reselection decodes the entity ID to get config data
-    let decodeDebug: String
+    var decodeDebug: String
     if let id = configID {
         let hasPipe = id.contains("|")
         let uuidPart = uuidFromEntityID(id)
