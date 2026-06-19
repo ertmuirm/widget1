@@ -232,11 +232,10 @@ func decodeConfigFromID(_ entityID: String) -> WidgetConfig? {
     let uuid = String(parts[0])
     let freshEntityKey = "FRESH_ENTITY_\(uuid)"
     
-    // CHECK KEYCHAIN FIRST - this works for sideloaded apps!
-    // SwapWidgetItemsIntent writes fresh entity ID to keychain
-    if let freshData = SharedStorage.shared.keychainRead(forKey: freshEntityKey),
-       let freshEntityID = String(data: freshData, encoding: .utf8) {
-        SharedStorage.shared.appendExtensionLog("DECODE: FOUND fresh via KEYCHAIN len=\(freshEntityID.count)")
+    // CHECK UserDefaults FIRST - for sideloaded apps, main app and widget
+    // extension share the same UserDefaults (signed with same certificate)
+    if let freshEntityID = UserDefaults.standard.string(forKey: freshEntityKey) {
+        SharedStorage.shared.appendExtensionLog("DECODE: FOUND fresh via UserDefaults len=\(freshEntityID.count)")
         // Found fresh entity - decode it!
         let freshParts = freshEntityID.split(separator: "|", maxSplits: 1)
         if freshParts.count == 2, let data = Data(base64Encoded: String(freshParts[1])) {

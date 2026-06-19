@@ -327,20 +327,15 @@ struct SwapWidgetItemsIntent: AppIntent {
             }
         }
         
-        // Also write via SharedStorage's scatterWrite
-        SharedStorage.shared.scatterWriteOverride(orderValue, forKey: orderKey)
-        
-        // CRITICAL: Write the FRESH encoded entity ID to KEYCHAIN
-        // This is the ONLY reliable way to share data between main app and widget extension
-        // for sideloaded apps (App Groups don't work!)
+        // Write fresh entity ID to UserDefaults - for sideloaded apps, 
+        // main app and widget extension share the same UserDefaults
         let freshEntityKey = "FRESH_ENTITY_\(widgetUUID)"
-        if let freshData = freshEntityID.data(using: .utf8) {
-            let status = SharedStorage.shared.keychainWrite(freshData, forKey: freshEntityKey)
-            storage.appendExtensionLog("SWAP: wrote FRESH_ENTITY to keychain status=\(status)")
-        }
+        UserDefaults.standard.set(freshEntityID, forKey: freshEntityKey)
+        UserDefaults.standard.synchronize()
+        storage.appendExtensionLog("SWAP: wrote FRESH_ENTITY to UserDefaults")
 
         // Debug info
-        let debugInfo = "RE_ENCODED|widgetID=\(widgetEntityID.prefix(15))|freshLen=\(freshEntityID.count)|key=FRESH_ENTITY"
+        let debugInfo = "RE_ENCODED|freshLen=\(freshEntityID.count)|key=\(freshEntityKey)"
         UserDefaults.standard.set(debugInfo, forKey: "swapDebug")
 
         // Increment version counter to signal data changed.
