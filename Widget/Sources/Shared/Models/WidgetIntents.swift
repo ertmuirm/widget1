@@ -781,11 +781,11 @@ private func makeEntryInternal(configID: String?, debugNote: String?) -> WidgetE
     }
     infoLines.append(refreshTapped)
     
-    // Check what refresh intent could access
-    let refreshSource = UserDefaults.standard.string(forKey: "REFRESH_SOURCE") ?? "?"
-    let refreshStorage = UserDefaults.standard.string(forKey: "REFRESH_STORAGE") ?? "?"
-    infoLines.append("REFRESH source: \(refreshSource)")
-    infoLines.append("REFRESH configs: \(refreshStorage)")
+    // Check fresh ID from intent
+    let freshIDSource = UserDefaults.standard.string(forKey: "REFRESH_ID_SOURCE") ?? "?"
+    let freshIDLen = UserDefaults.standard.string(forKey: "REFRESH_FRESH_ID")?.count ?? 0
+    infoLines.append("freshID source: \(freshIDSource)")
+    infoLines.append("freshID len: \(freshIDLen)")
     
     freshConfigInfo = infoLines.joined(separator: "\n")
     
@@ -1531,18 +1531,28 @@ struct RefreshWidgetIntent: AppIntent {
             UserDefaults(suiteName: id)?.set("tapped_\(timestamp)", forKey: "REFRESH_TAPPED")
         }
         
-        // DEBUG: Try to access SharedStorage (like reselection does)
-        let storage = SharedStorage.shared
-        let configs = (try? storage.loadConfigurations()) ?? []
-        let storageName = storage.debugReadSource(forKey: SharedStorage.configKey)
+        // Try to call suggestedEntities() like reselection does
+        // Even if SharedStorage isn't accessible, this might give us fresh data
+        let candidates = try await LargeWidgetQuery().suggestedEntities()
+        let matchingEntity = candidates.first { uuidFromEntityID($0.id).uppercased() == entityUUID.uppercased() }
         
-        // Write storage access info
-        UserDefaults.standard.set("configs_\(configs.count)", forKey: "REFRESH_STORAGE")
-        UserDefaults.standard.set(storageName, forKey: "REFRESH_SOURCE")
+        let freshID: String
+        let freshIDSource: String
+        if let found = matchingEntity {
+            freshID = found.id
+            freshIDSource = "suggestedEntities"
+        } else {
+            freshID = ""
+            freshIDSource = "NOT_FOUND"
+        }
+        
+        // Write fresh ID for widget to read
+        UserDefaults.standard.set(freshID, forKey: "REFRESH_FRESH_ID")
+        UserDefaults.standard.set(freshIDSource, forKey: "REFRESH_ID_SOURCE")
         
         DarwinNotificationCenter.shared.postSwapAction()
         WidgetCenter.shared.reloadAllTimelines()
         
-        return .result(value: "refreshed_\(timestamp)", dialog: IntentDialog("Refresh tapped @ \(timestamp)"))
+        return .result(value: freshID, dialog: IntentDialog("Refresh @ \(freshIDSource)"))
     }
 }
