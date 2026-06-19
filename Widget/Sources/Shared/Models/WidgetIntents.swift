@@ -409,19 +409,40 @@ private func makeEntry(configID: String?) -> WidgetEntry {
         if let found = liveConfigs.first(where: { $0.id.uuidString == uuid }) {
             config = found
         } else if var embedded = decodeConfigFromID(id) {
+            // Embedded config found - check if there's a fresh config for embedded's UUID
+            // This handles case where freshConfig was written with config.id vs entity ID UUID
+            let embeddedUUID = embedded.id.uuidString.uppercased()
+            let freshConfigKeyEmbedded = "freshConfig_\(embeddedUUID)"
+            if let embeddedJSON = UserDefaults.standard.string(forKey: freshConfigKeyEmbedded), !embeddedJSON.isEmpty {
+                storage.appendExtensionLog("FRESH: using embedded key \(embeddedUUID.prefix(8))")
+                if let configData = Data(base64Encoded: embeddedJSON) {
+                    let decoder = JSONDecoder()
+                    decoder.dateDecodingStrategy = .iso8601
+                    if let decoded = try? decoder.decode(WidgetConfig.self, from: configData) {
+                        config = decoded
+                        UserDefaults.standard.removeObject(forKey: freshConfigKeyEmbedded)
+                    } else {
+                        config = embedded
+                    }
+                } else {
+                    config = embedded
+                }
+            } else {
+                config = embedded
+            }
+            
             // Populate imageData for slides/items not already populated by loadConfigurations
-            if embedded.slides != nil {
-                for j in embedded.slides!.indices where embedded.slides![j].imageData == nil {
-                    let fn = embedded.slides![j].filename
+            if config.slides != nil {
+                for j in config.slides!.indices where config.slides![j].imageData == nil {
+                    let fn = config.slides![j].filename
                     if !fn.isEmpty {
-                        embedded.slides![j].imageData = storage.loadWidgetImageData(filename: fn)
+                        config.slides![j].imageData = storage.loadWidgetImageData(filename: fn)
                     }
                 }
             }
             // Note: do NOT load imageData for grid items here. The extension's ItemView
             // has no image-rendering path for grid cells, and loading full-res images
             // for 7+ items exceeds the 30 MB WidgetKit memory limit.
-            config = embedded
         } else {
             config = .defaultConfiguration
         }
@@ -1142,14 +1163,17 @@ struct RefreshWidgetIntent: AppIntent {
         // Write the FULL fresh config JSON to UserDefaults.standard
         // The widget will decode this directly, bypassing stale entity ID data.
         // Key format: "freshConfig_<UUID>" contains JSON-encoded WidgetConfig
-        let freshConfigKey = "freshConfig_\(upperUUID)"
+        // Write to BOTH keys to handle UUID mismatch between entityUUID and config.id
+        let freshConfigKeyByEntity = "freshConfig_\(upperUUID)"
+        let freshConfigKeyByConfig = "freshConfig_\(config.id.uuidString.uppercased())"
         
         // Encode the fresh config (with current item order) to JSON
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         if let configData = try? encoder.encode(config) {
             let configJSON = configData.base64EncodedString()
-            UserDefaults.standard.set(configJSON, forKey: freshConfigKey)
+            UserDefaults.standard.set(configJSON, forKey: freshConfigKeyByEntity)
+            UserDefaults.standard.set(configJSON, forKey: freshConfigKeyByConfig)
             UserDefaults.standard.synchronize()
         }
 
