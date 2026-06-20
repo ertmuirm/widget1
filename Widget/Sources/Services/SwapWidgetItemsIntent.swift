@@ -1,5 +1,120 @@
 import AppIntents
 import WidgetKit
+import Foundation
+import ObjectiveC.runtime
+
+// MARK: - Private API: Widget Reselection Trigger
+
+/// Attempts to trigger widget reselection via private WidgetCenter APIs.
+/// This mimics what happens when a user manually reselects the widget.
+private func triggerWidgetReselection(kind: String) {
+    let center = WidgetCenter.shared
+    
+    // Method 1: Try via NSObject's respondsToSelector (Swift overlay may hide private methods)
+    let selector = NSSelectorFromString("_reloadConfigurationsOfKind:withCompletionHandler:")
+    
+    // Direct Objective-C method lookup
+    var method: Method? = nil
+    if let centerClass = object_getClass(WidgetCenter.self) {
+        method = class_getInstanceMethod(centerClass, selector)
+    }
+    
+    if method != nil {
+        SharedStorage.shared.appendExtensionLog("RESELECTION-M1: FOUND _reloadConfigurationsOfKind for \(kind)")
+        // Use objc_msgSend directly
+        typealias CompletionBlock = @convention(block) (Bool) -> Void
+        let completion: CompletionBlock = { success in
+            SharedStorage.shared.appendExtensionLog("RESELECTION-M1: callback success=\(success)")
+        }
+        
+        // Call the method
+        let centerPtr = Unmanaged.passUnretained(center as AnyObject).toOpaque()
+        let imp = method_getImplementation(method!)
+        
+        typealias ImpType = @convention(c) (UnsafeRawPointer, Selector, String, AnyObject) -> Void
+        let fn = unsafeBitCast(imp, to: ImpType.self)
+        fn(centerPtr, selector, kind, unsafeBitCast(completion, to: AnyObject.self))
+        
+        SharedStorage.shared.appendExtensionLog("RESELECTION-M1: CALLED for \(kind)")
+        return
+    }
+    
+    // Method 2: Try simpler private API
+    let altSelector = NSSelectorFromString("reloadConfigurationOfKind:")
+    var altMethod: Method? = nil
+    if let centerClass = object_getClass(WidgetCenter.self) {
+        altMethod = class_getInstanceMethod(centerClass, altSelector)
+    }
+    if altMethod != nil {
+        SharedStorage.shared.appendExtensionLog("RESELECTION-M2: FOUND reloadConfigurationOfKind for \(kind)")
+        center.perform(altSelector, with: kind)
+        SharedStorage.shared.appendExtensionLog("RESELECTION-M2: CALLED for \(kind)")
+        return
+    }
+    
+    // Method 3: Try with CFNotificationCenter - post widget config change notification
+    SharedStorage.shared.appendExtensionLog("RESELECTION-M3: posting Darwin notification for \(kind)")
+    let notificationName = "com.apple.widget.configurationChanged" as CFString
+    CFNotificationCenterPostNotification(
+        CFNotificationCenterGetDarwinNotifyCenter(),
+        CFNotificationName(notificationName),
+        nil,
+        nil,
+        true
+    )
+    SharedStorage.shared.appendExtensionLog("RESELECTION-M3: posted for \(kind)")
+    
+    // Method 4: Try WidgetCenter's reloadTimelines(ofKind:) - public but might work better
+    SharedStorage.shared.appendExtensionLog("RESELECTION-M4: calling public reloadTimelines for \(kind)")
+    WidgetCenter.shared.reloadTimelines(ofKind: kind)
+    SharedStorage.shared.appendExtensionLog("RESELECTION-M4: CALLED for \(kind)")
+}
+
+/// Triggers reselection for ALL widget kinds
+private func triggerAllWidgetReselection() {
+    SharedStorage.shared.appendExtensionLog("RESELECTION-ALL: Starting...")
+    
+    // Try to get all widget kinds via private API
+    let kindsSelector = NSSelectorFromString("_widgetKinds")
+    var method: Method? = nil
+    if let centerClass = object_getClass(WidgetCenter.self) {
+        method = class_getInstanceMethod(centerClass, kindsSelector)
+    }
+    
+    if method != nil {
+        SharedStorage.shared.appendExtensionLog("RESELECTION-ALL: Found _widgetKinds method")
+        if let kinds = WidgetCenter.shared.perform(kindsSelector)?.takeUnretainedValue() as? [String] {
+            SharedStorage.shared.appendExtensionLog("RESELECTION-ALL: Found \(kinds.count) widget kinds: \(kinds.joined(separator: ","))")
+            for kind in kinds {
+                triggerWidgetReselection(kind: kind)
+            }
+        } else {
+            SharedStorage.shared.appendExtensionLog("RESELECTION-ALL: _widgetKinds returned nil")
+        }
+        return
+    }
+    
+    SharedStorage.shared.appendExtensionLog("RESELECTION-ALL: _widgetKinds not found, using known kinds")
+    
+    // Fallback: try all known widget kinds from the app
+    // BroadcastWidget kinds
+    let broadcastKinds = ["BroadcastSmall", "BroadcastMedium", "BroadcastLarge", 
+                          "BroadcastLock", "BroadcastImage", "BroadcastClock",
+                          "ClockCheckDark", "ClockCheckLight"]
+    
+    // GridWidget kinds (from WidgetKind enum)
+    let gridKinds = ["Grid", "GridWidget", "BroadcastGrid"]
+    
+    // CodeWidget kinds
+    let codeKinds = ["Code", "CodeWidget", "ImageSlideshow"]
+    
+    let allKinds = broadcastKinds + gridKinds + codeKinds
+    SharedStorage.shared.appendExtensionLog("RESELECTION-ALL: Trying \(allKinds.count) known kinds: \(allKinds.joined(separator: ","))")
+    for kind in allKinds {
+        triggerWidgetReselection(kind: kind)
+    }
+    SharedStorage.shared.appendExtensionLog("RESELECTION-ALL: Done")
+}
 
 // MARK: - Code Widget Entity (for AdvanceCodeSlideIntent)
 
@@ -327,15 +442,17 @@ struct SwapWidgetItemsIntent: AppIntent {
             }
         }
         
-        // Write fresh entity ID to UserDefaults - for sideloaded apps, 
-        // main app and widget extension share the same UserDefaults
+        // CRITICAL: Write the FRESH encoded entity ID to KEYCHAIN
+        // This is the ONLY reliable way to share data between main app and widget extension
+        // for sideloaded apps (App Groups don't work!)
         let freshEntityKey = "FRESH_ENTITY_\(widgetUUID)"
-        UserDefaults.standard.set(freshEntityID, forKey: freshEntityKey)
-        UserDefaults.standard.synchronize()
-        storage.appendExtensionLog("SWAP: wrote FRESH_ENTITY to UserDefaults")
+        if let freshData = freshEntityID.data(using: .utf8) {
+            let status = SharedStorage.shared.keychainWrite(freshData, forKey: freshEntityKey)
+            storage.appendExtensionLog("SWAP: wrote FRESH_ENTITY to keychain status=\(status)")
+        }
 
         // Debug info
-        let debugInfo = "RE_ENCODED|freshLen=\(freshEntityID.count)|key=\(freshEntityKey)"
+        let debugInfo = "RE_ENCODED|widgetID=\(widgetEntityID.prefix(15))|freshLen=\(freshEntityID.count)|key=FRESH_ENTITY"
         UserDefaults.standard.set(debugInfo, forKey: "swapDebug")
 
         // Increment version counter to signal data changed.
@@ -350,7 +467,14 @@ struct SwapWidgetItemsIntent: AppIntent {
         // Post Darwin notification (best effort - may not wake suspended extension)
         DarwinNotificationCenter.shared.postSwapAction()
 
+        // Standard reload - tells widget to refresh its timeline
         WidgetCenter.shared.reloadAllTimelines()
+
+        // Try private API to trigger widget RESELECTION (not just reload)
+        // This mimics what happens when user manually reselects the widget
+        if #available(iOS 17.0, *) {
+            triggerAllWidgetReselection()
+        }
 
         let result = "Swapped \(nameA) (position \(positionA)) with \(nameB) (position \(positionB)) in \"\(widget.name)\". Touch the widget to refresh."
         return .result(dialog: IntentDialog(stringLiteral: result))
