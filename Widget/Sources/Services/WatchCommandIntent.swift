@@ -259,3 +259,30 @@ enum BLEDataFormat: String, AppEnum {
         .hex: "Hex (e.g., 55 for battery level)"
     ]
 }
+
+// MARK: - App Shortcuts Provider
+
+/// Only expose the two BLE-related intents in Shortcuts.
+/// Other AppIntents (NoOpIntent, AdvanceImageIntent) are for widget button use only.
+struct WidgetShortcuts: AppShortcutsProvider {
+    static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: SendBLECommandIntent(),
+            phrases: [
+                "Send BLE Command to \(.applicationName)",
+                "Control BLE device with \(.applicationName)"
+            ],
+            shortTitle: "Send BLE Command",
+            systemImageName: "antenna.radiowaves.left.and.right"
+        )
+        AppShortcut(
+            intent: ReadBLEDataIntent(),
+            phrases: [
+                "Read BLE Data with \(.applicationName)",
+                "Get BLE sensor value from \(.applicationName)"
+            ],
+            shortTitle: "Read BLE Data",
+            systemImageName: "sensor.tag.radiowaves.forward"
+        )
+    }
+}
