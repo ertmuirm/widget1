@@ -1,104 +1,105 @@
-﻿2026-06-20T01:22:45.1976210Z ##[group]Run set -e
-2026-06-20T01:22:45.1976490Z [36;1mset -e[0m
-2026-06-20T01:22:45.1976660Z [36;1m[0m
-2026-06-20T01:22:45.1976830Z [36;1m# Generate Xcode project first[0m
-2026-06-20T01:22:45.1977080Z [36;1mxcodegen generate[0m
-2026-06-20T01:22:45.1977310Z [36;1m[0m
-2026-06-20T01:22:45.1977520Z [36;1m# Build using xcodebuild[0m
-2026-06-20T01:22:45.1977890Z [36;1mxcodebuild -project Widget.xcodeproj -scheme Widget -configuration Release \[0m
-2026-06-20T01:22:45.1978280Z [36;1m  -derivedDataPath ./build \[0m
-2026-06-20T01:22:45.1978520Z [36;1m  CODE_SIGN_IDENTITY="-" \[0m
-2026-06-20T01:22:45.1978750Z [36;1m  CODE_SIGNING_ALLOWED=NO \[0m
-2026-06-20T01:22:45.1978960Z [36;1m  CODE_SIGNING_REQUIRED=NO \[0m
-2026-06-20T01:22:45.1979190Z [36;1m  OTHER_CODE_SIGN_FLAGS="--" \[0m
-2026-06-20T01:22:45.1997120Z [36;1m  build 2>&1 | tee build.log | tail -50[0m
-2026-06-20T01:22:45.1997500Z [36;1m[0m
-2026-06-20T01:22:45.1997650Z [36;1m# Show any errors[0m
-2026-06-20T01:22:45.1997830Z [36;1mecho "=== Build Errors ==="[0m
-2026-06-20T01:22:45.1998310Z [36;1mgrep -i "error:" build.log || echo "No errors found"[0m
-2026-06-20T01:22:45.1998600Z [36;1m[0m
-2026-06-20T01:22:45.1998870Z [36;1m# Manually embed entitlements for BroadcastExtension[0m
-2026-06-20T01:22:45.1999360Z [36;1mEXTENSION=$(find ./build -path "*/PlugIns/BroadcastExtension.appex" -type d 2>/dev/null | head -1)[0m
-2026-06-20T01:22:45.1999790Z [36;1mif [ -n "$EXTENSION" ]; then[0m
-2026-06-20T01:22:45.2000050Z [36;1m  echo "Embedding entitlements into: $EXTENSION"[0m
-2026-06-20T01:22:45.2000530Z [36;1m  cp WidgetExtension/BroadcastExtension.entitlements "$EXTENSION/BroadcastExtension.entitlements"[0m
-2026-06-20T01:22:45.2000960Z [36;1m  echo "Entitlements:"[0m
-2026-06-20T01:22:45.2001280Z [36;1m  cat "$EXTENSION/BroadcastExtension.entitlements"[0m
-2026-06-20T01:22:45.2001550Z [36;1mfi[0m
-2026-06-20T01:22:45.2001700Z [36;1m[0m
-2026-06-20T01:22:45.2001870Z [36;1m# Find Widget.app anywhere in build[0m
-2026-06-20T01:22:45.2002230Z [36;1mAPP=$(find ./build -name "Widget.app" -type d 2>/dev/null | head -1)[0m
-2026-06-20T01:22:45.2002600Z [36;1mif [ -n "$APP" ]; then[0m
-2026-06-20T01:22:45.2002870Z [36;1m  echo "Found: $APP"[0m
-2026-06-20T01:22:45.2003070Z [36;1m  mkdir -p Payload[0m
-2026-06-20T01:22:45.2008420Z [36;1m  cp -R "$APP" Payload/[0m
-2026-06-20T01:22:45.2008680Z [36;1m  chmod +x Payload/Widget.app/Widget[0m
-2026-06-20T01:22:45.2008910Z [36;1melse[0m
-2026-06-20T01:22:45.2009090Z [36;1m  echo "Widget.app not found!"[0m
-2026-06-20T01:22:45.2009330Z [36;1m  echo "=== Build Products ==="[0m
-2026-06-20T01:22:45.2009660Z [36;1m  find ./build -name "*.app" -type d 2>/dev/null || echo "No .app files found"[0m
-2026-06-20T01:22:45.2010000Z [36;1m  exit 1[0m
-2026-06-20T01:22:45.2010150Z [36;1mfi[0m
-2026-06-20T01:22:45.2010330Z [36;1mzip -r Widget.ipa Payload[0m
-2026-06-20T01:22:45.2010530Z [36;1mls -la *.ipa[0m
-2026-06-20T01:22:45.2042690Z shell: /bin/bash -e {0}
-2026-06-20T01:22:45.2042940Z ##[endgroup]
-2026-06-20T01:22:45.2425530Z ⚙️  Generating plists...
-2026-06-20T01:22:45.2426660Z ⚙️  Generating project...
-2026-06-20T01:22:45.2871960Z ⚙️  Writing project...
-2026-06-20T01:22:45.2940290Z Created project at /Users/runner/work/widget1/widget1/Widget.xcodeproj
-2026-06-20T01:23:07.0764910Z CompileSwift normal arm64 (in target 'BroadcastExtension' from project 'Widget')
-2026-06-20T01:23:07.0880370Z     cd /Users/runner/work/widget1/widget1
-2026-06-20T01:23:07.0952020Z     
-2026-06-20T01:23:07.1117550Z /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift:673:9: warning: variable 'freshEncodedConfig' was written to, but never read
-2026-06-20T01:23:07.1220620Z     var freshEncodedConfig: String?
-2026-06-20T01:23:07.1330560Z         ^
-2026-06-20T01:23:07.1467550Z /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift:674:9: warning: variable 'freshConfigSource' was written to, but never read
-2026-06-20T01:23:07.1612070Z     var freshConfigSource = "embedded"
-2026-06-20T01:23:07.1741780Z         ^
-2026-06-20T01:23:07.1860490Z chmod: Payload/Widget.app/Widget: No such file or directory
-2026-06-20T01:23:07.1861490Z /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift:722:9: warning: initialization of immutable value 'marker' was never used; consider replacing with assignment to '_' or removing it
-2026-06-20T01:23:07.1950910Z     let marker = UserDefaults.standard.string(forKey: "refreshMarker") ?? "NO_MARKER"
-2026-06-20T01:23:07.2077300Z     ~~~~^~~~~~
-2026-06-20T01:23:07.2192080Z     _
-2026-06-20T01:23:07.2305540Z /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift:723:9: warning: initialization of immutable value 'swapDebug' was never used; consider replacing with assignment to '_' or removing it
-2026-06-20T01:23:07.2407950Z     let swapDebug = UserDefaults.standard.string(forKey: "swapDebug") ?? "NO_SWAP_DEBUG"
-2026-06-20T01:23:07.2537060Z     ~~~~^~~~~~~~~
-2026-06-20T01:23:07.2702060Z     _
-2026-06-20T01:23:07.2836880Z /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift:739:9: warning: initialization of immutable value 'configIDSample' was never used; consider replacing with assignment to '_' or removing it
-2026-06-20T01:23:07.2951040Z     let configIDSample = configID.map { $0.count > 20 ? String($0.prefix(20)) + "..." : $0 } ?? "nil"
-2026-06-20T01:23:07.3078270Z     ~~~~^~~~~~~~~~~~~~
-2026-06-20T01:23:07.3181990Z     _
-2026-06-20T01:23:07.3283680Z /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift:741:9: warning: initialization of immutable value 'dataVersion' was never used; consider replacing with assignment to '_' or removing it
-2026-06-20T01:23:07.3339560Z     let dataVersion = UserDefaults.standard.integer(forKey: versionKeyByEntity)
-2026-06-20T01:23:07.3449230Z     ~~~~^~~~~~~~~~~
-2026-06-20T01:23:07.3568180Z     _
-2026-06-20T01:23:07.3676610Z /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift:758:9: warning: initialization of immutable value 'itemNames' was never used; consider replacing with assignment to '_' or removing it
-2026-06-20T01:23:07.3726140Z     let itemNames = finalConfig.items.prefix(3).map { $0.displayType.rawValue }.joined(separator: ",")
-2026-06-20T01:23:07.3835640Z     ~~~~^~~~~~~~~
-2026-06-20T01:23:07.3964230Z     _
-2026-06-20T01:23:07.4073120Z /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift:1569:81: error: instance method 'appendInterpolation' requires that 'String.SubSequence' (aka 'Substring') inherit from 'NSObject'
-2026-06-20T01:23:07.4177350Z         return .result(value: widgetEntity.id, dialog: IntentDialog("Refresh @ \(uuid.prefix(8))"))
-2026-06-20T01:23:07.4279300Z                                                                                 ^
-2026-06-20T01:23:07.4386280Z Foundation.String.LocalizationValue.StringInterpolation.appendInterpolation:4:22: note: where 'Subject' = 'String.SubSequence' (aka 'Substring')
-2026-06-20T01:23:07.4456300Z public mutating func appendInterpolation<Subject>(_ subject: Subject) where Subject : NSObject    }
-2026-06-20T01:23:07.4558710Z                      ^
-2026-06-20T01:23:07.4659760Z 
-2026-06-20T01:23:07.4783430Z SwiftDriver\ Compilation BroadcastExtension normal arm64 com.apple.xcode.tools.swift.compiler (in target 'BroadcastExtension' from project 'Widget')
-2026-06-20T01:23:07.4907240Z     cd /Users/runner/work/widget1/widget1
-2026-06-20T01:23:07.5029900Z     builtin-Swift-Compilation -- /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name BroadcastExtension -O -whole-module-optimization -enforce-exclusivity\=checked @/Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/BroadcastExtension.build/Objects-normal/arm64/BroadcastExtension.SwiftFileList -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk -target arm64-apple-ios17.0 -g -module-cache-path /Users/runner/work/widget1/widget1/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -application-extension -swift-version 5 -I /Users/runner/work/widget1/widget1/build/Build/Products/Release-iphoneos -F /Users/runner/work/widget1/widget1/build/Build/Products/Release-iphoneos -c -num-threads 3 -Xcc -ivfsstatcache -Xcc /Users/runner/work/widget1/widget1/build/SDKStatCaches.noindex/iphoneos18.5-22F76-a529daf784b3616c7c04a36aeb7f5c05.sdkstatcache -output-file-map /Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/BroadcastExtension.build/Objects-normal/arm64/BroadcastExtension-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/BroadcastExtension.build/Objects-normal/arm64/BroadcastExtension.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/widget1/widget1/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/BroadcastExtension.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/BroadcastExtension.build/Objects-normal/arm64/BroadcastExtension_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/BroadcastExtension.build/BroadcastExtension-generated-files.hmap -Xcc -I/Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/BroadcastExtension.build/BroadcastExtension-own-target-headers.hmap -Xcc -I/Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/BroadcastExtension.build/BroadcastExtension-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/BroadcastExtension.build/BroadcastExtension-project-headers.hmap -Xcc -I/Users/runner/work/widget1/widget1/build/Build/Products/Release-iphoneos/include -Xcc -I/Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/BroadcastExtension.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/BroadcastExtension.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/BroadcastExtension.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/BroadcastExtension.build/Objects-normal/arm64/BroadcastExtension-Swift.h -working-directory /Users/runner/work/widget1/widget1 -no-emit-module-separately-wmo
-2026-06-20T01:23:07.5100420Z 
-2026-06-20T01:23:07.5211770Z note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in target 'Widget' from project 'Widget')
-2026-06-20T01:23:07.5229880Z note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in target 'BroadcastExtension' from project 'Widget')
-2026-06-20T01:23:07.5270580Z ** BUILD FAILED **
-2026-06-20T01:23:07.5327150Z 
-2026-06-20T01:23:07.5376610Z 
-2026-06-20T01:23:07.5390870Z The following build commands failed:
-2026-06-20T01:23:07.5436210Z 	SwiftCompile normal arm64 Compiling\ BroadcastExtensionBundle.swift,\ BroadcastWidget.swift,\ DarwinNotificationCenter.swift,\ IntentHandler.swift,\ LauncherModels.swift,\ QRCodeGenerator.swift,\ SharedStorage.swift,\ WidgetEntryView.swift,\ WidgetIntents.swift,\ WidgetModels.swift,\ WidgetNotificationHandler.swift,\ GeneratedAssetSymbols.swift /Users/runner/work/widget1/widget1/WidgetExtension/BroadcastExtensionBundle.swift /Users/runner/work/widget1/widget1/WidgetExtension/BroadcastWidget.swift /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Services/DarwinNotificationCenter.swift /Users/runner/work/widget1/widget1/WidgetExtension/IntentHandler.swift /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/LauncherModels.swift /Users/runner/work/widget1/widget1/Widget/Sources/Shared/QRCodeGenerator.swift /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Services/SharedStorage.swift /Users/runner/work/widget1/widget1/WidgetExtension/WidgetEntryView.swift /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetModels.swift /Users/runner/work/widget1/widget1/WidgetExtension/WidgetNotificationHandler.swift /Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/BroadcastExtension.build/DerivedSources/GeneratedAssetSymbols.swift (in target 'BroadcastExtension' from project 'Widget')
-2026-06-20T01:23:07.5546890Z 	CompileSwift normal arm64 (in target 'BroadcastExtension' from project 'Widget')
-2026-06-20T01:23:07.5566090Z 	Building project Widget with scheme Widget and configuration Release
-2026-06-20T01:23:07.5670480Z (3 failures)
-2026-06-20T01:23:07.5685620Z === Build Errors ===
-2026-06-20T01:23:07.5738580Z /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift:1569:81: error: instance method 'appendInterpolation' requires that 'String.SubSequence' (aka 'Substring') inherit from 'NSObject'
-2026-06-20T01:23:07.5833010Z Found: ./build/Build/Products/Release-iphoneos/Widget.app
-2026-06-20T01:23:07.5910500Z ##[error]Process completed with exit code 1.
+﻿2026-06-20T01:28:46.3240540Z ##[group]Run set -e
+2026-06-20T01:28:46.3240850Z [36;1mset -e[0m
+2026-06-20T01:28:46.3241070Z [36;1m[0m
+2026-06-20T01:28:46.3241250Z [36;1m# Generate Xcode project first[0m
+2026-06-20T01:28:46.3241510Z [36;1mxcodegen generate[0m
+2026-06-20T01:28:46.3241860Z [36;1m[0m
+2026-06-20T01:28:46.3242070Z [36;1m# Build using xcodebuild[0m
+2026-06-20T01:28:46.3242520Z [36;1mxcodebuild -project Widget.xcodeproj -scheme Widget -configuration Release \[0m
+2026-06-20T01:28:46.3242900Z [36;1m  -derivedDataPath ./build \[0m
+2026-06-20T01:28:46.3243150Z [36;1m  CODE_SIGN_IDENTITY="-" \[0m
+2026-06-20T01:28:46.3243370Z [36;1m  CODE_SIGNING_ALLOWED=NO \[0m
+2026-06-20T01:28:46.3243630Z [36;1m  CODE_SIGNING_REQUIRED=NO \[0m
+2026-06-20T01:28:46.3243900Z [36;1m  OTHER_CODE_SIGN_FLAGS="--" \[0m
+2026-06-20T01:28:46.3244240Z [36;1m  build 2>&1 | tee build.log | tail -50[0m
+2026-06-20T01:28:46.3244480Z [36;1m[0m
+2026-06-20T01:28:46.3244640Z [36;1m# Show any errors[0m
+2026-06-20T01:28:46.3244930Z [36;1mecho "=== Build Errors ==="[0m
+2026-06-20T01:28:46.3245280Z [36;1mgrep -i "error:" build.log || echo "No errors found"[0m
+2026-06-20T01:28:46.3246040Z [36;1m[0m
+2026-06-20T01:28:46.3246280Z [36;1m# Manually embed entitlements for BroadcastExtension[0m
+2026-06-20T01:28:46.3247460Z [36;1mEXTENSION=$(find ./build -path "*/PlugIns/BroadcastExtension.appex" -type d 2>/dev/null | head -1)[0m
+2026-06-20T01:28:46.3247940Z [36;1mif [ -n "$EXTENSION" ]; then[0m
+2026-06-20T01:28:46.3248240Z [36;1m  echo "Embedding entitlements into: $EXTENSION"[0m
+2026-06-20T01:28:46.3248730Z [36;1m  cp WidgetExtension/BroadcastExtension.entitlements "$EXTENSION/BroadcastExtension.entitlements"[0m
+2026-06-20T01:28:46.3249160Z [36;1m  echo "Entitlements:"[0m
+2026-06-20T01:28:46.3249430Z [36;1m  cat "$EXTENSION/BroadcastExtension.entitlements"[0m
+2026-06-20T01:28:46.3249690Z [36;1mfi[0m
+2026-06-20T01:28:46.3249840Z [36;1m[0m
+2026-06-20T01:28:46.3250010Z [36;1m# Find Widget.app anywhere in build[0m
+2026-06-20T01:28:46.3250490Z [36;1mAPP=$(find ./build -name "Widget.app" -type d 2>/dev/null | head -1)[0m
+2026-06-20T01:28:46.3250880Z [36;1mif [ -n "$APP" ]; then[0m
+2026-06-20T01:28:46.3251090Z [36;1m  echo "Found: $APP"[0m
+2026-06-20T01:28:46.3251290Z [36;1m  mkdir -p Payload[0m
+2026-06-20T01:28:46.3254560Z [36;1m  cp -R "$APP" Payload/[0m
+2026-06-20T01:28:46.3254800Z [36;1m  chmod +x Payload/Widget.app/Widget[0m
+2026-06-20T01:28:46.3255080Z [36;1melse[0m
+2026-06-20T01:28:46.3255320Z [36;1m  echo "Widget.app not found!"[0m
+2026-06-20T01:28:46.3255550Z [36;1m  echo "=== Build Products ==="[0m
+2026-06-20T01:28:46.3255960Z [36;1m  find ./build -name "*.app" -type d 2>/dev/null || echo "No .app files found"[0m
+2026-06-20T01:28:46.3256650Z [36;1m  exit 1[0m
+2026-06-20T01:28:46.3256830Z [36;1mfi[0m
+2026-06-20T01:28:46.3257010Z [36;1mzip -r Widget.ipa Payload[0m
+2026-06-20T01:28:46.3257220Z [36;1mls -la *.ipa[0m
+2026-06-20T01:28:46.3297670Z shell: /bin/bash -e {0}
+2026-06-20T01:28:46.3297960Z ##[endgroup]
+2026-06-20T01:28:46.3814630Z ⚙️  Generating plists...
+2026-06-20T01:28:46.3816100Z ⚙️  Generating project...
+2026-06-20T01:28:46.4364530Z ⚙️  Writing project...
+2026-06-20T01:28:46.4442250Z Created project at /Users/runner/work/widget1/widget1/Widget.xcodeproj
+2026-06-20T01:29:36.8332140Z         if let kinds = WidgetCenter.shared.perform(kindsSelector)?.takeUnretainedValue() as? [String] {
+2026-06-20T01:29:36.8338960Z                        ~~~~~~~~~~~~~~~~~~~ ^~~~~~~
+2026-06-20T01:29:36.8339930Z /Users/runner/work/widget1/widget1/Widget/Sources/Views/WidgetEditorView.swift:104:29: warning: variable 'editedItem' was never mutated; consider changing to 'let' constant
+2026-06-20T01:29:36.8344670Z                         var editedItem = actions[sel.id]
+2026-06-20T01:29:36.8348320Z                         ~~~ ^
+2026-06-20T01:29:36.8576200Z                         let
+2026-06-20T01:29:36.8577550Z /Users/runner/work/widget1/widget1/Widget/Sources/Views/WidgetEditorView.swift:855:22: warning: 'onChange(of:perform:)' was deprecated in iOS 17.0: Use `onChange` with a two or zero parameter action closure instead.
+2026-06-20T01:29:36.8585630Z                     .onChange(of: qrScanPickerItems) { items in
+2026-06-20T01:29:36.8586630Z                      ^
+2026-06-20T01:29:36.8587450Z /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift:673:9: warning: variable 'freshEncodedConfig' was written to, but never read
+2026-06-20T01:29:36.8589540Z     var freshEncodedConfig: String?
+2026-06-20T01:29:36.8592300Z         ^
+2026-06-20T01:29:36.8593270Z /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift:674:9: warning: variable 'freshConfigSource' was written to, but never read
+2026-06-20T01:29:36.8595220Z     var freshConfigSource = "embedded"
+2026-06-20T01:29:36.8595720Z         ^
+2026-06-20T01:29:36.8596670Z /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift:722:9: warning: initialization of immutable value 'marker' was never used; consider replacing with assignment to '_' or removing it
+2026-06-20T01:29:36.8598030Z     let marker = UserDefaults.standard.string(forKey: "refreshMarker") ?? "NO_MARKER"
+2026-06-20T01:29:36.8598640Z     ~~~~^~~~~~
+2026-06-20T01:29:36.8599040Z     _
+2026-06-20T01:29:36.8599980Z /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift:723:9: warning: initialization of immutable value 'swapDebug' was never used; consider replacing with assignment to '_' or removing it
+2026-06-20T01:29:36.8610830Z     let swapDebug = UserDefaults.standard.string(forKey: "swapDebug") ?? "NO_SWAP_DEBUG"
+2026-06-20T01:29:36.8612220Z     ~~~~^~~~~~~~~
+2026-06-20T01:29:36.8613100Z     _
+2026-06-20T01:29:36.8617220Z /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift:739:9: warning: initialization of immutable value 'configIDSample' was never used; consider replacing with assignment to '_' or removing it
+2026-06-20T01:29:36.8620770Z     let configIDSample = configID.map { $0.count > 20 ? String($0.prefix(20)) + "..." : $0 } ?? "nil"
+2026-06-20T01:29:36.8630740Z     ~~~~^~~~~~~~~~~~~~
+2026-06-20T01:29:36.8631100Z     _
+2026-06-20T01:29:36.8632050Z /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift:741:9: warning: initialization of immutable value 'dataVersion' was never used; consider replacing with assignment to '_' or removing it
+2026-06-20T01:29:36.8648250Z     let dataVersion = UserDefaults.standard.integer(forKey: versionKeyByEntity)
+2026-06-20T01:29:36.8648740Z     ~~~~^~~~~~~~~~~
+2026-06-20T01:29:36.8648950Z     _
+2026-06-20T01:29:36.8650940Z /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift:758:9: warning: initialization of immutable value 'itemNames' was never used; consider replacing with assignment to '_' or removing it
+2026-06-20T01:29:36.8652210Z     let itemNames = finalConfig.items.prefix(3).map { $0.displayType.rawValue }.joined(separator: ",")
+2026-06-20T01:29:36.8652710Z     ~~~~^~~~~~~~~
+2026-06-20T01:29:36.8653040Z     _
+2026-06-20T01:29:36.8653210Z 
+2026-06-20T01:29:36.8653520Z SwiftDriver\ Compilation Widget normal arm64 com.apple.xcode.tools.swift.compiler (in target 'Widget' from project 'Widget')
+2026-06-20T01:29:36.8654130Z     cd /Users/runner/work/widget1/widget1
+2026-06-20T01:29:36.8680500Z     builtin-Swift-Compilation -- /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc -module-name Widget -O -whole-module-optimization -enforce-exclusivity\=checked @/Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/Widget.build/Objects-normal/arm64/Widget.SwiftFileList -enable-bare-slash-regex -enable-experimental-feature DebugDescriptionMacro -sdk /Applications/Xcode_16.4.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk -target arm64-apple-ios17.0 -g -module-cache-path /Users/runner/work/widget1/widget1/build/ModuleCache.noindex -Xfrontend -serialize-debugging-options -swift-version 5 -I /Users/runner/work/widget1/widget1/build/Build/Products/Release-iphoneos -F /Users/runner/work/widget1/widget1/build/Build/Products/Release-iphoneos -c -num-threads 3 -Xcc -ivfsstatcache -Xcc /Users/runner/work/widget1/widget1/build/SDKStatCaches.noindex/iphoneos18.5-22F76-a529daf784b3616c7c04a36aeb7f5c05.sdkstatcache -output-file-map /Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/Widget.build/Objects-normal/arm64/Widget-OutputFileMap.json -use-frontend-parseable-output -save-temps -no-color-diagnostics -serialize-diagnostics -emit-dependencies -emit-module -emit-module-path /Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/Widget.build/Objects-normal/arm64/Widget.swiftmodule -validate-clang-modules-once -clang-build-session-file /Users/runner/work/widget1/widget1/build/ModuleCache.noindex/Session.modulevalidation -Xcc -I/Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/Widget.build/swift-overrides.hmap -emit-const-values -Xfrontend -const-gather-protocols-file -Xfrontend /Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/Widget.build/Objects-normal/arm64/Widget_const_extract_protocols.json -Xcc -iquote -Xcc /Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/Widget.build/Widget-generated-files.hmap -Xcc -I/Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/Widget.build/Widget-own-target-headers.hmap -Xcc -I/Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/Widget.build/Widget-all-target-headers.hmap -Xcc -iquote -Xcc /Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/Widget.build/Widget-project-headers.hmap -Xcc -I/Users/runner/work/widget1/widget1/build/Build/Products/Release-iphoneos/include -Xcc -I/Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/Widget.build/DerivedSources-normal/arm64 -Xcc -I/Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/Widget.build/DerivedSources/arm64 -Xcc -I/Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/Widget.build/DerivedSources -emit-objc-header -emit-objc-header-path /Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/Widget.build/Objects-normal/arm64/Widget-Swift.h -working-directory /Users/runner/work/widget1/widget1 -no-emit-module-separately-wmo
+2026-06-20T01:29:36.8693840Z 
+2026-06-20T01:29:36.8695560Z note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in target 'Widget' from project 'Widget')
+2026-06-20T01:29:36.8698050Z note: Disabling previews because SWIFT_VERSION is set and SWIFT_OPTIMIZATION_LEVEL=-O, expected -Onone (in target 'BroadcastExtension' from project 'Widget')
+2026-06-20T01:29:36.8699370Z ** BUILD FAILED **
+2026-06-20T01:29:36.8699600Z 
+2026-06-20T01:29:36.8699600Z 
+2026-06-20T01:29:36.8699750Z The following build commands failed:
+2026-06-20T01:29:36.8718060Z 	SwiftCompile normal arm64 Compiling\ ActionExecutionService.swift,\ AppDelegate.swift,\ BLECommandExecutor.swift,\ BLEDebugView.swift,\ BLEDeviceStore.swift,\ BLEManager.swift,\ BackupView.swift,\ CallKitManager.swift,\ Constants.swift,\ ContentView.swift,\ DarwinNotificationCenter.swift,\ DebugLogManager.swift,\ DebugLogView.swift,\ DebugOverlayView.swift,\ IntentDiscoveryService.swift,\ ItemEditorView.swift,\ LauncherEditorView.swift,\ LauncherGridView.swift,\ LauncherModels.swift,\ LocalActionServer.swift,\ PlatformConstraints.swift,\ PredefinedActions.swift,\ PushCommandView.swift,\ QRCodeGenerator.swift,\ RemoteControlEditorView.swift,\ ServerSettingsView.swift,\ SettingsView.swift,\ SharedStorage.swift,\ ShortcutFileService.swift,\ ShortcutService.swift,\ SwapWidgetItemsIntent.swift,\ URLOpener.swift,\ WatchCommandIntent.swift,\ WidgetApp.swift,\ WidgetEditorView.swift,\ WidgetIntents.swift,\ WidgetListView.swift,\ WidgetModels.swift,\ WidgetViewModel.swift,\ GeneratedAssetSymbols.swift /Users/runner/work/widget1/widget1/Widget/Sources/Services/ActionExecutionService.swift /Users/runner/work/widget1/widget1/Widget/AppDelegate.swift /Users/runner/work/widget1/widget1/Widget/Sources/Services/BLECommandExecutor.swift /Users/runner/work/widget1/widget1/Widget/Sources/Views/BLEDebugView.swift /Users/runner/work/widget1/widget1/Widget/Sources/Services/BLEDeviceStore.swift /Users/runner/work/widget1/widget1/Widget/Sources/Services/BLEManager.swift /Users/runner/work/widget1/widget1/Widget/Sources/Views/BackupView.swift /Users/runner/work/widget1/widget1/Widget/Sources/Services/CallKitManager.swift /Users/runner/work/widget1/widget1/Widget/Sources/Utilities/Constants.swift /Users/runner/work/widget1/widget1/Widget/Sources/Views/ContentView.swift /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Services/DarwinNotificationCenter.swift /Users/runner/work/widget1/widget1/Widget/Sources/Services/DebugLogManager.swift /Users/runner/work/widget1/widget1/Widget/Sources/Views/DebugLogView.swift /Users/runner/work/widget1/widget1/Widget/Sources/Views/DebugOverlayView.swift /Users/runner/work/widget1/widget1/Widget/Sources/Services/IntentDiscoveryService.swift /Users/runner/work/widget1/widget1/Widget/Sources/Views/ItemEditorView.swift /Users/runner/work/widget1/widget1/Widget/Sources/Views/LauncherEditorView.swift /Users/runner/work/widget1/widget1/Widget/Sources/Views/LauncherGridView.swift /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/LauncherModels.swift /Users/runner/work/widget1/widget1/Widget/Sources/Services/LocalActionServer.swift /Users/runner/work/widget1/widget1/Widget/Sources/Utilities/PlatformConstraints.swift /Users/runner/work/widget1/widget1/Widget/Sources/Views/PredefinedActions.swift /Users/runner/work/widget1/widget1/Widget/Sources/Views/PushCommandView.swift /Users/runner/work/widget1/widget1/Widget/Sources/Shared/QRCodeGenerator.swift /Users/runner/work/widget1/widget1/Widget/Sources/Views/RemoteControlEditorView.swift /Users/runner/work/widget1/widget1/Widget/Sources/Views/ServerSettingsView.swift /Users/runner/work/widget1/widget1/Widget/Sources/Views/SettingsView.swift /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Services/SharedStorage.swift /Users/runner/work/widget1/widget1/Widget/Sources/Services/ShortcutFileService.swift /Users/runner/work/widget1/widget1/Widget/Sources/Services/ShortcutService.swift /Users/runner/work/widget1/widget1/Widget/Sources/Services/SwapWidgetItemsIntent.swift /Users/runner/work/widget1/widget1/Widget/Sources/Services/URLOpener.swift /Users/runner/work/widget1/widget1/Widget/Sources/Services/WatchCommandIntent.swift /Users/runner/work/widget1/widget1/Widget/WidgetApp.swift /Users/runner/work/widget1/widget1/Widget/Sources/Views/WidgetEditorView.swift /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetIntents.swift /Users/runner/work/widget1/widget1/Widget/Sources/Views/WidgetListView.swift /Users/runner/work/widget1/widget1/Widget/Sources/Shared/Models/WidgetModels.swift /Users/runner/work/widget1/widget1/Widget/Sources/ViewModels/WidgetViewModel.swift /Users/runner/work/widget1/widget1/build/Build/Intermediates.noindex/Widget.build/Release-iphoneos/Widget.build/DerivedSources/GeneratedAssetSymbols.swift (in target 'Widget' from project 'Widget')
+2026-06-20T01:29:36.8752360Z 	CompileSwift normal arm64 (in target 'Widget' from project 'Widget')
+2026-06-20T01:29:36.8752930Z 	Building project Widget with scheme Widget and configuration Release
+2026-06-20T01:29:36.8753380Z (3 failures)
+2026-06-20T01:29:36.8753600Z === Build Errors ===
+2026-06-20T01:29:36.8754850Z /Users/runner/work/widget1/widget1/Widget/Sources/Services/SwapWidgetItemsIntent.swift:50:16: error: value of type 'WidgetCenter' has no member 'perform'
+2026-06-20T01:29:36.8755810Z /Users/runner/work/widget1/widget1/Widget/Sources/Services/SwapWidgetItemsIntent.swift:86:44: error: value of type 'WidgetCenter' has no member 'perform'
+2026-06-20T01:29:36.8989070Z Found: ./build/Build/Products/Release-iphoneos/Widget.app
+2026-06-20T01:29:36.9105540Z chmod: Payload/Widget.app/Widget: No such file or directory
+2026-06-20T01:29:36.9220830Z ##[error]Process completed with exit code 1.

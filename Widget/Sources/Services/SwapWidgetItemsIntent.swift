@@ -8,9 +8,7 @@ import ObjectiveC.runtime
 /// Attempts to trigger widget reselection via private WidgetCenter APIs.
 /// This mimics what happens when a user manually reselects the widget.
 private func triggerWidgetReselection(kind: String) {
-    let center = WidgetCenter.shared
-    
-    // Method 1: Try via NSObject's respondsToSelector (Swift overlay may hide private methods)
+    // Method 1: Try to call _reloadConfigurationsOfKind:withCompletionHandler: via objc_msgSend
     let selector = NSSelectorFromString("_reloadConfigurationsOfKind:withCompletionHandler:")
     
     // Direct Objective-C method lookup
@@ -27,7 +25,8 @@ private func triggerWidgetReselection(kind: String) {
             SharedStorage.shared.appendExtensionLog("RESELECTION-M1: callback success=\(success)")
         }
         
-        // Call the method
+        // Call the method via objc_msgSend
+        let center = WidgetCenter.shared
         let centerPtr = Unmanaged.passUnretained(center as AnyObject).toOpaque()
         let imp = method_getImplementation(method!)
         
@@ -39,7 +38,7 @@ private func triggerWidgetReselection(kind: String) {
         return
     }
     
-    // Method 2: Try simpler private API
+    // Method 2: Try simpler private API - reloadConfigurationOfKind:
     let altSelector = NSSelectorFromString("reloadConfigurationOfKind:")
     var altMethod: Method? = nil
     if let centerClass = object_getClass(WidgetCenter.self) {
@@ -47,7 +46,13 @@ private func triggerWidgetReselection(kind: String) {
     }
     if altMethod != nil {
         SharedStorage.shared.appendExtensionLog("RESELECTION-M2: FOUND reloadConfigurationOfKind for \(kind)")
-        center.perform(altSelector, with: kind)
+        // Call via objc_msgSend
+        let center = WidgetCenter.shared
+        let centerPtr = Unmanaged.passUnretained(center as AnyObject).toOpaque()
+        let imp = method_getImplementation(altMethod!)
+        typealias ImpType2 = @convention(c) (UnsafeRawPointer, Selector, String) -> Void
+        let fn = unsafeBitCast(imp, to: ImpType2.self)
+        fn(centerPtr, altSelector, kind)
         SharedStorage.shared.appendExtensionLog("RESELECTION-M2: CALLED for \(kind)")
         return
     }
@@ -83,7 +88,15 @@ private func triggerAllWidgetReselection() {
     
     if method != nil {
         SharedStorage.shared.appendExtensionLog("RESELECTION-ALL: Found _widgetKinds method")
-        if let kinds = WidgetCenter.shared.perform(kindsSelector)?.takeUnretainedValue() as? [String] {
+        // Call via objc_msgSend and get return value
+        let center = WidgetCenter.shared
+        let centerPtr = Unmanaged.passUnretained(center as AnyObject).toOpaque()
+        let imp = method_getImplementation(method!)
+        
+        typealias RetIMP = @convention(c) (UnsafeRawPointer, Selector) -> AnyObject?
+        let fn = unsafeBitCast(imp, to: RetIMP.self)
+        if let result = fn(centerPtr, kindsSelector),
+           let kinds = result?.takeUnretainedValue() as? [String] {
             SharedStorage.shared.appendExtensionLog("RESELECTION-ALL: Found \(kinds.count) widget kinds: \(kinds.joined(separator: ","))")
             for kind in kinds {
                 triggerWidgetReselection(kind: kind)
