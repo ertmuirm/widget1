@@ -840,6 +840,8 @@ struct ClockBroadcastProvider: AppIntentTimelineProvider {
 /// Placed on every empty grid cell and the widget background so that tapping
 /// anywhere without a real action does nothing instead of opening the host app.
 struct NoOpIntent: AppIntent {
+    static var title: LocalizedStringResource = "No Action"
+    @available(*, unavailable, message: "This intent is for internal widget use only")
     static var openAppWhenRun: Bool = false
     func perform() async throws -> some IntentResult { .result() }
 }
@@ -850,6 +852,8 @@ struct NoOpIntent: AppIntent {
 // inside the extension process. For Shortcuts use, see AdvanceCodeSlideIntent (main app only).
 
 struct AdvanceImageIntent: AppIntent {
+    static var title: LocalizedStringResource = "Advance Slide"
+    @available(*, unavailable, message: "This intent is for internal widget use only")
     static var openAppWhenRun: Bool = false
 
     @Parameter(title: "Widget ID")   var widgetID: String
