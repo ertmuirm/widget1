@@ -1569,12 +1569,45 @@ struct RefreshWidgetIntent: AppIntent {
         let timestamp = Int(Date().timeIntervalSince1970) % 10000
         
         // Write debug info
-        UserDefaults.standard.set("tapped_\(timestamp)", forKey: "REFRESH_TAPPED")
+        UserDefaults.standard.set("refreshed_\(timestamp)", forKey: "REFRESH_TAPPED")
         
-        // Extract UUID and write to keychain - this tells the widget which entity to re-encode
+        // CRITICAL: Extract UUID and write FRESH entity data to keychain
+        // This mimics what happens during widget reselection - the app re-encodes fresh data
         let uuid = uuidFromEntityID(widgetEntity.id)
-        if let uuidData = uuid.data(using: .utf8) {
-            _ = SharedStorage.shared.keychainWrite(uuidData, forKey: "REFRESH_TARGET_UUID")
+        let freshEntityKey = "FRESH_ENTITY_\(uuid)"
+        
+        // Try to find fresh config from storage (same approach as swap action)
+        var freshConfig: WidgetConfig? = nil
+        var configSource = "none"
+        
+        // Method 1: Try gridConfigs() - this reads fresh data from storage
+        if let gridConfig = gridConfigs().first(where: { encodeEntityID($0).contains(uuid) }) {
+            freshConfig = gridConfig
+            configSource = "grid"
+        }
+        
+        // Method 2: Decode existing entity (might already be fresh from keychain/UserDefaults)
+        if freshConfig == nil, let decoded = decodeConfigFromID(widgetEntity.id) {
+            freshConfig = decoded
+            configSource = "decode"
+        }
+        
+        // Write fresh config to keychain
+        if let config = freshConfig {
+            let encoded = encodeEntityID(config)
+            if let encodedData = encoded.data(using: .utf8) {
+                let status = SharedStorage.shared.keychainWrite(encodedData, forKey: freshEntityKey)
+                UserDefaults.standard.set("FRESH|len=\(encoded.count)|status=\(status)|src=\(configSource)", forKey: "REFRESH_DEBUG")
+                // Also write to UserDefaults.standard
+                UserDefaults.standard.set(encoded, forKey: freshEntityKey)
+            }
+        } else {
+            UserDefaults.standard.set("FRESH|NO_CONFIG_FOUND", forKey: "REFRESH_DEBUG")
+        }
+        
+        // Also trigger widget reselection methods
+        if #available(iOS 17.0, *) {
+            triggerAllWidgetReselection()
         }
         
         // Trigger widget reload
@@ -1582,5 +1615,80 @@ struct RefreshWidgetIntent: AppIntent {
         WidgetCenter.shared.reloadAllTimelines()
         
         return .result(value: widgetEntity.id, dialog: IntentDialog("Refresh @ \(String(uuid.prefix(8)))"))
+    }
+    
+    /// Triggers reselection for ALL widget kinds (same as SwapWidgetItemsIntent)
+    @available(iOS 17.0, *)
+    private func triggerAllWidgetReselection() {
+        // Method 1: Try to get all widget kinds via private API
+        let kindsSelector = NSSelectorFromString("_widgetKinds")
+        var method: Method? = nil
+        if let centerClass = object_getClass(WidgetCenter.self) {
+            method = class_getInstanceMethod(centerClass, kindsSelector)
+        }
+        
+        if method != nil {
+            let center = WidgetCenter.shared
+            let centerPtr = Unmanaged.passUnretained(center as AnyObject).toOpaque()
+            let imp = method_getImplementation(method!)
+            
+            typealias RetIMP = @convention(c) (UnsafeRawPointer, Selector) -> [String]?
+            let fn = unsafeBitCast(imp, to: RetIMP.self)
+            if let kinds = fn(centerPtr, kindsSelector) {
+                for kind in kinds {
+                    triggerWidgetReselection(kind: kind)
+                }
+            }
+        } else {
+            // Fallback: try known widget kinds
+            let knownKinds = ["BroadcastSmall", "BroadcastMedium", "BroadcastLarge", 
+                              "BroadcastLock", "BroadcastImage", "BroadcastClock",
+                              "ClockCheckDark", "ClockCheckLight", "Grid", "Code"]
+            for kind in knownKinds {
+                triggerWidgetReselection(kind: kind)
+            }
+        }
+    }
+    
+    @available(iOS 17.0, *)
+    private func triggerWidgetReselection(kind: String) {
+        // Method 1: _reloadConfigurationsOfKind:withCompletionHandler:
+        let selector = NSSelectorFromString("_reloadConfigurationsOfKind:withCompletionHandler:")
+        var method: Method? = nil
+        if let centerClass = object_getClass(WidgetCenter.self) {
+            method = class_getInstanceMethod(centerClass, selector)
+        }
+        
+        if method != nil {
+            let center = WidgetCenter.shared
+            let centerPtr = Unmanaged.passUnretained(center as AnyObject).toOpaque()
+            let imp = method_getImplementation(method!)
+            
+            typealias CompletionBlock = @convention(block) (Bool) -> Void
+            let completion: CompletionBlock = { _ in }
+            typealias ImpType = @convention(c) (UnsafeRawPointer, Selector, String, AnyObject) -> Void
+            let fn = unsafeBitCast(imp, to: ImpType.self)
+            fn(centerPtr, selector, kind, unsafeBitCast(completion, to: AnyObject.self))
+            return
+        }
+        
+        // Method 2: reloadConfigurationOfKind:
+        let altSelector = NSSelectorFromString("reloadConfigurationOfKind:")
+        var altMethod: Method? = nil
+        if let centerClass = object_getClass(WidgetCenter.self) {
+            altMethod = class_getInstanceMethod(centerClass, altSelector)
+        }
+        if altMethod != nil {
+            let center = WidgetCenter.shared
+            let centerPtr = Unmanaged.passUnretained(center as AnyObject).toOpaque()
+            let imp = method_getImplementation(altMethod!)
+            typealias ImpType2 = @convention(c) (UnsafeRawPointer, Selector, String) -> Void
+            let fn = unsafeBitCast(imp, to: ImpType2.self)
+            fn(centerPtr, altSelector, kind)
+            return
+        }
+        
+        // Fallback: public reloadTimelines
+        WidgetCenter.shared.reloadTimelines(ofKind: kind)
     }
 }
