@@ -93,10 +93,10 @@ private func triggerAllWidgetReselection() {
         let centerPtr = Unmanaged.passUnretained(center as AnyObject).toOpaque()
         let imp = method_getImplementation(method!)
         
-        typealias RetIMP = @convention(c) (UnsafeRawPointer, Selector) -> AnyObject?
+        // _widgetKinds returns [String] - cast directly
+        typealias RetIMP = @convention(c) (UnsafeRawPointer, Selector) -> [String]?
         let fn = unsafeBitCast(imp, to: RetIMP.self)
-        if let result = fn(centerPtr, kindsSelector),
-           let kinds = result?.takeUnretainedValue() as? [String] {
+        if let kinds = fn(centerPtr, kindsSelector) {
             SharedStorage.shared.appendExtensionLog("RESELECTION-ALL: Found \(kinds.count) widget kinds: \(kinds.joined(separator: ","))")
             for kind in kinds {
                 triggerWidgetReselection(kind: kind)

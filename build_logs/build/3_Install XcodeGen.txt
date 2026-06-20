@@ -1,15 +1,15 @@
-﻿2026-06-20T01:28:40.1998070Z ##[group]Run export HOMEBREW_NO_REQUIRE_TAP_TRUST=1
-2026-06-20T01:28:40.1998750Z [36;1mexport HOMEBREW_NO_REQUIRE_TAP_TRUST=1[0m
-2026-06-20T01:28:40.1999250Z [36;1mbrew install xcodegen[0m
-2026-06-20T01:28:40.2035180Z shell: /bin/bash -e {0}
-2026-06-20T01:28:40.2035630Z ##[endgroup]
-2026-06-20T01:28:42.8108470Z ✔︎ JSON API formula_tap_migrations.jws.json
-2026-06-20T01:28:42.8109180Z ✔︎ JSON API cask_tap_migrations.jws.json
-2026-06-20T01:28:45.2036940Z Inspect the formula dependency plan before installing with `brew install --ask`.
-2026-06-20T01:28:45.2039150Z Enable ask mode by setting `HOMEBREW_ASK=1`.
-2026-06-20T01:28:45.2040020Z Hide these hints with `HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
-2026-06-20T01:28:45.2041310Z [32m==>[0m [1mFetching downloads for: [32mxcodegen[39m[0m
-2026-06-20T01:28:45.4769820Z ✔︎ Bottle Manifest xcodegen (2.45.4)
-2026-06-20T01:28:45.9320610Z ✔︎ Bottle xcodegen (2.45.4)
-2026-06-20T01:28:46.0381350Z [34m==>[0m [1mPouring xcodegen--2.45.4.arm64_sequoia.bottle.tar.gz[0m
-2026-06-20T01:28:46.1624770Z 🍺  /opt/homebrew/Cellar/xcodegen/2.45.4: 38 files, 7.4MB
+﻿2026-06-20T01:33:56.8282850Z ##[group]Run export HOMEBREW_NO_REQUIRE_TAP_TRUST=1
+2026-06-20T01:33:56.8284040Z [36;1mexport HOMEBREW_NO_REQUIRE_TAP_TRUST=1[0m
+2026-06-20T01:33:56.8285000Z [36;1mbrew install xcodegen[0m
+2026-06-20T01:33:56.8318640Z shell: /bin/bash -e {0}
+2026-06-20T01:33:56.8319340Z ##[endgroup]
+2026-06-20T01:33:59.0186470Z ✔︎ JSON API formula_tap_migrations.jws.json
+2026-06-20T01:33:59.0188070Z ✔︎ JSON API cask_tap_migrations.jws.json
+2026-06-20T01:34:00.7534790Z Inspect the formula dependency plan before installing with `brew install --ask`.
+2026-06-20T01:34:00.7536140Z Enable ask mode by setting `HOMEBREW_ASK=1`.
+2026-06-20T01:34:00.7536980Z Hide these hints with `HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).
+2026-06-20T01:34:00.7538600Z [32m==>[0m [1mFetching downloads for: [32mxcodegen[39m[0m
+2026-06-20T01:34:01.2521370Z ✔︎ Bottle Manifest xcodegen (2.45.4)
+2026-06-20T01:34:02.0637310Z ✔︎ Bottle xcodegen (2.45.4)
+2026-06-20T01:34:02.1272220Z [34m==>[0m [1mPouring xcodegen--2.45.4.arm64_sequoia.bottle.tar.gz[0m
+2026-06-20T01:34:02.2349290Z 🍺  /opt/homebrew/Cellar/xcodegen/2.45.4: 38 files, 7.4MB
