@@ -1,74 +1,74 @@
-﻿2026-06-20T01:33:55.0278630Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
-2026-06-20T01:33:55.0285070Z ##[group]Run actions/checkout@v4
-2026-06-20T01:33:55.0285660Z with:
-2026-06-20T01:33:55.0286000Z   repository: ertmuirm/widget1
-2026-06-20T01:33:55.0289110Z   token: ***
-2026-06-20T01:33:55.0289430Z   ssh-strict: true
-2026-06-20T01:33:55.0289760Z   ssh-user: git
-2026-06-20T01:33:55.0290100Z   persist-credentials: true
-2026-06-20T01:33:55.0290450Z   clean: true
-2026-06-20T01:33:55.0290810Z   sparse-checkout-cone-mode: true
-2026-06-20T01:33:55.0291200Z   fetch-depth: 1
-2026-06-20T01:33:55.0291520Z   fetch-tags: false
-2026-06-20T01:33:55.0291850Z   show-progress: true
-2026-06-20T01:33:55.0292180Z   lfs: false
-2026-06-20T01:33:55.0292500Z   submodules: false
-2026-06-20T01:33:55.0292890Z   set-safe-directory: true
-2026-06-20T01:33:55.0293460Z ##[endgroup]
-2026-06-20T01:33:55.4882290Z Syncing repository: ertmuirm/widget1
-2026-06-20T01:33:55.4883700Z ##[group]Getting Git version info
-2026-06-20T01:33:55.4884330Z Working directory is '/Users/runner/work/widget1/widget1'
-2026-06-20T01:33:55.4885150Z [command]/opt/homebrew/bin/git version
-2026-06-20T01:33:55.4998450Z git version 2.54.0
-2026-06-20T01:33:55.5022330Z ##[endgroup]
-2026-06-20T01:33:55.5029180Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/b5a71807-5965-4f27-aeca-24d76c59b1b1/.gitconfig'
-2026-06-20T01:33:55.5037000Z Temporarily overriding HOME='/Users/runner/work/_temp/b5a71807-5965-4f27-aeca-24d76c59b1b1' before making global git config changes
-2026-06-20T01:33:55.5041570Z Adding repository directory to the temporary git global config as a safe directory
-2026-06-20T01:33:55.5044260Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/widget1/widget1
-2026-06-20T01:33:55.5141160Z Deleting the contents of '/Users/runner/work/widget1/widget1'
-2026-06-20T01:33:55.5143800Z ##[group]Initializing the repository
-2026-06-20T01:33:55.5146870Z [command]/opt/homebrew/bin/git init /Users/runner/work/widget1/widget1
-2026-06-20T01:33:55.5352640Z hint: Using 'master' as the name for the initial branch. This default branch name
-2026-06-20T01:33:55.5358280Z hint: will change to "main" in Git 3.0. To configure the initial branch name
-2026-06-20T01:33:55.5360980Z hint: to use in all of your new repositories, which will suppress this warning,
-2026-06-20T01:33:55.5361570Z hint: call:
-2026-06-20T01:33:55.5362010Z hint:
-2026-06-20T01:33:55.5363650Z hint: 	git config --global init.defaultBranch <name>
-2026-06-20T01:33:55.5364320Z hint:
-2026-06-20T01:33:55.5364910Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
-2026-06-20T01:33:55.5365690Z hint: 'development'. The just-created branch can be renamed via this command:
-2026-06-20T01:33:55.5366340Z hint:
-2026-06-20T01:33:55.5366840Z hint: 	git branch -m <name>
-2026-06-20T01:33:55.5367300Z hint:
-2026-06-20T01:33:55.5367860Z hint: Disable this message with "git config set advice.defaultBranchName false"
-2026-06-20T01:33:55.5368810Z Initialized empty Git repository in /Users/runner/work/widget1/widget1/.git/
-2026-06-20T01:33:55.5370470Z [command]/opt/homebrew/bin/git remote add origin https://github.com/ertmuirm/widget1
-2026-06-20T01:33:55.5426190Z ##[endgroup]
-2026-06-20T01:33:55.5427020Z ##[group]Disabling automatic garbage collection
-2026-06-20T01:33:55.5429010Z [command]/opt/homebrew/bin/git config --local gc.auto 0
-2026-06-20T01:33:55.5533030Z ##[endgroup]
-2026-06-20T01:33:55.5549950Z ##[group]Setting up auth
-2026-06-20T01:33:55.5561150Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
-2026-06-20T01:33:55.5572920Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
-2026-06-20T01:33:55.6394600Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
-2026-06-20T01:33:55.6445670Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
-2026-06-20T01:33:55.7326450Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
-2026-06-20T01:33:55.7357170Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
-2026-06-20T01:33:55.8712230Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
-2026-06-20T01:33:55.8848380Z ##[endgroup]
-2026-06-20T01:33:55.8849210Z ##[group]Fetching the repository
-2026-06-20T01:33:55.8850380Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +122f14c44f6ad46412ece384e798e8bb60ea1136:refs/remotes/origin/openhands1
-2026-06-20T01:33:56.7139690Z From https://github.com/ertmuirm/widget1
-2026-06-20T01:33:56.7141040Z  * [new ref]         122f14c44f6ad46412ece384e798e8bb60ea1136 -> origin/openhands1
-2026-06-20T01:33:56.7218230Z ##[endgroup]
-2026-06-20T01:33:56.7219140Z ##[group]Determining the checkout info
-2026-06-20T01:33:56.7220030Z ##[endgroup]
-2026-06-20T01:33:56.7221940Z [command]/opt/homebrew/bin/git sparse-checkout disable
-2026-06-20T01:33:56.7291680Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
-2026-06-20T01:33:56.7366530Z ##[group]Checking out the ref
-2026-06-20T01:33:56.7371410Z [command]/opt/homebrew/bin/git checkout --progress --force -B openhands1 refs/remotes/origin/openhands1
-2026-06-20T01:33:56.7787420Z Switched to a new branch 'openhands1'
-2026-06-20T01:33:56.7891710Z branch 'openhands1' set up to track 'origin/openhands1'.
-2026-06-20T01:33:56.8165370Z ##[endgroup]
-2026-06-20T01:33:56.8168410Z [command]/opt/homebrew/bin/git log -1 --format=%H
-2026-06-20T01:33:56.8169490Z 122f14c44f6ad46412ece384e798e8bb60ea1136
+﻿2026-06-20T04:20:10.2787910Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-06-20T04:20:10.2794940Z ##[group]Run actions/checkout@v4
+2026-06-20T04:20:10.2795540Z with:
+2026-06-20T04:20:10.2795920Z   repository: ertmuirm/widget1
+2026-06-20T04:20:10.2798990Z   token: ***
+2026-06-20T04:20:10.2799310Z   ssh-strict: true
+2026-06-20T04:20:10.2799640Z   ssh-user: git
+2026-06-20T04:20:10.2799970Z   persist-credentials: true
+2026-06-20T04:20:10.2800330Z   clean: true
+2026-06-20T04:20:10.2800670Z   sparse-checkout-cone-mode: true
+2026-06-20T04:20:10.2801060Z   fetch-depth: 1
+2026-06-20T04:20:10.2801380Z   fetch-tags: false
+2026-06-20T04:20:10.2801720Z   show-progress: true
+2026-06-20T04:20:10.2802050Z   lfs: false
+2026-06-20T04:20:10.2802360Z   submodules: false
+2026-06-20T04:20:10.2802740Z   set-safe-directory: true
+2026-06-20T04:20:10.2803320Z ##[endgroup]
+2026-06-20T04:20:10.7567910Z Syncing repository: ertmuirm/widget1
+2026-06-20T04:20:10.7569870Z ##[group]Getting Git version info
+2026-06-20T04:20:10.7571120Z Working directory is '/Users/runner/work/widget1/widget1'
+2026-06-20T04:20:10.7590580Z [command]/opt/homebrew/bin/git version
+2026-06-20T04:20:10.8642170Z git version 2.54.0
+2026-06-20T04:20:10.8669060Z ##[endgroup]
+2026-06-20T04:20:10.8682440Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/e0d3d090-e98b-4385-90db-1feadf696db7/.gitconfig'
+2026-06-20T04:20:10.8684910Z Temporarily overriding HOME='/Users/runner/work/_temp/e0d3d090-e98b-4385-90db-1feadf696db7' before making global git config changes
+2026-06-20T04:20:10.8693910Z Adding repository directory to the temporary git global config as a safe directory
+2026-06-20T04:20:10.8702630Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/widget1/widget1
+2026-06-20T04:20:10.8916670Z Deleting the contents of '/Users/runner/work/widget1/widget1'
+2026-06-20T04:20:10.8928520Z ##[group]Initializing the repository
+2026-06-20T04:20:10.8929480Z [command]/opt/homebrew/bin/git init /Users/runner/work/widget1/widget1
+2026-06-20T04:20:10.9398620Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-06-20T04:20:10.9404840Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-06-20T04:20:10.9406300Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-06-20T04:20:10.9414920Z hint: call:
+2026-06-20T04:20:10.9415580Z hint:
+2026-06-20T04:20:10.9416210Z hint: 	git config --global init.defaultBranch <name>
+2026-06-20T04:20:10.9416930Z hint:
+2026-06-20T04:20:10.9417530Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-06-20T04:20:10.9419220Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-06-20T04:20:10.9420010Z hint:
+2026-06-20T04:20:10.9420680Z hint: 	git branch -m <name>
+2026-06-20T04:20:10.9421220Z hint:
+2026-06-20T04:20:10.9421890Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-06-20T04:20:10.9422840Z Initialized empty Git repository in /Users/runner/work/widget1/widget1/.git/
+2026-06-20T04:20:10.9425230Z [command]/opt/homebrew/bin/git remote add origin https://github.com/ertmuirm/widget1
+2026-06-20T04:20:10.9555020Z ##[endgroup]
+2026-06-20T04:20:10.9557510Z ##[group]Disabling automatic garbage collection
+2026-06-20T04:20:10.9559350Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-06-20T04:20:10.9643190Z ##[endgroup]
+2026-06-20T04:20:10.9649480Z ##[group]Setting up auth
+2026-06-20T04:20:10.9653830Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-06-20T04:20:10.9752590Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-06-20T04:20:11.1551820Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-06-20T04:20:11.1638350Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-06-20T04:20:11.4474550Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-06-20T04:20:11.4499770Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-06-20T04:20:11.4806680Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-06-20T04:20:11.4872640Z ##[endgroup]
+2026-06-20T04:20:11.4884050Z ##[group]Fetching the repository
+2026-06-20T04:20:11.4895220Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +f82fbcd2e77429fa83bf0bc3498d4e0422bc11a9:refs/remotes/origin/openhands1
+2026-06-20T04:20:12.3422810Z From https://github.com/ertmuirm/widget1
+2026-06-20T04:20:12.3425200Z  * [new ref]         f82fbcd2e77429fa83bf0bc3498d4e0422bc11a9 -> origin/openhands1
+2026-06-20T04:20:12.3510200Z ##[endgroup]
+2026-06-20T04:20:12.3512420Z ##[group]Determining the checkout info
+2026-06-20T04:20:12.3518590Z ##[endgroup]
+2026-06-20T04:20:12.3520950Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-06-20T04:20:12.3601130Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-06-20T04:20:12.3676030Z ##[group]Checking out the ref
+2026-06-20T04:20:12.3678220Z [command]/opt/homebrew/bin/git checkout --progress --force -B openhands1 refs/remotes/origin/openhands1
+2026-06-20T04:20:12.4255590Z Switched to a new branch 'openhands1'
+2026-06-20T04:20:12.4358890Z branch 'openhands1' set up to track 'origin/openhands1'.
+2026-06-20T04:20:12.4576630Z ##[endgroup]
+2026-06-20T04:20:12.4590890Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-06-20T04:20:12.4591690Z f82fbcd2e77429fa83bf0bc3498d4e0422bc11a9

@@ -1580,8 +1580,12 @@ struct RefreshWidgetIntent: AppIntent {
         var freshConfig: WidgetConfig? = nil
         var configSource = "none"
         
-        // Method 1: Try gridConfigs() - this reads fresh data from storage
-        if let gridConfig = gridConfigs().first(where: { encodeEntityID($0).contains(uuid) }) {
+        // Method 1: Load configs from storage and find matching grid config
+        let allConfigs = (try? SharedStorage.shared.loadConfigurations()) ?? []
+        let gridConfigsList = allConfigs.filter { $0.widgetKind == .grid || $0.widgetKind == nil }
+            .filter { $0.size != .systemExtraLarge }
+        
+        if let gridConfig = gridConfigsList.first(where: { encodeEntityID($0).contains(uuid) }) {
             freshConfig = gridConfig
             configSource = "grid"
         }
