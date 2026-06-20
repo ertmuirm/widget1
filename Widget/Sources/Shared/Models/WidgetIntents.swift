@@ -250,6 +250,21 @@ func decodeConfigFromID(_ entityID: String) -> WidgetConfig? {
         }
     }
     
+    // FALLBACK: Check UserDefaults.standard (written by swap action as debug)
+    if let freshEntityID = UserDefaults.standard.string(forKey: freshEntityKey) {
+        SharedStorage.shared.appendExtensionLog("DECODE: FOUND fresh via UserDefaults key=\(freshEntityKey)")
+        let freshParts = freshEntityID.split(separator: "|", maxSplits: 1)
+        if freshParts.count == 2, let data = Data(base64Encoded: String(freshParts[1])) {
+            if let slim = try? JSONDecoder().decode(SlimConfig.self, from: data) {
+                return slim.toWidgetConfig()
+            }
+            let dec = JSONDecoder(); dec.dateDecodingStrategy = .iso8601
+            if let config = try? dec.decode(WidgetConfig.self, from: data) {
+                return config
+            }
+        }
+    }
+    
     // Fall back to decoding the provided entity ID
     SharedStorage.shared.appendExtensionLog("DECODE: using EMBEDDED entityID.len=\(entityID.count)")
     guard let data = Data(base64Encoded: String(parts[1])) else { return nil }

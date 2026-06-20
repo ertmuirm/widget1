@@ -461,12 +461,17 @@ struct SwapWidgetItemsIntent: AppIntent {
         let freshEntityKey = "FRESH_ENTITY_\(widgetUUID)"
         if let freshData = freshEntityID.data(using: .utf8) {
             let status = SharedStorage.shared.keychainWrite(freshData, forKey: freshEntityKey)
-            storage.appendExtensionLog("SWAP: wrote FRESH_ENTITY to keychain status=\(status)")
+            storage.appendExtensionLog("SWAP-KEYCHAIN: wrote freshEntityKey=\(freshEntityKey) len=\(freshEntityID.count) status=\(status)")
+            
+            // ALSO write to UserDefaults.standard as fallback/debug
+            UserDefaults.standard.set(freshEntityID, forKey: freshEntityKey)
+            storage.appendExtensionLog("SWAP-UD: also wrote to UserDefaults.standard key=\(freshEntityKey)")
         }
 
         // Debug info
-        let debugInfo = "RE_ENCODED|widgetID=\(widgetEntityID.prefix(15))|freshLen=\(freshEntityID.count)|key=FRESH_ENTITY"
+        let debugInfo = "RE_ENCODED|widgetID=\(widgetEntityID.prefix(15))|freshLen=\(freshEntityID.count)|key=\(freshEntityKey)"
         UserDefaults.standard.set(debugInfo, forKey: "swapDebug")
+        storage.appendExtensionLog("SWAP: debugInfo=\(debugInfo)")
 
         // Increment version counter to signal data changed.
         let versionKey = "dataVersion_\(widgetUUID)"
