@@ -1566,6 +1566,6 @@ struct RefreshWidgetIntent: AppIntent {
         DarwinNotificationCenter.shared.postSwapAction()
         WidgetCenter.shared.reloadAllTimelines()
         
-        return .result(value: widgetEntity.id, dialog: IntentDialog("Refresh @ \(uuid.prefix(8))"))
+        return .result(value: widgetEntity.id, dialog: IntentDialog("Refresh @ \(String(uuid.prefix(8)))"))
     }
 }
