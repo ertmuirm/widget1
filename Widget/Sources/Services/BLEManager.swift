@@ -299,6 +299,56 @@ final class BLEManager: NSObject, ObservableObject {
         return true
     }
 
+    // MARK: - Read characteristic
+
+    func readCharacteristic(serviceUUID: String, charUUID: String) async {
+        guard let p = activePeripheral else {
+            log("Read failed: not connected", category: .error)
+            return
+        }
+        
+        let targetServiceUUID = CBUUID(string: serviceUUID)
+        let targetCharUUID = CBUUID(string: charUUID)
+        
+        // Find the characteristic in discovered services
+        var foundChar: CBCharacteristic?
+        
+        // If serviceUUID is provided, search in that specific service
+        // Otherwise, search all services for the characteristic
+        if !serviceUUID.isEmpty {
+            for service in p.services ?? [] {
+                if service.uuid == targetServiceUUID {
+                    for char in service.characteristics ?? [] {
+                        if char.uuid == targetCharUUID {
+                            foundChar = char
+                            break
+                        }
+                    }
+                }
+            }
+        } else {
+            // Search all services for the characteristic
+            for service in p.services ?? [] {
+                for char in service.characteristics ?? [] {
+                    if char.uuid == targetCharUUID {
+                        foundChar = char
+                        break
+                    }
+                }
+                if foundChar != nil { break }
+            }
+        }
+        
+        guard let char = foundChar else {
+            log("Read failed: characteristic \(charUUID) not found", category: .error)
+            return
+        }
+        
+        // Read the value - result will come through didUpdateValueFor delegate
+        p.readValue(for: char)
+        log("READ → \(charUUID): requested", category: .info)
+    }
+
     // MARK: - Watch state parser
 
     private func handleIncomingPacket(_ data: Data, charUUID: String) {

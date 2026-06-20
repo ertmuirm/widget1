@@ -2,11 +2,11 @@ import AppIntents
 
 // MARK: - Device entity
 
-struct SavedWatchEntity: AppEntity {
+struct SavedBLEEntity: AppEntity {
     static var typeDisplayRepresentation: TypeDisplayRepresentation {
-        TypeDisplayRepresentation(name: "Watch Device")
+        TypeDisplayRepresentation(name: "BLE Device")
     }
-    static var defaultQuery = SavedWatchQuery()
+    static var defaultQuery = SavedBLEQuery()
 
     var id: String   // device UUID string
     var name: String
@@ -18,31 +18,31 @@ struct SavedWatchEntity: AppEntity {
     init(id: String, name: String) { self.id = id; self.name = name }
 }
 
-struct SavedWatchQuery: EntityQuery {
-    func entities(for identifiers: [String]) async throws -> [SavedWatchEntity] {
+struct SavedBLEQuery: EntityQuery {
+    func entities(for identifiers: [String]) async throws -> [SavedBLEEntity] {
         BLEDeviceStore.shared.devices
             .filter { identifiers.contains($0.id.uuidString) }
-            .map { SavedWatchEntity(id: $0.id.uuidString, name: $0.name) }
+            .map { SavedBLEEntity(id: $0.id.uuidString, name: $0.name) }
     }
 
-    func suggestedEntities() async throws -> [SavedWatchEntity] {
+    func suggestedEntities() async throws -> [SavedBLEEntity] {
         let devs = BLEDeviceStore.shared.devices
-        guard !devs.isEmpty else { return [SavedWatchEntity(id: "none", name: "No saved devices")] }
-        return devs.map { SavedWatchEntity(id: $0.id.uuidString, name: $0.name) }
+        guard !devs.isEmpty else { return [SavedBLEEntity(id: "none", name: "No saved devices")] }
+        return devs.map { SavedBLEEntity(id: $0.id.uuidString, name: $0.name) }
     }
 
-    func defaultResult() async -> SavedWatchEntity? {
-        BLEDeviceStore.shared.devices.first.map { SavedWatchEntity(id: $0.id.uuidString, name: $0.name) }
+    func defaultResult() async -> SavedBLEEntity? {
+        BLEDeviceStore.shared.devices.first.map { SavedBLEEntity(id: $0.id.uuidString, name: $0.name) }
     }
 }
 
-// MARK: - Command entity
+// MARK: - Write Command entity
 
-struct WatchCommandEntity: AppEntity {
+struct WriteCommandEntity: AppEntity {
     static var typeDisplayRepresentation: TypeDisplayRepresentation {
-        TypeDisplayRepresentation(name: "Watch Command")
+        TypeDisplayRepresentation(name: "Write Command")
     }
-    static var defaultQuery = WatchCommandQuery()
+    static var defaultQuery = WriteCommandQuery()
 
     var id: String        // preset UUID string
     var label: String
@@ -57,45 +57,90 @@ struct WatchCommandEntity: AppEntity {
     }
 }
 
-struct WatchCommandQuery: EntityQuery {
-    func entities(for identifiers: [String]) async throws -> [WatchCommandEntity] {
+struct WriteCommandQuery: EntityQuery {
+    func entities(for identifiers: [String]) async throws -> [WriteCommandEntity] {
         BLEDeviceStore.shared.devices.flatMap { dev in
             (dev.vibrationPresets + dev.notificationPresets)
                 .filter { identifiers.contains($0.id.uuidString) }
-                .map { WatchCommandEntity(id: $0.id.uuidString, label: $0.label, deviceID: dev.id.uuidString) }
+                .map { WriteCommandEntity(id: $0.id.uuidString, label: $0.label, deviceID: dev.id.uuidString) }
         }
     }
 
-    func suggestedEntities() async throws -> [WatchCommandEntity] {
+    func suggestedEntities() async throws -> [WriteCommandEntity] {
         BLEDeviceStore.shared.devices.flatMap { dev in
             (dev.vibrationPresets + dev.notificationPresets)
-                .map { WatchCommandEntity(id: $0.id.uuidString, label: $0.label, deviceID: dev.id.uuidString) }
+                .map { WriteCommandEntity(id: $0.id.uuidString, label: $0.label, deviceID: dev.id.uuidString) }
         }
     }
 
-    func defaultResult() async -> WatchCommandEntity? {
+    func defaultResult() async -> WriteCommandEntity? {
         guard let dev = BLEDeviceStore.shared.devices.first,
               let preset = (dev.vibrationPresets + dev.notificationPresets).first
         else { return nil }
-        return WatchCommandEntity(id: preset.id.uuidString, label: preset.label, deviceID: dev.id.uuidString)
+        return WriteCommandEntity(id: preset.id.uuidString, label: preset.label, deviceID: dev.id.uuidString)
     }
 }
 
-// MARK: - Intent
+// MARK: - Read Preset entity
 
-struct SendWatchCommandIntent: AppIntent {
-    static var title: LocalizedStringResource = "Send Watch Command"
-    static var description = IntentDescription("Send a Vibration or Notification command to a paired smartwatch over Bluetooth. The watch must be nearby. Save devices in the app's Bluetooth menu first.")
+struct ReadPresetEntity: AppEntity {
+    static var typeDisplayRepresentation: TypeDisplayRepresentation {
+        TypeDisplayRepresentation(name: "Read Preset")
+    }
+    static var defaultQuery = ReadPresetQuery()
+
+    var id: String        // preset UUID string
+    var label: String
+    var deviceID: String  // owning device UUID string (for display disambiguation)
+
+    var displayRepresentation: DisplayRepresentation {
+        DisplayRepresentation(title: "\(label)")
+    }
+
+    init(id: String, label: String, deviceID: String) {
+        self.id = id; self.label = label; self.deviceID = deviceID
+    }
+}
+
+struct ReadPresetQuery: EntityQuery {
+    func entities(for identifiers: [String]) async throws -> [ReadPresetEntity] {
+        BLEDeviceStore.shared.devices.flatMap { dev in
+            dev.readPresets
+                .filter { identifiers.contains($0.id.uuidString) }
+                .map { ReadPresetEntity(id: $0.id.uuidString, label: $0.label, deviceID: dev.id.uuidString) }
+        }
+    }
+
+    func suggestedEntities() async throws -> [ReadPresetEntity] {
+        BLEDeviceStore.shared.devices.flatMap { dev in
+            dev.readPresets
+                .map { ReadPresetEntity(id: $0.id.uuidString, label: $0.label, deviceID: dev.id.uuidString) }
+        }
+    }
+
+    func defaultResult() async -> ReadPresetEntity? {
+        guard let dev = BLEDeviceStore.shared.devices.first,
+              let preset = dev.readPresets.first
+        else { return nil }
+        return ReadPresetEntity(id: preset.id.uuidString, label: preset.label, deviceID: dev.id.uuidString)
+    }
+}
+
+// MARK: - Send BLE Command Intent
+
+struct SendBLECommandIntent: AppIntent {
+    static var title: LocalizedStringResource = "Send BLE Command"
+    static var description = IntentDescription("Send a Vibration or Notification command to a paired BLE device over Bluetooth. The device must be nearby. Save devices in the app's Bluetooth menu first.")
     static var openAppWhenRun: Bool = false
 
-    @Parameter(title: "Device", description: "The saved watch to send the command to")
-    var device: SavedWatchEntity
+    @Parameter(title: "Device", description: "The saved BLE device to send the command to")
+    var device: SavedBLEEntity
 
     @Parameter(title: "Command", description: "The preset command to send")
-    var command: WatchCommandEntity
+    var command: WriteCommandEntity
 
     init() {}
-    init(device: SavedWatchEntity, command: WatchCommandEntity) {
+    init(device: SavedBLEEntity, command: WriteCommandEntity) {
         self.device = device; self.command = command
     }
 
@@ -124,4 +169,93 @@ struct SendWatchCommandIntent: AppIntent {
             return .result(dialog: IntentDialog(stringLiteral: "Bluetooth error: \(error.localizedDescription)"))
         }
     }
+}
+
+// MARK: - Read BLE Data Intent
+
+struct ReadBLEDataIntent: AppIntent {
+    static var title: LocalizedStringResource = "Read BLE Data"
+    static var description = IntentDescription("Read a value from a BLE device characteristic. The device must be nearby. Save devices and read presets in the app's Bluetooth menu first.")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Device", description: "The saved BLE device to read from")
+    var device: SavedBLEEntity
+
+    @Parameter(title: "Read Preset", description: "The preset defining which service/characteristic to read")
+    var preset: ReadPresetEntity
+
+    @Parameter(title: "Output Format", description: "How to format the output value")
+    var format: BLEDataFormat
+
+    init() {}
+    init(device: SavedBLEEntity, preset: ReadPresetEntity, format: BLEDataFormat) {
+        self.device = device; self.preset = preset; self.format = format
+    }
+
+    func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
+        guard let savedDevice = BLEDeviceStore.shared.device(withIDString: device.id) else {
+            return .result(value: "", dialog: IntentDialog(stringLiteral: "Device \(device.name) not found. Open the app and save the device first."))
+        }
+
+        guard let readPreset = savedDevice.readPresets.first(where: { $0.id.uuidString == preset.id }) else {
+            return .result(value: "", dialog: IntentDialog(stringLiteral: "Read preset not found. Open the app and re-save the device."))
+        }
+
+        do {
+            let executor = BLEReadExecutor()
+            let timeout = TimeInterval(BLEDeviceStore.shared.commandTimeoutSeconds)
+            let data = try await executor.execute(
+                peripheralID: savedDevice.id,
+                serviceUUID: readPreset.serviceUUID,
+                characteristicUUID: readPreset.characteristicUUID,
+                timeout: timeout
+            )
+
+            let formattedValue = formatData(data, format: format)
+            return .result(
+                value: formattedValue,
+                dialog: IntentDialog(stringLiteral: "\(readPreset.label): \(formattedValue)")
+            )
+        } catch let err as BLEReadError {
+            return .result(value: "", dialog: IntentDialog(stringLiteral: err.errorDescription ?? "Read failed."))
+        } catch {
+            return .result(value: "", dialog: IntentDialog(stringLiteral: "Bluetooth error: \(error.localizedDescription)"))
+        }
+    }
+
+    private func formatData(_ data: Data, format: BLEDataFormat) -> String {
+        switch format {
+        case .decimal:
+            if data.count == 1 {
+                return String(data[0])
+            } else if data.count <= 8 {
+                var value: UInt64 = 0
+                for byte in data {
+                    value = (value << 8) | UInt64(byte)
+                }
+                return String(value)
+            } else {
+                // For longer data, return space-separated decimal bytes
+                return data.map { String($0) }.joined(separator: " ")
+            }
+        case .ascii:
+            return data.printableASCII.isEmpty ? data.hexString : data.printableASCII
+        case .hex:
+            return data.hexString
+        }
+    }
+}
+
+enum BLEDataFormat: String, AppEnum {
+    case decimal = "Decimal"
+    case ascii = "ASCII"
+    case hex = "Hex"
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Output Format"
+
+    static var caseDisplayRepresentations: [BLEDataFormat: DisplayRepresentation] = [
+        .decimal: "Decimal (e.g., 85 for battery level)",
+        .ascii: "ASCII (e.g., ABC123 for text data)",
+        .hex: "Hex (e.g., 55 for battery level)"
+    ]
 }

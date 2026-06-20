@@ -12,12 +12,27 @@ struct BLEPreset: Codable, Identifiable {
     }
 }
 
+struct BLEReadPreset: Codable, Identifiable {
+    var id: UUID
+    var label: String
+    var serviceUUID: String
+    var characteristicUUID: String
+
+    init(id: UUID = UUID(), label: String, serviceUUID: String, characteristicUUID: String) {
+        self.id = id
+        self.label = label
+        self.serviceUUID = serviceUUID
+        self.characteristicUUID = characteristicUUID
+    }
+}
+
 struct SavedBLEDevice: Codable, Identifiable {
     var id: UUID               // CBPeripheral.identifier
     var name: String
     var writeTargetUUID: String
     var vibrationPresets: [BLEPreset]
     var notificationPresets: [BLEPreset]
+    var readPresets: [BLEReadPreset]
 }
 
 final class BLEDeviceStore: ObservableObject {
@@ -45,6 +60,15 @@ final class BLEDeviceStore: ObservableObject {
             "df0019fd02012200141111111111111111111111",
             "110000000000000000",
         ]),
+    ]
+
+    // Battery service UUID (standard BLE Battery Service)
+    static let batteryServiceUUID = "180F"
+    // Battery level characteristic UUID
+    static let batteryLevelCharUUID = "2A19"
+
+    static let defaultReadPresets: [BLEReadPreset] = [
+        BLEReadPreset(label: "Battery Level", serviceUUID: batteryServiceUUID, characteristicUUID: batteryLevelCharUUID),
     ]
 
     private init() {

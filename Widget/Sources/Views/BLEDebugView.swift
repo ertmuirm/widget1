@@ -7,6 +7,7 @@ struct BLEDebugView: View {
 
     @State private var vibrationPresets     = BLEDeviceStore.defaultVibrationPresets
     @State private var notificationPresets  = BLEDeviceStore.defaultNotificationPresets
+    @State private var readPresets         = BLEDeviceStore.defaultReadPresets
 
     @State private var hexInput         = ""
     @State private var showExportSheet  = false
@@ -29,8 +30,8 @@ struct BLEDebugView: View {
                 writeTargetSection
                 watchStateSection
                 senderSection
-                presetSection(title: "Vibration",    presets: $vibrationPresets,    color: .orange)
-                presetSection(title: "Notification",  presets: $notificationPresets, color: .green)
+                writePresetsSection
+                readPresetsSection
                 saveDeviceSection
                 streamSection
                 servicesSection
@@ -52,9 +53,11 @@ struct BLEDebugView: View {
             if let saved = store.device(withID: p.identifier) {
                 vibrationPresets    = saved.vibrationPresets
                 notificationPresets = saved.notificationPresets
+                readPresets         = saved.readPresets.isEmpty ? BLEDeviceStore.defaultReadPresets : saved.readPresets
             } else {
                 vibrationPresets    = BLEDeviceStore.defaultVibrationPresets
                 notificationPresets = BLEDeviceStore.defaultNotificationPresets
+                readPresets         = BLEDeviceStore.defaultReadPresets
             }
         }
     }
@@ -127,7 +130,7 @@ struct BLEDebugView: View {
                             HStack(spacing: 8) {
                                 Text("TX: \(String(device.writeTargetUUID.prefix(8)))…")
                                     .font(.caption2.monospaced()).foregroundStyle(.secondary)
-                                Text("\(device.vibrationPresets.count + device.notificationPresets.count) presets")
+                                Text("\(device.vibrationPresets.count + device.notificationPresets.count) write · \(device.readPresets.count) read")
                                     .font(.caption2).foregroundStyle(.secondary)
                             }
                         }
@@ -145,7 +148,7 @@ struct BLEDebugView: View {
         } header: {
             Text("Saved Devices")
         } footer: {
-            Text("Saved devices retain their write target and preset commands for use in the Shortcuts app.")
+            Text("Saved devices retain their write target, read presets, and commands for use in the Shortcuts app.")
                 .font(.caption)
         }
     }
@@ -165,7 +168,7 @@ struct BLEDebugView: View {
         } header: {
             Text("Shortcuts Settings")
         } footer: {
-            Text("Maximum time the Send Watch Command action will wait across all phases — connecting, scanning, and service discovery. Set to Off to skip scanning and only send if the watch is already cached by iOS.")
+            Text("Maximum time the \"Send BLE Command\" and \"Read BLE Data\" actions will wait across all phases — connecting, scanning, and service discovery. Set to Off to skip scanning and only send/read if the device is already cached by iOS.")
                 .font(.caption)
         }
     }
@@ -339,30 +342,80 @@ struct BLEDebugView: View {
         }
     }
 
-    // MARK: - Editable Preset Sections
+    // MARK: - Write Presets Section
 
     @ViewBuilder
-    private func presetSection(title: String, presets: Binding<[BLEPreset]>, color: Color) -> some View {
+    private var writePresetsSection: some View {
         Section {
-            ForEach(presets) { $preset in
+            ForEach($vibrationPresets) { $preset in
                 PresetRow(
                     preset: $preset,
-                    accentColor: color,
+                    accentColor: .orange,
                     onSend: {
                         if ble.isRecordingStream { ble.stopStreamRecording() }
                         ble.writeHexSequence(preset.hexSequence)
                         ble.startStreamRecording()
                     },
-                    onDelete: { presets.wrappedValue.removeAll { $0.id == preset.id } }
+                    onDelete: { vibrationPresets.removeAll { $0.id == preset.id } }
+                )
+                .disabled(ble.selectedWriteTarget == nil)
+            }
+            ForEach($notificationPresets) { $preset in
+                PresetRow(
+                    preset: $preset,
+                    accentColor: .green,
+                    onSend: {
+                        if ble.isRecordingStream { ble.stopStreamRecording() }
+                        ble.writeHexSequence(preset.hexSequence)
+                        ble.startStreamRecording()
+                    },
+                    onDelete: { notificationPresets.removeAll { $0.id == preset.id } }
                 )
                 .disabled(ble.selectedWriteTarget == nil)
             }
             Button {
-                presets.wrappedValue.append(BLEPreset(label: "New Command", hexSequence: [""]))
+                vibrationPresets.append(BLEPreset(label: "New Vibration", hexSequence: [""]))
             } label: {
-                Label("Add Preset", systemImage: "plus").font(.subheadline)
+                Label("Add Vibration Preset", systemImage: "plus").font(.subheadline)
             }
-        } header: { Text(title) }
+            Button {
+                notificationPresets.append(BLEPreset(label: "New Notification", hexSequence: [""]))
+            } label: {
+                Label("Add Notification Preset", systemImage: "plus").font(.subheadline)
+            }
+        } header: {
+            Text("Write Presets")
+        } footer: {
+            Text("Presets for sending commands to the BLE device. Used by the \"Send BLE Command\" Shortcuts action.")
+        }
+    }
+
+    // MARK: - Read Presets Section
+
+    @ViewBuilder
+    private var readPresetsSection: some View {
+        Section {
+            ForEach($readPresets) { $preset in
+                ReadPresetRow(
+                    preset: $preset,
+                    onRead: {
+                        Task {
+                            await ble.readCharacteristic(serviceUUID: preset.serviceUUID, charUUID: preset.characteristicUUID)
+                        }
+                    },
+                    onDelete: { readPresets.removeAll { $0.id == preset.id } }
+                )
+            }
+            Button {
+                readPresets.append(BLEReadPreset(label: "New Read", serviceUUID: "", characteristicUUID: ""))
+            } label: {
+                Label("Add Read Preset", systemImage: "plus").font(.subheadline)
+            }
+        } header: {
+            Text("Read Presets")
+        } footer: {
+            Text("Presets for reading values from the BLE device. Used by the \"Read BLE Data\" Shortcuts action.")
+        }
     }
 
     // MARK: - Save Device
@@ -375,8 +428,10 @@ struct BLEDebugView: View {
                     Text(String(target.uuid.prefix(18)) + "…")
                         .font(.caption.monospaced()).foregroundStyle(.secondary)
                 }
-                LabeledContent("Presets",
+                LabeledContent("Write Presets",
                     value: "\(vibrationPresets.count) vibration · \(notificationPresets.count) notification")
+                LabeledContent("Read Presets",
+                    value: "\(readPresets.count)")
 
                 Button {
                     let device = SavedBLEDevice(
@@ -384,7 +439,8 @@ struct BLEDebugView: View {
                         name: p.name ?? "Unknown",
                         writeTargetUUID: target.uuid,
                         vibrationPresets: vibrationPresets,
-                        notificationPresets: notificationPresets
+                        notificationPresets: notificationPresets,
+                        readPresets: readPresets
                     )
                     store.upsert(device)
                     withAnimation { savedToast = true }
@@ -408,7 +464,7 @@ struct BLEDebugView: View {
             }
         } header: { Text("Save to Shortcuts") }
         footer: {
-        Text("After saving, find \u{201C}Send Watch Command\u{201D} in the Shortcuts app under this app\u{2019}s actions.")
+            Text("After saving, find \u{201C}Send BLE Command\u{201D} and \u{201C}Read BLE Data\u{201D} in the Shortcuts app under this app\u{2019}s actions.")
                 .font(.caption)
         }
     }
@@ -612,6 +668,90 @@ private struct PresetRow: View {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
         if !lines.isEmpty { preset.hexSequence = lines }
+        isEditing = false
+    }
+}
+
+// MARK: - Read Preset Row (inline-editable)
+
+private struct ReadPresetRow: View {
+    @Binding var preset: BLEReadPreset
+    let onRead: () -> Void
+    let onDelete: () -> Void
+
+    @State private var isEditing  = false
+    @State private var editLabel  = ""
+    @State private var editService = ""
+    @State private var editChar   = ""
+
+    var body: some View {
+        if isEditing {
+            VStack(alignment: .leading, spacing: 8) {
+                TextField("Label", text: $editLabel)
+                    .font(.body)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Service UUID").font(.caption).foregroundStyle(.secondary)
+                    TextField("e.g., 180F", text: $editService)
+                        .font(.system(.body, design: .monospaced))
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Characteristic UUID").font(.caption).foregroundStyle(.secondary)
+                    TextField("e.g., 2A19", text: $editChar)
+                        .font(.system(.body, design: .monospaced))
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                }
+
+                HStack(spacing: 12) {
+                    Button("Done") { commitEdit() }
+                        .buttonStyle(.borderedProminent).font(.caption)
+                    Button("Cancel", role: .cancel) { isEditing = false }
+                        .font(.caption)
+                    Spacer()
+                    Button(role: .destructive) { onDelete() } label: {
+                        Image(systemName: "trash")
+                    }
+                    .font(.caption).foregroundStyle(.red)
+                }
+            }
+            .padding(.vertical, 4)
+            .onAppear {
+                editLabel   = preset.label
+                editService = preset.serviceUUID
+                editChar    = preset.characteristicUUID
+            }
+        } else {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(preset.label).foregroundStyle(.white)
+                    if !preset.serviceUUID.isEmpty {
+                        Text("SVC: \(preset.serviceUUID)").font(.caption.monospaced()).foregroundStyle(.secondary)
+                    }
+                    Text("CHAR: \(preset.characteristicUUID)").font(.caption.monospaced()).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button { onRead() } label: {
+                    Image(systemName: "arrow.down.circle.fill").foregroundStyle(.blue)
+                }
+                .buttonStyle(.plain)
+
+                Button { isEditing = true } label: {
+                    Image(systemName: "pencil").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func commitEdit() {
+        let trimmed = editLabel.trimmingCharacters(in: .whitespaces)
+        if !trimmed.isEmpty { preset.label = trimmed }
+        preset.serviceUUID = editService.trimmingCharacters(in: .whitespaces).uppercased()
+        preset.characteristicUUID = editChar.trimmingCharacters(in: .whitespaces).uppercased()
         isEditing = false
     }
 }
