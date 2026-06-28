@@ -264,9 +264,10 @@ enum BLEDataFormat: String, AppEnum {
 
 /// Reads the battery level from a paired BLE device using the Battery Service (180F/2A19).
 /// This uses the Cloud Battery approach to bypass iOS GATT service hiding for system accessories.
+/// Also supports HeyCyan smart glasses via their vendor SDK.
 struct ReadBLEBatteryIntent: AppIntent {
     static var title: LocalizedStringResource = "Read BLE Battery"
-    static var description = IntentDescription("Reads the battery level from a paired BLE device. Works with system accessories that iOS normally hides from third-party apps.")
+    static var description = IntentDescription("Reads the battery level from a paired BLE device. Works with system accessories that iOS normally hides from third-party apps. Supports HeyCyan smart glasses via SDK.")
     static var openAppWhenRun: Bool = false
 
     @Parameter(title: "Device", description: "The saved BLE device to read battery from")
@@ -282,6 +283,19 @@ struct ReadBLEBatteryIntent: AppIntent {
             return .result(value: 0, dialog: IntentDialog(stringLiteral: "Device \(device.name) not found. Open the app and save the device first."))
         }
 
+        // Try HeyCyan SDK first (for smart glasses)
+        if device.name.lowercased().contains("heycyan") || 
+           device.name.lowercased().contains("glasses") ||
+           device.name.lowercased().contains("eyewear") {
+            if let level = try? await HeyCyanService.shared.readBatteryLevel() {
+                return .result(
+                    value: level,
+                    dialog: IntentDialog(stringLiteral: "\(device.name) battery: \(level)% (HeyCyan SDK)")
+                )
+            }
+        }
+
+        // Try standard BLE battery read
         do {
             let batteryLevel = try await BLEManager.shared.readBatteryLevel(for: savedDevice.id)
             return .result(

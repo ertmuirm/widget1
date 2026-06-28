@@ -78,6 +78,18 @@ final class BLEReadExecutor: NSObject {
         CBUUID(string: "8667556C-9A37-4C91-84ED-54EE27D90049"),  // Apple Audio
     ]
 
+    /// Known service UUIDs for general device discovery
+    private let knownServiceUUIDs: [CBUUID] = [
+        CBUUID(string: "FFF0"),
+        CBUUID(string: "FFE0"),
+        CBUUID(string: "180D"),  // Heart Rate
+        CBUUID(string: "180A"),  // Device Information
+        CBUUID(string: "1800"),  // Generic Access
+        CBUUID(string: "1801"),  // Generic Attribute
+        CBUUID(string: "180F"),  // Battery Service
+        CBUUID(string: "6E400001-B5A3-F393-E0A9-E50E24DCCA9F"),  // Nordic UART
+    ]
+
     func execute(peripheralID: UUID, serviceUUID: String, characteristicUUID: String,
                  timeout: TimeInterval = 10) async throws -> Data {
         targetPeripheralID = peripheralID
