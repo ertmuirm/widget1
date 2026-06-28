@@ -249,6 +249,24 @@ final class BLEManager: NSObject, ObservableObject {
         let knownPeripherals = central.retrieveConnectedPeripherals(withServices: knownServiceUUIDs)
         log("retrieveConnectedPeripherals (known services): \(knownPeripherals.count) peripheral(s)")
 
+        // Also try retrieving from saved device identifiers - these might be cached
+        // even if not returned by retrieveConnectedPeripherals
+        var cachedConnectedPeripherals: [CBPeripheral] = []
+        let savedIDs = (UserDefaults.standard.stringArray(forKey: storedIdentifiersKey) ?? [])
+            .compactMap { UUID(uuidString: $0) }
+        if !savedIDs.isEmpty {
+            let cachedPeripherals = central.retrievePeripherals(withIdentifiers: savedIDs)
+            log("retrievePeripherals (cached): \(cachedPeripherals.count) peripheral(s)")
+            
+            // Check which cached peripherals are actually connected
+            for p in cachedPeripherals {
+                if p.state == .connected {
+                    cachedConnectedPeripherals.append(p)
+                    log("  Cached & connected: \(p.name ?? "Unknown") (\(p.identifier))", category: .conn)
+                }
+            }
+        }
+
         // Combine and deduplicate
         var seen = Set<UUID>()
         var all: [BLEDeviceInfo] = []
@@ -259,6 +277,16 @@ final class BLEManager: NSObject, ObservableObject {
                 let info = makeDeviceInfo(p, source: .systemConnected)
                 all.append(info)
                 log("  System-connected: \(info.name) (\(info.id))", category: .conn)
+            }
+        }
+
+        // Add cached peripherals that are currently connected but not in retrieveConnectedPeripherals
+        for p in cachedConnectedPeripherals {
+            if !seen.contains(p.identifier) {
+                seen.insert(p.identifier)
+                let info = makeDeviceInfo(p, source: .systemConnected)
+                all.append(info)
+                log("  Cached & connected: \(info.name) (\(info.id))", category: .conn)
             }
         }
 

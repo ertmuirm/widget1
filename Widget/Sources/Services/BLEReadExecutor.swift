@@ -142,25 +142,27 @@ final class BLEReadExecutor: NSObject {
 
     // MARK: - Cloud Battery: Try to find peripheral from system-connected devices
     private func findSystemConnectedPeripheral(_ central: CBCentralManager) -> CBPeripheral? {
-        // First, try to retrieve by identifier - this works for cached/devices seen before
+        // Step 1: Try retrievePeripherals first - this works for ANY device we've seen before,
+        // including cached devices that iOS has stored from previous connections.
+        // This is the KEY fix for headphones that Apple Cloud Battery can see!
         let retrieved = central.retrievePeripherals(withIdentifiers: [targetPeripheralID!])
         if let found = retrieved.first {
             return found
         }
 
-        // Try with Battery Service specifically
+        // Step 2: Try with Battery Service specifically
         let batteryConnected = central.retrieveConnectedPeripherals(withServices: [CBUUID(string: "180F")])
         if let found = batteryConnected.first(where: { $0.identifier == targetPeripheralID }) {
             return found
         }
 
-        // Try extended service UUIDs
+        // Step 3: Try extended service UUIDs
         let extendedConnected = central.retrieveConnectedPeripherals(withServices: extendedServiceUUIDs)
         if let found = extendedConnected.first(where: { $0.identifier == targetPeripheralID }) {
             return found
         }
 
-        // Finally, try known service UUIDs
+        // Step 4: Finally, try known service UUIDs
         let knownConnected = central.retrieveConnectedPeripherals(withServices: knownServiceUUIDs)
         if let found = knownConnected.first(where: { $0.identifier == targetPeripheralID }) {
             return found

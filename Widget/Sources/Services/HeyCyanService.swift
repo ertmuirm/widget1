@@ -1,20 +1,27 @@
 import Foundation
 import CoreBluetooth
 
-/// HeyCyan Smart Glasses SDK Service
+/// HeyCyan Smart Glasses BLE Service
 /// 
-/// This service integrates with the HeyCyan (eBowwa) SDK to read battery level
-/// from smart glasses devices via their vendor-specific BLE profile.
-///
-/// SDK Integration:
-/// - Core Manager: QCSDKManager.shared or HeyCyanSDKManager
-/// - Delegate Protocol: QCSDKManagerDelegate / HeyCyanSDKManagerDelegate
-/// - Battery Level: deviceBatteryLevel (Int 0-100)
-/// - Charging State: isCharging (Bool)
-/// - Delegate Method: didUpdateDeviceStatus / didUpdateBatteryLevel
+/// This service handles battery reading from HeyCyan smart glasses via their
+/// vendor-specific BLE profile. Based on the ebowwa/HeyCyanSmartGlassesSDK:
+/// 
+/// Service UUID: 7905FFF0-B5CE-4E99-A40F-4B1E122D00D0
+/// Characteristic UUID: 6e40fff0-b5a3-f393-e0a9-e50e24dcca9e
+/// 
+/// The SDK documentation shows these are the primary BLE identifiers.
+/// Battery level can be read using the QCSDKCmdCreator.getDeviceBattery() command.
 final class HeyCyanService: NSObject, ObservableObject {
 
     static let shared = HeyCyanService()
+
+    // MARK: - HeyCyan BLE UUIDs
+    static let heyCyanServiceUUID = CBUUID(string: "7905FFF0-B5CE-4E99-A40F-4B1E122D00D0")
+    static let heyCyanCharacteristicUUID = CBUUID(string: "6e40fff0-b5a3-f393-e0a9-e50e24dcca9e")
+    
+    // Alternative UUIDs from SDK documentation
+    static let heyCyanAltServiceUUID = CBUUID(string: "FFF0")
+    static let heyCyanAltCharacteristicUUID = CBUUID(string: "FFF1")
 
     // MARK: - Published State
     @Published private(set) var isConnected = false
@@ -24,189 +31,235 @@ final class HeyCyanService: NSObject, ObservableObject {
     @Published private(set) var deviceIdentifier: UUID?
 
     // MARK: - Private State
-    private var sdkManager: AnyObject?
-    private var delegateProxy: HeyCyanDelegateProxy?
+    private var centralManager: CBCentralManager?
+    private var connectedPeripheral: CBPeripheral?
+    private var batteryCharacteristic: CBCharacteristic?
     private var pendingReadContinuations: [CheckedContinuation<Int, Error>] = []
     private let queue = DispatchQueue(label: "com.ioswidget.heycyan.service", qos: .userInitiated)
-
-    // SDK delegate proxy to receive callbacks
-    private class HeyCyanDelegateProxy: NSObject {
-        weak var service: HeyCyanService?
-        
-        init(service: HeyCyanService) {
-            self.service = service
-            super.init()
-        }
-
-        // MARK: - Battery Level Updates
-        func didUpdateBatteryLevel(_ level: Int) {
-            DispatchQueue.main.async { [weak self] in
-                self?.service?.handleBatteryUpdate(level: level)
-            }
-        }
-
-        func didUpdateDeviceStatus(batteryLevel: Int, isCharging: Bool) {
-            DispatchQueue.main.async { [weak self] in
-                self?.service?.handleDeviceStatusUpdate(batteryLevel: batteryLevel, isCharging: isCharging)
-            }
-        }
-
-        // MARK: - Connection State
-        func didConnect(deviceName: String?, identifier: UUID) {
-            DispatchQueue.main.async { [weak self] in
-                self?.service?.handleConnection(deviceName: deviceName, identifier: identifier)
-            }
-        }
-
-        func didDisconnect() {
-            DispatchQueue.main.async { [weak self] in
-                self?.service?.handleDisconnection()
-            }
-        }
-    }
 
     // MARK: - Initialization
 
     private override init() {
         super.init()
-        delegateProxy = HeyCyanDelegateProxy(service: self)
-        initializeSDK()
-    }
-
-    private func initializeSDK() {
-        // Initialize the HeyCyan SDK
-        // Replace with actual SDK initialization based on framework version
-        
-        /*
-        // Option 1: Using QCSDKManager (if available)
-        if let manager = QCSDKManager.shared as? QCSDKManager {
-            manager.addDelegate(delegateProxy)
-            manager.startScanning()
-            sdkManager = manager
-        }
-        // Option 2: Using HeyCyanSDKManager (if available)
-        else if let manager = HeyCyanSDKManager.shared as? HeyCyanSDKManager {
-            manager.delegate = delegateProxy
-            manager.startScan()
-            sdkManager = manager
-        }
-        */
-        
-        // For now, log initialization
-        print("[HeyCyanService] SDK initialized")
+        centralManager = CBCentralManager(delegate: self, queue: queue)
     }
 
     // MARK: - Public API
 
-    /// Check if a device identifier matches a HeyCyan device
-    func isHeyCyanDevice(identifier: UUID) -> Bool {
-        guard let deviceID = deviceIdentifier else { return false }
-        return deviceID == identifier
+    /// Check if a device identifier matches a HeyCyan device by scanning for it
+    func isHeyCyanDevice(identifier: UUID) async -> Bool {
+        guard centralManager?.state == .poweredOn else { return false }
+        
+        return await withCheckedContinuation { continuation in
+            // Try to retrieve the peripheral
+            let peripherals = centralManager?.retrievePeripherals(withIdentifiers: [identifier]) ?? []
+            if let peripheral = peripherals.first {
+                // Check if it matches HeyCyan service UUIDs
+                let name = peripheral.name?.lowercased() ?? ""
+                if name.contains("heycyan") || name.contains("glasses") || name.contains("js-01") {
+                    continuation.resume(returning: true)
+                    return
+                }
+            }
+            continuation.resume(returning: false)
+        }
     }
 
-    /// Read battery level from HeyCyan device
-    /// Returns cached value immediately if available, otherwise waits for SDK update
-    func readBatteryLevel() async throws -> Int {
-        // If we have a current value, return it
-        if let level = batteryLevel {
-            return level
+    /// Connect to HeyCyan device and read battery level
+    func readBatteryLevel(for peripheralID: UUID) async throws -> Int {
+        guard centralManager?.state == .poweredOn else {
+            throw HeyCyanError.bluetoothUnavailable
         }
 
-        // If not connected, throw error
-        guard isConnected else {
+        // First try to find in cache
+        let cachedPeripherals = centralManager?.retrievePeripherals(withIdentifiers: [peripheralID]) ?? []
+        if let peripheral = cachedPeripherals.first {
+            return try await connectAndReadBattery(peripheral)
+        }
+
+        // Try system-connected
+        let systemConnected = centralManager?.retrieveConnectedPeripherals(withServices: [
+            Self.heyCyanServiceUUID,
+            Self.heyCyanAltServiceUUID
+        ]) ?? []
+        
+        if let peripheral = systemConnected.first(where: { $0.identifier == peripheralID }) {
+            return try await connectAndReadBattery(peripheral)
+        }
+
+        // Not found
+        throw HeyCyanError.deviceNotFound
+    }
+
+    /// Read battery from cached HeyCyan device
+    func readBatteryLevel() async throws -> Int {
+        guard let peripheralID = deviceIdentifier else {
             throw HeyCyanError.deviceNotConnected
         }
+        return try await readBatteryLevel(for: peripheralID)
+    }
 
-        // Wait for next battery update
+    // MARK: - Private Methods
+
+    private func connectAndReadBattery(_ peripheral: CBPeripheral) async throws -> Int {
         return try await withCheckedThrowingContinuation { continuation in
             queue.async { [weak self] in
-                self?.pendingReadContinuations.append(continuation)
-            }
-            
-            // Timeout after 10 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
-                self?.queue.async {
-                    if let idx = self?.pendingReadContinuations.firstIndex(where: { _ in true }) {
-                        self?.pendingReadContinuations[idx].resume(throwing: HeyCyanError.timeout)
-                        self?.pendingReadContinuations.remove(at: idx)
-                    }
+                guard let self = self else {
+                    continuation.resume(throwing: HeyCyanError.unknownDevice)
+                    return
+                }
+
+                self.connectedPeripheral = peripheral
+                self.pendingReadContinuations.append(CheckContinuationWrapper(continuation))
+                peripheral.delegate = self
+                
+                if peripheral.state == .connected {
+                    peripheral.discoverServices([Self.heyCyanServiceUUID, Self.heyCyanAltServiceUUID])
+                } else {
+                    self.centralManager?.connect(peripheral, options: nil)
                 }
             }
             
-            // Request fresh battery reading from SDK
-            self.requestBatteryUpdate()
-        }
-    }
-
-    /// Start scanning for HeyCyan devices
-    func startScanning() {
-        /*
-        if let manager = sdkManager as? QCSDKManager {
-            manager.startScanning()
-        } else if let manager = sdkManager as? HeyCyanSDKManager {
-            manager.startScan()
-        }
-        */
-    }
-
-    /// Stop scanning for HeyCyan devices
-    func stopScanning() {
-        /*
-        if let manager = sdkManager as? QCSDKManager {
-            manager.stopScanning()
-        } else if let manager = sdkManager as? HeyCyanSDKManager {
-            manager.stopScan()
-        }
-        */
-    }
-
-    // MARK: - Private Handlers
-
-    private func handleBatteryUpdate(level: Int) {
-        batteryLevel = level
-        
-        // Resume any pending reads
-        queue.async { [weak self] in
-            guard let self = self else { return }
-            while !self.pendingReadContinuations.isEmpty {
-                let continuation = self.pendingReadContinuations.removeFirst()
-                continuation.resume(returning: level)
+            // Timeout
+            DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
+                self?.queue.async {
+                    if let wrapper = self?.pendingReadContinuations.first as? CheckContinuationWrapper {
+                        self?.pendingReadContinuations.removeAll { ($0 as? CheckContinuationWrapper) === wrapper }
+                        wrapper.continuation.resume(throwing: HeyCyanError.timeout)
+                    }
+                }
             }
         }
     }
 
-    private func handleDeviceStatusUpdate(batteryLevel: Int, isCharging: Bool) {
-        self.batteryLevel = batteryLevel
-        self.isCharging = isCharging
+    private func handleBatteryValue(_ data: Data) {
+        // HeyCyan battery response parsing
+        // Based on SDK: battery level is typically at a specific byte offset
+        // Try to parse as single byte first (0-100 range)
+        if data.count >= 1 {
+            let level = Int(data[0])
+            if level <= 100 {
+                batteryLevel = level
+                resumePendingReads(with: level)
+                return
+            }
+        }
         
-        // Resume any pending reads
-        queue.async { [weak self] in
-            guard let self = self else { return }
-            while !self.pendingReadContinuations.isEmpty {
-                let continuation = self.pendingReadContinuations.removeFirst()
-                continuation.resume(returning: batteryLevel)
+        // Try little-endian uint16
+        if data.count >= 2 {
+            let level = Int(data[0]) | (Int(data[1]) << 8)
+            if level <= 100 {
+                batteryLevel = level
+                resumePendingReads(with: level)
+                return
             }
         }
     }
 
-    private func handleConnection(deviceName: String?, identifier: UUID) {
-        isConnected = true
-        self.deviceName = deviceName
-        self.deviceIdentifier = identifier
-    }
-
-    private func handleDisconnection() {
-        isConnected = false
-    }
-
-    private func requestBatteryUpdate() {
-        /*
-        if let manager = sdkManager as? QCSDKManager {
-            manager.requestBatteryLevel()
-        } else if let manager = sdkManager as? HeyCyanSDKManager {
-            manager.fetchBatteryLevel()
+    private func resumePendingReads(with level: Int) {
+        while !pendingReadContinuations.isEmpty {
+            let wrapper = pendingReadContinuations.removeFirst() as? CheckContinuationWrapper
+            wrapper?.continuation.resume(returning: level)
         }
-        */
+    }
+
+    private func resumePendingReads(with error: Error) {
+        while !pendingReadContinuations.isEmpty {
+            let wrapper = pendingReadContinuations.removeFirst() as? CheckContinuationWrapper
+            wrapper?.continuation.resume(throwing: error)
+        }
+    }
+}
+
+// MARK: - Helper type for continuation storage
+
+private class CheckContinuationWrapper {
+    let continuation: CheckedContinuation<Int, Error>
+    init(_ continuation: CheckedContinuation<Int, Error>) {
+        self.continuation = continuation
+    }
+}
+
+// MARK: - CBCentralManagerDelegate
+
+extension HeyCyanService: CBCentralManagerDelegate {
+    func centralManagerDidUpdateState(_ central: CBCentralManager) {
+        // State updated
+    }
+
+    func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        DispatchQueue.main.async { [weak self] in
+            self?.isConnected = true
+            self?.deviceName = peripheral.name
+            self?.deviceIdentifier = peripheral.identifier
+        }
+        peripheral.discoverServices([Self.heyCyanServiceUUID, Self.heyCyanAltServiceUUID])
+    }
+
+    func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
+        resumePendingReads(with: HeyCyanError.connectionFailed(error?.localizedDescription ?? "unknown"))
+    }
+
+    func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        DispatchQueue.main.async { [weak self] in
+            self?.isConnected = false
+        }
+        if error != nil {
+            resumePendingReads(with: HeyCyanError.connectionFailed("Disconnected"))
+        }
+    }
+}
+
+// MARK: - CBPeripheralDelegate
+
+extension HeyCyanService: CBPeripheralDelegate {
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
+        guard error == nil, let services = peripheral.services else {
+            resumePendingReads(with: HeyCyanError.sdkNotAvailable)
+            return
+        }
+
+        for service in services {
+            if service.uuid == Self.heyCyanServiceUUID || service.uuid == Self.heyCyanAltServiceUUID {
+                peripheral.discoverCharacteristics(nil, for: service)
+                return
+            }
+        }
+        
+        // Service not found, try discovering all characteristics
+        for service in services {
+            peripheral.discoverCharacteristics(nil, for: service)
+        }
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
+        guard error == nil, let characteristics = service.characteristics else { return }
+
+        for char in characteristics {
+            // Check if this is a readable characteristic
+            if char.properties.contains(.read) {
+                batteryCharacteristic = char
+                peripheral.readValue(for: char)
+                return
+            }
+            
+            // Check for notify characteristic
+            if char.properties.contains(.notify) {
+                batteryCharacteristic = char
+                peripheral.setNotifyValue(true, for: char)
+            }
+        }
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+        guard error == nil, let data = characteristic.value else { return }
+        handleBatteryValue(data)
+    }
+
+    func peripheral(_ peripheral: CBPeripheral, didUpdateNotificationStateFor characteristic: CBCharacteristic, error: Error?) {
+        if characteristic.isNotifying {
+            peripheral.readValue(for: characteristic)
+        }
     }
 }
 
@@ -214,14 +267,20 @@ final class HeyCyanService: NSObject, ObservableObject {
 
 enum HeyCyanError: LocalizedError {
     case deviceNotConnected
+    case bluetoothUnavailable
+    case deviceNotFound
     case sdkNotAvailable
+    case connectionFailed(String)
     case timeout
     case unknownDevice
 
     var errorDescription: String? {
         switch self {
         case .deviceNotConnected: return "HeyCyan device not connected"
-        case .sdkNotAvailable: return "HeyCyan SDK not available"
+        case .bluetoothUnavailable: return "Bluetooth is not available"
+        case .deviceNotFound: return "HeyCyan device not found"
+        case .sdkNotAvailable: return "HeyCyan service not found on device"
+        case .connectionFailed(let m): return "Connection failed: \(m)"
         case .timeout: return "Battery read timed out"
         case .unknownDevice: return "Device not recognized as HeyCyan"
         }
