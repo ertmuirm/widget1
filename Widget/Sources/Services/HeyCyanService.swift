@@ -34,7 +34,7 @@ final class HeyCyanService: NSObject, ObservableObject {
     private var centralManager: CBCentralManager?
     private var connectedPeripheral: CBPeripheral?
     private var batteryCharacteristic: CBCharacteristic?
-    private var pendingReadContinuations: [CheckedContinuation<Int, Error>] = []
+    private var pendingReadContinuations: [CheckContinuationWrapper] = []
     private let queue = DispatchQueue(label: "com.ioswidget.heycyan.service", qos: .userInitiated)
 
     // MARK: - Initialization
@@ -123,8 +123,8 @@ final class HeyCyanService: NSObject, ObservableObject {
             // Timeout
             DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in
                 self?.queue.async {
-                    if let wrapper = self?.pendingReadContinuations.first as? CheckContinuationWrapper {
-                        self?.pendingReadContinuations.removeAll { ($0 as? CheckContinuationWrapper) === wrapper }
+                    if let wrapper = self?.pendingReadContinuations.first {
+                        self?.pendingReadContinuations.removeAll { $0 === wrapper }
                         wrapper.continuation.resume(throwing: HeyCyanError.timeout)
                     }
                 }
