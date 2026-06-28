@@ -130,7 +130,13 @@ final class BLEReadExecutor: NSObject {
 
     // MARK: - Cloud Battery: Try to find peripheral from system-connected devices
     private func findSystemConnectedPeripheral(_ central: CBCentralManager) -> CBPeripheral? {
-        // Try Battery Service first (most common for Cloud Battery)
+        // First, try to retrieve by identifier - this works for cached/devices seen before
+        let retrieved = central.retrievePeripherals(withIdentifiers: [targetPeripheralID!])
+        if let found = retrieved.first {
+            return found
+        }
+
+        // Try with Battery Service specifically
         let batteryConnected = central.retrieveConnectedPeripherals(withServices: [CBUUID(string: "180F")])
         if let found = batteryConnected.first(where: { $0.identifier == targetPeripheralID }) {
             return found
@@ -139,6 +145,12 @@ final class BLEReadExecutor: NSObject {
         // Try extended service UUIDs
         let extendedConnected = central.retrieveConnectedPeripherals(withServices: extendedServiceUUIDs)
         if let found = extendedConnected.first(where: { $0.identifier == targetPeripheralID }) {
+            return found
+        }
+
+        // Finally, try known service UUIDs
+        let knownConnected = central.retrieveConnectedPeripherals(withServices: knownServiceUUIDs)
+        if let found = knownConnected.first(where: { $0.identifier == targetPeripheralID }) {
             return found
         }
 
@@ -203,7 +215,9 @@ extension BLEReadExecutor: CBCentralManagerDelegate {
             return
         }
 
-        // Step 2: Try retrieve by identifier (cached from prior sessions)
+        // Step 2: Try retrieve by identifier (cached from prior sessions or previously seen devices)
+        // This is crucial - even if not "connected" via retrieveConnectedPeripherals,
+        // we may have seen this device before and can reconnect
         let retrieved = central.retrievePeripherals(withIdentifiers: [targetID])
         if let found = retrieved.first {
             found.delegate = self
