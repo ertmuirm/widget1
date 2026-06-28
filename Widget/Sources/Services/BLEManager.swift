@@ -230,10 +230,28 @@ final class BLEManager: NSObject, ObservableObject {
     }
 
     func refreshSystemConnected() {
-        let peripherals = central.retrieveConnectedPeripherals(withServices: knownServiceUUIDs)
-        log("retrieveConnectedPeripherals: \(peripherals.count) peripheral(s)")
-        systemConnectedDevices = peripherals.map { makeDeviceInfo($0, source: .systemConnected) }
-        for d in systemConnectedDevices { log("  System-connected: \(d.name) (\(d.id))") }
+        // First try with battery service (Cloud Battery approach)
+        let batteryPeripherals = central.retrieveConnectedPeripherals(withServices: [BLEManager.batteryServiceUUID])
+        log("retrieveConnectedPeripherals (Battery Service): \(batteryPeripherals.count) peripheral(s)")
+
+        // Also try with all known service UUIDs
+        let knownPeripherals = central.retrieveConnectedPeripherals(withServices: knownServiceUUIDs)
+        log("retrieveConnectedPeripherals (known services): \(knownPeripherals.count) peripheral(s)")
+
+        // Combine and deduplicate
+        var seen = Set<UUID>()
+        var all: [BLEDeviceInfo] = []
+
+        for p in batteryPeripherals + knownPeripherals {
+            if !seen.contains(p.identifier) {
+                seen.insert(p.identifier)
+                let info = makeDeviceInfo(p, source: .systemConnected)
+                all.append(info)
+                log("  System-connected: \(info.name) (\(info.id))", category: .conn)
+            }
+        }
+
+        systemConnectedDevices = all
     }
 
     private func storeConnectedIdentifier(_ uuid: UUID) {
@@ -257,9 +275,19 @@ final class BLEManager: NSObject, ObservableObject {
         fff1Found = false; watchStateHistory = []
         activePeripheral = device.peripheral
         activePeripheral?.delegate = self
-        connectionState = .connecting
-        central.connect(device.peripheral, options: nil)
-        log("Connecting to \(device.name) (\(device.id))…", category: .conn)
+
+        // Check if device is already connected by the system
+        if device.peripheral.state == .connected {
+            log("Device \(device.name) already connected by system, using existing connection", category: .conn)
+            connectionState = .connected
+            connectedPeripheral = device.peripheral
+            // Discover battery service to trigger service discovery
+            device.peripheral.discoverServices([BLEManager.batteryServiceUUID])
+        } else {
+            connectionState = .connecting
+            central.connect(device.peripheral, options: nil)
+            log("Connecting to \(device.name) (\(device.id))…", category: .conn)
+        }
     }
 
     func disconnect() {
@@ -267,6 +295,15 @@ final class BLEManager: NSObject, ObservableObject {
     }
 
     func connect(peripheralID: UUID) {
+        // First check system-connected peripherals (these are already connected by iOS)
+        let systemPeripherals = central.retrieveConnectedPeripherals(withServices: nil)
+        if let p = systemPeripherals.first(where: { $0.identifier == peripheralID }) {
+            log("Found peripheral in system-connected list, using existing connection", category: .conn)
+            connect(makeDeviceInfo(p, source: .systemConnected))
+            return
+        }
+
+        // Try retrieving from cache
         let peripherals = central.retrievePeripherals(withIdentifiers: [peripheralID])
         if let p = peripherals.first {
             connect(makeDeviceInfo(p, source: .retrieved))
