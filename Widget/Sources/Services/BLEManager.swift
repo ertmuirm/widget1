@@ -295,12 +295,17 @@ final class BLEManager: NSObject, ObservableObject {
     }
 
     func connect(peripheralID: UUID) {
-        // First check system-connected peripherals (these are already connected by iOS)
-        let systemPeripherals = central.retrieveConnectedPeripherals(withServices: nil)
-        if let p = systemPeripherals.first(where: { $0.identifier == peripheralID }) {
-            log("Found peripheral in system-connected list, using existing connection", category: .conn)
-            connect(makeDeviceInfo(p, source: .systemConnected))
-            return
+        // First check system-connected peripherals using all known service UUIDs
+        let batteryPeripherals = central.retrieveConnectedPeripherals(withServices: [BLEManager.batteryServiceUUID])
+        let knownPeripherals = central.retrieveConnectedPeripherals(withServices: knownServiceUUIDs)
+
+        // Combine and find matching peripheral
+        for p in batteryPeripherals + knownPeripherals {
+            if p.identifier == peripheralID {
+                log("Found peripheral in system-connected list, using existing connection", category: .conn)
+                connect(makeDeviceInfo(p, source: .systemConnected))
+                return
+            }
         }
 
         // Try retrieving from cache
