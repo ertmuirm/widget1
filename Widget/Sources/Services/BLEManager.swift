@@ -230,11 +230,22 @@ final class BLEManager: NSObject, ObservableObject {
     }
 
     func refreshSystemConnected() {
-        // First try with battery service (Cloud Battery approach)
-        let batteryPeripherals = central.retrieveConnectedPeripherals(withServices: [BLEManager.batteryServiceUUID])
+        // Try multiple service UUID sets for Cloud Battery approach
+        let batteryServiceUUIDs: [CBUUID] = [BLEManager.batteryServiceUUID]
+        let extendedServiceUUIDs: [CBUUID] = [
+            BLEManager.batteryServiceUUID,
+            CBUUID(string: "180A"),  // Device Information
+            CBUUID(string: "1800"),  // Generic Access
+            CBUUID(string: "180D"),  // Heart Rate
+            CBUUID(string: "1801"),  // Generic Attribute
+        ]
+
+        let batteryPeripherals = central.retrieveConnectedPeripherals(withServices: batteryServiceUUIDs)
         log("retrieveConnectedPeripherals (Battery Service): \(batteryPeripherals.count) peripheral(s)")
 
-        // Also try with all known service UUIDs
+        let extendedPeripherals = central.retrieveConnectedPeripherals(withServices: extendedServiceUUIDs)
+        log("retrieveConnectedPeripherals (extended services): \(extendedPeripherals.count) peripheral(s)")
+
         let knownPeripherals = central.retrieveConnectedPeripherals(withServices: knownServiceUUIDs)
         log("retrieveConnectedPeripherals (known services): \(knownPeripherals.count) peripheral(s)")
 
@@ -242,7 +253,7 @@ final class BLEManager: NSObject, ObservableObject {
         var seen = Set<UUID>()
         var all: [BLEDeviceInfo] = []
 
-        for p in batteryPeripherals + knownPeripherals {
+        for p in batteryPeripherals + extendedPeripherals + knownPeripherals {
             if !seen.contains(p.identifier) {
                 seen.insert(p.identifier)
                 let info = makeDeviceInfo(p, source: .systemConnected)
@@ -281,8 +292,8 @@ final class BLEManager: NSObject, ObservableObject {
             log("Device \(device.name) already connected by system, using existing connection", category: .conn)
             connectionState = .connected
             connectedPeripheral = device.peripheral
-            // Discover battery service to trigger service discovery
-            device.peripheral.discoverServices([BLEManager.batteryServiceUUID])
+            // Discover all services to show full capabilities
+            device.peripheral.discoverServices(nil)
         } else {
             connectionState = .connecting
             central.connect(device.peripheral, options: nil)
@@ -295,12 +306,30 @@ final class BLEManager: NSObject, ObservableObject {
     }
 
     func connect(peripheralID: UUID) {
-        // First check system-connected peripherals using all known service UUIDs
+        // First try retrieving from cache (for saved devices)
+        let cachedPeripherals = central.retrievePeripherals(withIdentifiers: [peripheralID])
+        if let p = cachedPeripherals.first {
+            log("Found peripheral in cache (saved device)", category: .conn)
+            connect(makeDeviceInfo(p, source: .retrieved))
+            return
+        }
+
+        // Extended service UUIDs for Cloud Battery approach
+        let extendedServiceUUIDs: [CBUUID] = [
+            BLEManager.batteryServiceUUID,
+            CBUUID(string: "180A"),
+            CBUUID(string: "1800"),
+            CBUUID(string: "180D"),
+            CBUUID(string: "1801"),
+        ]
+
+        // Check system-connected peripherals using extended service UUIDs
         let batteryPeripherals = central.retrieveConnectedPeripherals(withServices: [BLEManager.batteryServiceUUID])
+        let extendedPeripherals = central.retrieveConnectedPeripherals(withServices: extendedServiceUUIDs)
         let knownPeripherals = central.retrieveConnectedPeripherals(withServices: knownServiceUUIDs)
 
         // Combine and find matching peripheral
-        for p in batteryPeripherals + knownPeripherals {
+        for p in batteryPeripherals + extendedPeripherals + knownPeripherals {
             if p.identifier == peripheralID {
                 log("Found peripheral in system-connected list, using existing connection", category: .conn)
                 connect(makeDeviceInfo(p, source: .systemConnected))
@@ -308,14 +337,9 @@ final class BLEManager: NSObject, ObservableObject {
             }
         }
 
-        // Try retrieving from cache
-        let peripherals = central.retrievePeripherals(withIdentifiers: [peripheralID])
-        if let p = peripherals.first {
-            connect(makeDeviceInfo(p, source: .retrieved))
-        } else {
-            log("Peripheral \(peripheralID) not in cache — starting scan", category: .info)
-            startScan()
-        }
+        // Not found anywhere - start scan to try to find it
+        log("Peripheral \(peripheralID) not in cache or connected — starting scan", category: .info)
+        startScan()
     }
 
     // MARK: - Battery Service (Cloud Battery approach)
@@ -639,8 +663,8 @@ extension BLEManager: CBCentralManagerDelegate {
         connectionState = .connected; connectedPeripheral = peripheral
         storeConnectedIdentifier(peripheral.identifier)
         log("Connected to \(peripheral.name ?? peripheral.identifier.uuidString)", category: .conn)
-        // Only discover battery service to bypass iOS GATT hiding filter for paired devices
-        peripheral.discoverServices([BLEManager.batteryServiceUUID])
+        // Discover ALL services to show full device capabilities in debug view
+        peripheral.discoverServices(nil)
     }
 
     func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {

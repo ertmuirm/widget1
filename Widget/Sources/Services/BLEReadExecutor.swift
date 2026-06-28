@@ -47,11 +47,23 @@ final class BLEReadExecutor: NSObject {
     private var pendingServiceCount = 0
     private var discoveredServiceCount = 0
 
-    private let knownServiceUUIDs: [CBUUID] = [
+    /// Extended service UUIDs for Cloud Battery approach - includes many services
+    /// that might contain battery or other readable characteristics
+    private let extendedServiceUUIDs: [CBUUID] = [
+        // Standard BLE services
+        CBUUID(string: "180F"),  // Battery Service
+        CBUUID(string: "180A"),  // Device Information
+        CBUUID(string: "1800"),  // Generic Access
+        CBUUID(string: "1801"),  // Generic Attribute
+        CBUUID(string: "180D"),  // Heart Rate
+        // Common BLE device services
         CBUUID(string: "FFF0"),
         CBUUID(string: "FFE0"),
-        CBUUID(string: "6E400001-B5A3-F393-E0A9-E50E24DCCA9F"),
-        CBUUID(string: "180F"),  // Battery Service
+        CBUUID(string: "FFE1"),
+        CBUUID(string: "6E400001-B5A3-F393-E0A9-E50E24DCCA9F"),  // Nordic UART
+        // Apple-specific services (for AirPods, etc.)
+        CBUUID(string: "D0611E78-BBB4-4591-A5F8-487910AE4366"),  // Apple Continuity
+        CBUUID(string: "8667556C-9A37-4C91-84ED-54EE27D90049"),  // Apple Audio
     ]
 
     func execute(peripheralID: UUID, serviceUUID: String, characteristicUUID: String,
@@ -78,8 +90,12 @@ final class BLEReadExecutor: NSObject {
                 overallTimeoutWork = work
                 queue.asyncAfter(deadline: .now() + commandTimeout, execute: work)
             }
-            central = CBCentralManager(delegate: self, queue: queue,
-                                       options: [CBCentralManagerOptionShowPowerAlertKey: false])
+            // Use restore identifier for background state persistence (Cloud Battery approach)
+            let options: [String: Any] = [
+                CBCentralManagerOptionShowPowerAlertKey: false,
+                CBCentralManagerOptionRestoreIdentifierKey: "com.ioswidget.bleread.restoration"
+            ]
+            central = CBCentralManager(delegate: self, queue: queue, options: options)
         }
     }
 
@@ -96,6 +112,23 @@ final class BLEReadExecutor: NSObject {
         guard let p = peripheral else { return }
         central?.cancelPeripheralConnection(p)
     }
+
+    // MARK: - Cloud Battery: Try to find peripheral from system-connected devices
+    private func findSystemConnectedPeripheral(_ central: CBCentralManager) -> CBPeripheral? {
+        // Try Battery Service first (most common for Cloud Battery)
+        let batteryConnected = central.retrieveConnectedPeripherals(withServices: [CBUUID(string: "180F")])
+        if let found = batteryConnected.first(where: { $0.identifier == targetPeripheralID }) {
+            return found
+        }
+
+        // Try extended service UUIDs
+        let extendedConnected = central.retrieveConnectedPeripherals(withServices: extendedServiceUUIDs)
+        if let found = extendedConnected.first(where: { $0.identifier == targetPeripheralID }) {
+            return found
+        }
+
+        return nil
+    }
 }
 
 // MARK: - CBCentralManagerDelegate
@@ -109,15 +142,22 @@ extension BLEReadExecutor: CBCentralManagerDelegate {
         guard let targetID = targetPeripheralID else {
             resume(.failure(BLEReadError.deviceNotFound)); return
         }
-        // Try already-connected peripherals first (no scan, no battery cost).
-        let connected = central.retrieveConnectedPeripherals(withServices: knownServiceUUIDs)
-        if let found = connected.first(where: { $0.identifier == targetID }) {
+
+        // Step 1: Try to find from system-connected devices (Cloud Battery approach)
+        // This works for AirPods, Apple Watch, and other iOS-managed devices
+        if let found = findSystemConnectedPeripheral(central) {
             found.delegate = self
             peripheral = found
-            central.connect(found, options: nil)
+            // If already connected by system, discover services directly
+            if found.state == .connected {
+                found.discoverServices(nil)
+            } else {
+                central.connect(found, options: nil)
+            }
             return
         }
-        // Also try retrieve by identifier (cached from prior sessions).
+
+        // Step 2: Try retrieve by identifier (cached from prior sessions)
         let retrieved = central.retrievePeripherals(withIdentifiers: [targetID])
         if let found = retrieved.first {
             found.delegate = self
@@ -125,11 +165,22 @@ extension BLEReadExecutor: CBCentralManagerDelegate {
             central.connect(found, options: nil)
             return
         }
-        // Fall back to scan. If timeout is 0, skip scan — only fire if already cached.
+
+        // Step 3: Fall back to scan. If timeout is 0, skip scan.
         guard commandTimeout > 0 else {
             resume(.failure(BLEReadError.deviceNotFound)); return
         }
         central.scanForPeripherals(withServices: nil, options: nil)
+    }
+
+    func centralManager(_ central: CBCentralManager, willRestoreState dict: [String: Any]) {
+        // Restore state from background - handle reconnected peripherals
+        if let peripherals = dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral],
+           let targetID = targetPeripheralID,
+           let found = peripherals.first(where: { $0.identifier == targetID }) {
+            peripheral = found
+            found.delegate = self
+        }
     }
 
     func centralManager(_ central: CBCentralManager, didDiscover peripheral: CBPeripheral,
@@ -142,6 +193,7 @@ extension BLEReadExecutor: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        // Discover all services - for Cloud Battery devices, Battery Service will be available
         peripheral.discoverServices(nil)
     }
 
