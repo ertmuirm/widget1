@@ -1,115 +1,5 @@
 import Foundation
 import CoreBluetooth
-import ObjectiveC
-
-// MARK: - BLE Read Error
-
-enum BLEReadError: LocalizedError {
-    case deviceNotFound
-    case characteristicNotFound
-    case readTimeout
-    case connectionFailed
-    case bluetoothNotReady
-
-    var errorDescription: String? {
-        switch self {
-        case .deviceNotFound: return "BLE device not found"
-        case .characteristicNotFound: return "Battery characteristic not found"
-        case .readTimeout: return "Read timed out"
-        case .connectionFailed: return "Failed to connect to device"
-        case .bluetoothNotReady: return "Bluetooth is not ready"
-        }
-    }
-}
-
-// MARK: - Battery Read Delegate
-
-private class BatteryReadDelegate: NSObject, CBPeripheralDelegate {
-    let peripheral: CBPeripheral
-    var continuation: CheckedContinuation<Void, Error>?
-    var serviceContinuation: CheckedContinuation<Void, Error>?
-    var readContinuation: CheckedContinuation<Int, Error>?
-    private var batteryLevel: Int?
-    private var hasResumed = false
-
-    init(peripheral: CBPeripheral, continuation: CheckedContinuation<Void, Error>) {
-        self.peripheral = peripheral
-        self.continuation = continuation
-        super.init()
-    }
-
-    init(peripheral: CBPeripheral, serviceContinuation: CheckedContinuation<Void, Error>) {
-        self.peripheral = peripheral
-        self.serviceContinuation = serviceContinuation
-        super.init()
-    }
-
-    func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        guard !hasResumed else { return }
-
-        if let error = error {
-            serviceContinuation?.resume(throwing: error)
-            hasResumed = true
-            return
-        }
-
-        guard let services = peripheral.services,
-              let batteryService = services.first(where: { $0.uuid == BLEManager.batteryServiceUUID })
-        else {
-            serviceContinuation?.resume(throwing: BLEReadError.characteristicNotFound)
-            hasResumed = true
-            return
-        }
-
-        peripheral.discoverCharacteristics([BLEManager.batteryCharacteristicUUID], for: batteryService)
-    }
-
-    func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
-        guard !hasResumed else { return }
-
-        if let error = error {
-            serviceContinuation?.resume(throwing: error)
-            hasResumed = true
-            return
-        }
-
-        guard let chars = service.characteristics,
-              chars.contains(where: { $0.uuid == BLEManager.batteryCharacteristicUUID })
-        else {
-            serviceContinuation?.resume(throwing: BLEReadError.characteristicNotFound)
-            hasResumed = true
-            return
-        }
-
-        serviceContinuation?.resume()
-        hasResumed = true
-    }
-
-    func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-        guard !hasResumed else { return }
-
-        if characteristic.uuid == BLEManager.batteryCharacteristicUUID {
-            if let error = error {
-                readContinuation?.resume(throwing: error)
-            } else if let data = characteristic.value, let level = data.first {
-                readContinuation?.resume(returning: Int(level))
-            } else {
-                readContinuation?.resume(throwing: BLEReadError.readTimeout)
-            }
-            hasResumed = true
-        }
-    }
-
-    func peripheral(_ peripheral: CBPeripheral, didConnect peripheral: CBPeripheral) {
-        continuation?.resume()
-    }
-
-    func peripheral(_ peripheral: CBPeripheral, didFailToConnect error: Error?) {
-        guard !hasResumed else { return }
-        readContinuation?.resume(throwing: error ?? BLEReadError.connectionFailed)
-        hasResumed = true
-    }
-}
 
 // MARK: - Log entry
 
@@ -388,82 +278,39 @@ final class BLEManager: NSObject, ObservableObject {
 
     // MARK: - Battery Service (Cloud Battery approach)
 
-    /// Retrieve peripherals that have the Battery Service from iOS paired device stack
-    /// This bypasses the GATT service hiding filter for system accessories
+    /// Retrieve peripherals that have the Battery Service from iOS paired device stack.
+    /// This bypasses the GATT service hiding filter for system accessories.
     func retrieveBatteryPeripherals() -> [CBPeripheral] {
         let peripherals = central.retrieveConnectedPeripherals(withServices: [BLEManager.batteryServiceUUID])
         log("retrieveBatteryPeripherals: found \(peripherals.count) peripheral(s) with Battery Service", category: .conn)
         return peripherals
     }
 
-    /// Read battery level from a specific peripheral using the Cloud Battery approach
-    /// 1. Retrieve from system paired devices
-    /// 2. Connect and discover only battery service
-    /// 3. Read battery characteristic
+    /// Read battery level from a specific peripheral using the Cloud Battery approach.
+    /// Uses BLEReadExecutor which handles connection, service discovery, and reading.
     func readBatteryLevel(for peripheralID: UUID) async throws -> Int {
         log("Reading battery level for \(peripheralID)", category: .info)
 
-        // Step 1: Try to get from iOS paired device stack
+        // First, try to get from iOS paired device stack
         let batteryPeripherals = retrieveBatteryPeripherals()
-        var targetPeripheral: CBPeripheral?
-
         if let p = batteryPeripherals.first(where: { $0.identifier == peripheralID }) {
-            targetPeripheral = p
             log("Found peripheral in iOS paired device stack", category: .conn)
-        } else {
-            // Step 2: Try retrievePeripherals from cache
-            let cached = central.retrievePeripherals(withIdentifiers: [peripheralID])
-            if let p = cached.first {
-                targetPeripheral = p
-                log("Found peripheral in cache", category: .conn)
-            }
         }
 
-        guard let peripheral = targetPeripheral else {
-            throw BLEReadError.deviceNotFound
-        }
+        // Use BLEReadExecutor to handle the full read operation
+        let executor = BLEReadExecutor()
+        let data = try await executor.execute(
+            peripheralID: peripheralID,
+            serviceUUID: BLEManager.batteryServiceUUID.uuidString,
+            characteristicUUID: BLEManager.batteryCharacteristicUUID.uuidString,
+            timeout: 10
+        )
 
-        // Step 3: Connect if not already connected
-        if peripheral.state != .connected {
-            log("Connecting to peripheral for battery read...", category: .conn)
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                let delegate = BatteryReadDelegate(peripheral: peripheral, continuation: continuation)
-                // Store delegate temporarily
-                objc_setAssociatedObject(peripheral, "batteryDelegate", delegate, .OBJC_ASSOCIATION_RETAIN)
-                peripheral.delegate = delegate
-                central.connect(peripheral, options: nil)
-            }
+        // Battery level is a single byte (0-100)
+        guard let level = data.first else {
+            throw BLEReadError.readFailed("No data received")
         }
-
-        // Step 4: Discover battery service
-        peripheral.discoverServices([BLEManager.batteryServiceUUID])
-
-        // Step 5: Wait for service discovery and read
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            if let existingDelegate = objc_getAssociatedObject(peripheral, "batteryDelegate") as? BatteryReadDelegate {
-                existingDelegate.serviceContinuation = continuation
-            } else {
-                let delegate = BatteryReadDelegate(peripheral: peripheral, serviceContinuation: continuation)
-                objc_setAssociatedObject(peripheral, "batteryDelegate", delegate, .OBJC_ASSOCIATION_RETAIN)
-                peripheral.delegate = delegate
-            }
-        }
-
-        // Step 6: Read battery characteristic
-        guard let services = peripheral.services,
-              let batteryService = services.first(where: { $0.uuid == BLEManager.batteryServiceUUID }),
-              let batteryChar = batteryService.characteristics?.first(where: { $0.uuid == BLEManager.batteryCharacteristicUUID })
-        else {
-            throw BLEReadError.characteristicNotFound
-        }
-
-        // Read value
-        return try await withCheckedThrowingContinuation { continuation in
-            if let delegate = objc_getAssociatedObject(peripheral, "batteryDelegate") as? BatteryReadDelegate {
-                delegate.readContinuation = continuation
-            }
-            peripheral.readValue(for: batteryChar)
-        }
+        return Int(level)
     }
 
     // MARK: - Write (uses selectedWriteTarget)
