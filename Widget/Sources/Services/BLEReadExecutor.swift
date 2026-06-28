@@ -47,8 +47,20 @@ final class BLEReadExecutor: NSObject {
     private var pendingServiceCount = 0
     private var discoveredServiceCount = 0
 
-    /// Extended service UUIDs for Cloud Battery approach - includes many services
-    /// that might contain battery or other readable characteristics
+    // Battery read mode - scans all characteristics to find battery indicator
+    private var isBatteryReadMode = false
+    private var discoveredCharacteristics: [(service: CBService, characteristic: CBCharacteristic)] = []
+    private var characteristicsToRead: [(service: CBService, characteristic: CBCharacteristic)] = []
+
+    /// Common battery characteristic UUIDs (standard BLE)
+    private let batteryCharacteristicUUIDs: [CBUUID] = [
+        CBUUID(string: "2A19"),  // Battery Level (standard)
+        CBUUID(string: "2A25"),  // Battery Level (alternate)
+        CBUUID(string: "2A26"),  // Battery Level State
+        CBUUID(string: "2A27"),  // Battery Level Power State
+    ]
+
+    /// Extended service UUIDs for Cloud Battery approach
     private let extendedServiceUUIDs: [CBUUID] = [
         // Standard BLE services
         CBUUID(string: "180F"),  // Battery Service
@@ -75,6 +87,9 @@ final class BLEReadExecutor: NSObject {
         didRead = false
         pendingServiceCount = 0
         discoveredServiceCount = 0
+        isBatteryReadMode = serviceUUID.isEmpty || characteristicUUID.isEmpty
+        discoveredCharacteristics = []
+        characteristicsToRead = []
 
         return try await withCheckedThrowingContinuation { [self] (cont: CheckedContinuation<Data, Error>) in
             continuation = cont
@@ -128,6 +143,37 @@ final class BLEReadExecutor: NSObject {
         }
 
         return nil
+    }
+
+    // MARK: - Battery Detection Helper
+    private func isLikelyBatteryValue(_ data: Data) -> Bool {
+        // Battery level is typically a single byte with value 0-100
+        guard data.count >= 1, data.count <= 4 else { return false }
+        
+        // Check if all bytes could represent a battery percentage (0-100)
+        if data.count == 1 {
+            let value = data[0]
+            return value <= 100
+        }
+        
+        // For multi-byte values, check if reading as little-endian gives 0-100
+        if data.count == 2 {
+            let value = UInt16(data[0]) | (UInt16(data[1]) << 8)
+            return value <= 100
+        }
+        
+        return false
+    }
+
+    private func readNextBatteryCharacteristic() {
+        guard !characteristicsToRead.isEmpty else {
+            // No more characteristics to try
+            resume(.failure(BLEReadError.characteristicNotFound))
+            return
+        }
+
+        let next = characteristicsToRead.removeFirst()
+        peripheral?.readValue(for: next.characteristic)
     }
 }
 
@@ -222,13 +268,9 @@ extension BLEReadExecutor: CBPeripheralDelegate {
         pendingServiceCount = services.count
         discoveredServiceCount = 0
         
-        // If we have a specific service UUID, only discover characteristics for that service
-        if let targetSvc = targetServiceUUID,
-           let service = services.first(where: { $0.uuid == targetSvc }) {
-            peripheral.discoverCharacteristics([targetCharUUID!], for: service)
-        } else {
-            // Discover all characteristics to find the target
-            for svc in services { peripheral.discoverCharacteristics(nil, for: svc) }
+        // Discover characteristics for all services
+        for svc in services { 
+            peripheral.discoverCharacteristics(nil, for: svc)
         }
     }
 
@@ -237,36 +279,114 @@ extension BLEReadExecutor: CBPeripheralDelegate {
         if let error { resume(.failure(error)); return }
         discoveredServiceCount += 1
 
-        guard let targetChar = targetCharUUID,
-              let char = service.characteristics?.first(where: { $0.uuid == targetChar })
-        else {
-            // Check if we've discovered all services and still haven't found the characteristic
-            if discoveredServiceCount == pendingServiceCount && !didRead {
-                resume(.failure(BLEReadError.characteristicNotFound))
+        guard let chars = service.characteristics, !chars.isEmpty else {
+            if discoveredServiceCount == pendingServiceCount {
+                // All services discovered, handle based on mode
+                if isBatteryReadMode {
+                    handleBatteryModeServiceDiscoveryComplete()
+                } else if !didRead {
+                    resume(.failure(BLEReadError.characteristicNotFound))
+                }
             }
             return
         }
 
-        // Read the characteristic value
-        peripheral.readValue(for: char)
+        // Collect all readable characteristics
+        for char in chars {
+            let hasReadProperty = char.properties.contains(.read)
+            let isBatteryUUID = batteryCharacteristicUUIDs.contains(char.uuid)
+
+            if isBatteryReadMode {
+                // In battery mode, collect all readable characteristics
+                if hasReadProperty {
+                    discoveredCharacteristics.append((service: service, characteristic: char))
+                    characteristicsToRead.append((service: service, characteristic: char))
+                }
+            } else {
+                // Specific target mode - look for exact match
+                guard let targetChar = targetCharUUID,
+                      let targetSvc = targetServiceUUID
+                else {
+                    if discoveredServiceCount == pendingServiceCount && !didRead {
+                        resume(.failure(BLEReadError.characteristicNotFound))
+                    }
+                    return
+                }
+
+                if char.uuid == targetChar && service.uuid == targetSvc {
+                    // Found the exact characteristic - read it
+                    peripheral.readValue(for: char)
+                    return
+                }
+            }
+        }
+
+        // Check if we've discovered all services
+        if discoveredServiceCount == pendingServiceCount && !didRead {
+            if isBatteryReadMode {
+                handleBatteryModeServiceDiscoveryComplete()
+            } else {
+                resume(.failure(BLEReadError.characteristicNotFound))
+            }
+        }
+    }
+
+    private func handleBatteryModeServiceDiscoveryComplete() {
+        // Sort characteristics to try standard battery UUIDs first
+        characteristicsToRead.sort { a, b in
+            let aIsBattery = batteryCharacteristicUUIDs.contains(a.characteristic.uuid)
+            let bIsBattery = batteryCharacteristicUUIDs.contains(b.characteristic.uuid)
+            if aIsBattery && !bIsBattery { return true }
+            if !aIsBattery && bIsBattery { return false }
+            return a.characteristic.uuid.uuidString < b.characteristic.uuid.uuidString
+        }
+
+        // Start reading characteristics
+        readNextBatteryCharacteristic()
     }
 
     func peripheral(_ peripheral: CBPeripheral,
                     didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
         if let error {
-            if !didRead { resume(.failure(BLEReadError.readFailed(error.localizedDescription))) }
+            // On read error, try next characteristic
+            if isBatteryReadMode && !characteristicsToRead.isEmpty {
+                readNextBatteryCharacteristic()
+            } else if !didRead {
+                resume(.failure(BLEReadError.readFailed(error.localizedDescription)))
+            }
             return
         }
 
-        guard characteristic.uuid == targetCharUUID,
-              let data = characteristic.value
-        else {
-            if !didRead { resume(.failure(BLEReadError.readFailed("No data received"))) }
+        guard let data = characteristic.value else {
+            // No data, try next characteristic
+            if isBatteryReadMode && !characteristicsToRead.isEmpty {
+                readNextBatteryCharacteristic()
+            } else if !didRead {
+                resume(.failure(BLEReadError.readFailed("No data received")))
+            }
             return
         }
 
-        didRead = true
-        disconnect()
-        resume(.success(data))
+        if isBatteryReadMode {
+            // Check if this looks like a battery value
+            if isLikelyBatteryValue(data) {
+                // Success! Found a battery-like value
+                didRead = true
+                disconnect()
+                resume(.success(data))
+            } else if !characteristicsToRead.isEmpty {
+                // Not a battery value, try next
+                readNextBatteryCharacteristic()
+            } else {
+                // No more to try
+                resume(.failure(BLEReadError.characteristicNotFound))
+            }
+        } else {
+            // Specific target mode
+            guard characteristic.uuid == targetCharUUID else { return }
+            didRead = true
+            disconnect()
+            resume(.success(data))
+        }
     }
 }

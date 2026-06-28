@@ -354,6 +354,7 @@ final class BLEManager: NSObject, ObservableObject {
 
     /// Read battery level from a specific peripheral using the Cloud Battery approach.
     /// Uses BLEReadExecutor which handles connection, service discovery, and reading.
+    /// Automatically discovers all services and characteristics to find battery value.
     func readBatteryLevel(for peripheralID: UUID) async throws -> Int {
         log("Reading battery level for \(peripheralID)", category: .info)
 
@@ -363,16 +364,17 @@ final class BLEManager: NSObject, ObservableObject {
             log("Found peripheral in iOS paired device stack", category: .conn)
         }
 
-        // Use BLEReadExecutor to handle the full read operation
+        // Use BLEReadExecutor with empty service/characteristic to trigger auto-discover mode
+        // This will scan ALL services and characteristics to find battery-like values
         let executor = BLEReadExecutor()
         let data = try await executor.execute(
             peripheralID: peripheralID,
-            serviceUUID: BLEManager.batteryServiceUUID.uuidString,
-            characteristicUUID: BLEManager.batteryCharacteristicUUID.uuidString,
-            timeout: 10
+            serviceUUID: "",  // Empty triggers auto-discover mode
+            characteristicUUID: "",  // Empty triggers auto-discover mode
+            timeout: 15  // Longer timeout for full discovery
         )
 
-        // Battery level is a single byte (0-100)
+        // Battery level is typically a single byte (0-100)
         guard let level = data.first else {
             throw BLEReadError.readFailed("No data received")
         }
