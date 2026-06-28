@@ -260,9 +260,45 @@ enum BLEDataFormat: String, AppEnum {
     ]
 }
 
+// MARK: - Read BLE Battery Intent
+
+/// Reads the battery level from a paired BLE device using the Battery Service (180F/2A19).
+/// This uses the Cloud Battery approach to bypass iOS GATT service hiding for system accessories.
+struct ReadBLEBatteryIntent: AppIntent {
+    static var title: LocalizedStringResource = "Read BLE Battery"
+    static var description = IntentDescription("Reads the battery level from a paired BLE device. Works with system accessories that iOS normally hides from third-party apps.")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "Device", description: "The saved BLE device to read battery from")
+    var device: SavedBLEEntity
+
+    init() {}
+    init(device: SavedBLEEntity) {
+        self.device = device
+    }
+
+    func perform() async throws -> some IntentResult & ReturnsValue<Int> & ProvidesDialog {
+        guard let savedDevice = BLEDeviceStore.shared.device(withIDString: device.id) else {
+            return .result(value: 0, dialog: IntentDialog(stringLiteral: "Device \(device.name) not found. Open the app and save the device first."))
+        }
+
+        do {
+            let batteryLevel = try await BLEManager.shared.readBatteryLevel(for: savedDevice.id)
+            return .result(
+                value: batteryLevel,
+                dialog: IntentDialog(stringLiteral: "\(device.name) battery: \(batteryLevel)%")
+            )
+        } catch let err as BLEReadError {
+            return .result(value: 0, dialog: IntentDialog(stringLiteral: err.errorDescription ?? "Battery read failed."))
+        } catch {
+            return .result(value: 0, dialog: IntentDialog(stringLiteral: "Bluetooth error: \(error.localizedDescription)"))
+        }
+    }
+}
+
 // MARK: - App Shortcuts Provider
 
-/// Only expose the two BLE-related intents in Shortcuts.
+/// Only expose the BLE-related intents in Shortcuts.
 /// Other AppIntents (NoOpIntent, AdvanceImageIntent) are for widget button use only.
 struct WidgetShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
@@ -283,6 +319,15 @@ struct WidgetShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "Read BLE Data",
             systemImageName: "sensor.tag.radiowaves.forward"
+        )
+        AppShortcut(
+            intent: ReadBLEBatteryIntent(),
+            phrases: [
+                "Read BLE Battery with \(.applicationName)",
+                "Check \(.applicationName) device battery"
+            ],
+            shortTitle: "Read BLE Battery",
+            systemImageName: "battery.100"
         )
     }
 }
