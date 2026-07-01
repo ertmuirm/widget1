@@ -1,4 +1,5 @@
 import UIKit
+import UserNotifications
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
@@ -13,6 +14,10 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         ) { _ in
             AppDelegate.drainPendingRemoteCommand()
         }
+
+        // Request notification permissions for toast notifications
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+
         return true
     }
 
