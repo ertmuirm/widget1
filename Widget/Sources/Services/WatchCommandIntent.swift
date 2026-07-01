@@ -125,3 +125,19 @@ struct SendWatchCommandIntent: AppIntent {
         }
     }
 }
+
+// MARK: - App Shortcuts Provider
+
+struct WatchCommandShortcutsProvider: AppShortcutsProvider {
+    static var appShortcuts: [AppShortcut] {
+        AppShortcut(
+            intent: SendWatchCommandIntent(),
+            phrases: [
+                "Send BLE command in \(.applicationName)",
+                "Send watch command",
+            ],
+            shortTitle: "Send BLE Command",
+            systemImageName: "antenna.radiowaves.left.and.right"
+        )
+    }
+}

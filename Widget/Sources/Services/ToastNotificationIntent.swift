@@ -56,11 +56,12 @@ struct ToastShortcutsProvider: AppShortcutsProvider {
         AppShortcut(
             intent: ToastNotificationIntent(),
             phrases: [
+                "Show notification in \(.applicationName)",
                 "Show toast in \(.applicationName)",
                 "Trigger toast notification",
                 "Display custom toast"
             ],
-            shortTitle: "Trigger Toast",
+            shortTitle: "Show Notification",
             systemImageName: "bell.badge"
         )
     }
