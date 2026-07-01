@@ -29,7 +29,7 @@ struct ToastNotificationIntent: AppIntent {
         // Create notification content
         let content = UNMutableNotificationContent()
         content.body = message
-        content.sound = UNNotificationSoundName("ToastSound.wav")
+        content.sound = UNNotificationSound(named: UNNotificationSoundName("ToastSound.wav"))
 
         // Schedule notification with 1-second delay for instant delivery
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
