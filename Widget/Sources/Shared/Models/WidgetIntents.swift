@@ -842,6 +842,7 @@ struct ClockBroadcastProvider: AppIntentTimelineProvider {
 struct NoOpIntent: AppIntent {
     static var title: LocalizedStringResource = "No Action"
     static var openAppWhenRun: Bool = false
+    static var isDiscoverable: Bool = false
     func perform() async throws -> some IntentResult { .result() }
 }
 
@@ -853,6 +854,7 @@ struct NoOpIntent: AppIntent {
 struct AdvanceImageIntent: AppIntent {
     static var title: LocalizedStringResource = "Advance Slide"
     static var openAppWhenRun: Bool = false
+    static var isDiscoverable: Bool = false
 
     @Parameter(title: "Widget ID")   var widgetID: String
     @Parameter(title: "Forward")     var forward: Bool

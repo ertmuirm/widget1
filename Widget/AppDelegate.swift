@@ -1,9 +1,14 @@
 import UIKit
+import UserNotifications
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         LocalActionServer.shared.start()
+        
+        // Request notification permissions for toast notifications
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        
         // UIApplicationDelegate.applicationDidBecomeActive is intercepted by SwiftUI's
         // scene lifecycle and does not fire reliably. NotificationCenter fires in all cases.
         NotificationCenter.default.addObserver(
