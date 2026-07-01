@@ -4,7 +4,7 @@ import CoreBluetooth
 // MARK: - Read BLE Data Intent
 
 /// Self-contained BLE reader for use from App Intents.
-final class BLEReadExecutor: NSObject, NSObject {
+final class BLEReadExecutor: NSObject {
     private let queue = DispatchQueue(label: "com.ioswidget.ble-read-executor", qos: .userInitiated)
     private var central: CBCentralManager?
     private var peripheral: CBPeripheral?
@@ -158,7 +158,7 @@ extension BLEReadExecutor: CBPeripheralDelegate {
     
     func peripheral(_ peripheral: CBPeripheral,
                     didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
-        if let error { return } // Ignore errors on update, we might get more data later
+        guard error == nil else { return } // Ignore errors on update, we might get more data later
         if let value = characteristic.value, !value.isEmpty {
             readData = value
             // Disconnect after receiving data

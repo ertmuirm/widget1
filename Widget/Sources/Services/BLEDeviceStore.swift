@@ -16,6 +16,7 @@ struct SavedBLEDevice: Codable, Identifiable {
     var id: UUID               // CBPeripheral.identifier
     var name: String
     var writeTargetUUID: String
+    var readTargetUUID: String
     var vibrationPresets: [BLEPreset]
     var notificationPresets: [BLEPreset]
 }

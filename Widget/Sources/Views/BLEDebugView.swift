@@ -383,6 +383,7 @@ struct BLEDebugView: View {
                         id: p.identifier,
                         name: p.name ?? "Unknown",
                         writeTargetUUID: target.uuid,
+                        readTargetUUID: "",
                         vibrationPresets: vibrationPresets,
                         notificationPresets: notificationPresets
                     )
